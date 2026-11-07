@@ -219,3 +219,11 @@ dialog::backdrop {background:#05080bbc}
 .unit-poster-caption svg { color: var(--gold); }
 .unit-card.unit-poster:hover { border-color: var(--gold); }
 @media (max-width: 520px) { .unit-grid:has(.unit-poster) { grid-template-columns: 1fr; } }
+
+.unit-copy { white-space: pre-wrap; overflow-wrap: anywhere; }
+.unit-news-item + .unit-news-item { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 18px; }
+.unit-news-item h3 { margin: 8px 0 0; }
+.unit-news-item time { color: var(--muted); font-size: 12px; }
+.unit-editor-section { border-top: 1px solid var(--line); padding: 12px 0; }
+.unit-editor-section summary { cursor: pointer; color: var(--gold); font-weight: 700; }
+.unit-editor-section form { margin-top: 12px; }

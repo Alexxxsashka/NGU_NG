@@ -12,9 +12,9 @@ type ServiceCard={
  rank_name:string|null;
  rank:number|null;
  active:boolean;
+ unit_id:string|null;
  joined_on:string|null;
  position:string|null;
- commander:boolean;
  reports:string;
  approved_quantity:string;
  approved_points:string;
@@ -23,9 +23,8 @@ type ServiceCard={
 
 export async function ServiceTablet({user}:{user:Viewer}){
  const [card]=await query<ServiceCard>(`
-  SELECT p.static_id,p.first_name,p.last_name,p.active,p.rank,u.name AS unit_name,k.name AS rank_name,
+  SELECT p.static_id,CASE WHEN u.active THEN u.id END AS unit_id,p.first_name,p.last_name,p.active,p.rank,u.name AS unit_name,k.name AS rank_name,
          details.value->>'joinedOn' AS joined_on,details.value->>'position' AS position,
-         coalesce(details.value->>'commanderUnitId'=p.unit_id::text,false) AND coalesce(u.active,false) AS commander,
          totals.reports,totals.approved_quantity,totals.approved_points,totals.pending_items
   FROM personnel p
   LEFT JOIN units u ON u.id=p.unit_id
@@ -77,8 +76,8 @@ export async function ServiceTablet({user}:{user:Viewer}){
     <Icon size={19} aria-hidden="true"/><dt>{label}</dt><dd>{number(value)}</dd>
    </div>)}</dl>
   </section>}
-  {card?.active&&card.commander&&<div className="service-actions">
-   <Link className="button secondary" href="/my-unit"><Users size={17} aria-hidden="true"/>Мій підрозділ</Link>
+  {card?.active&&card.unit_id&&<div className="service-actions">
+   <Link className="button secondary" href={'/units/'+card.unit_id}><Users size={17} aria-hidden="true"/>Мій підрозділ</Link>
   </div>}
  </section>;
 }

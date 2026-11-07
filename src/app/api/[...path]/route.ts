@@ -8,6 +8,7 @@ import { currentWeek } from '@/lib/domain';
 import { week,staticId } from '@/lib/validation';
 import { filters,listReports,submitReport } from '@/lib/reports';
 import { saveTask,changePeriod,reviewItems,deleteReportItem,adjustAward,saveSettings,savePerson,reviewClaim,linkReport,changeRole,issueRecovery } from '@/lib/admin';
+import { updateUnitPage } from '@/lib/unit-page';
 import { assignService } from '@/lib/service-assignment';
 import { unitMatrix } from '@/lib/matrix';
 import { bootstrap,recover } from '@/lib/accounts';
@@ -41,6 +42,7 @@ export async function POST(request:Request,ctx:Context){try{
   if(path==='bootstrap')return json(await bootstrap(request,input));
   if(path==='recover')return json(await recover(request,input));
   if(path==='me/claims'){const u=await member(request);const p=z.object({staticId}).parse(input);return json(await transaction(async c=>{await lockStaticClaims(c);if((await c.query("SELECT id FROM profile_claims WHERE user_id=$1 AND status='pending'",[u.id])).rows.length)throw new HttpError('У вас уже є заявка на перевірці.');if((await c.query('SELECT id FROM personnel WHERE user_id=$1',[u.id])).rows.length)throw new HttpError('Ваш профіль уже прив’язаний.');await reserveStatic(c,p.staticId,u.id);return {saved:true};}));}
+  if(path.startsWith('units/')&&path.split('/').length===2)return json(await updateUnitPage(path.split('/')[1],input,await member(request)));
   const u=await admin(request);
   const actions:Record<string,(input:unknown)=>Promise<unknown>>={
     'admin/tasks':i=>saveTask(i,u),'admin/periods':i=>changePeriod(i,u),'admin/review':i=>reviewItems(i,u),'admin/reports/delete-item':i=>deleteReportItem(i,u),'admin/award':i=>adjustAward(i,u),

@@ -1,0 +1,53 @@
+'use client';
+import {useRouter} from 'next/navigation';
+import {useState} from 'react';
+import {api,Field,Notice} from './ui';
+
+const infoFields=[['overview','Про підрозділ'],['schedule','Розклад і заходи'],['rules','Правила та матеріали'],['contacts','Контакти командування']] as const;
+type Info=Record<(typeof infoFields)[number][0],string>;
+export function UnitEditor({unitId,info,news}:{unitId:string;info:Info;news:{id:string;title:string}[]}){
+ const router=useRouter();
+ const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
+ async function save(body:unknown,form?:HTMLFormElement){
+  setBusy(true);setError('');setMessage('');
+  try{await api('units/'+unitId,body);form?.reset();setMessage('Зміни збережено.');router.refresh();}
+  catch(e){setError((e as Error).message);}
+  finally{setBusy(false);}
+ }
+ return <section className="panel" id="unit-management">
+  <h2>Керування підрозділом</h2>
+  {error&&<Notice error>{error}</Notice>}{message&&<Notice>{message}</Notice>}
+  <details className="unit-editor-section">
+   <summary>Редагувати службову інформацію</summary>
+   <form className="stack" onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);void save({kind:'content',content:Object.fromEntries(data)});}}>
+    {infoFields.map(([name,label])=><Field key={name} label={label}><textarea name={name} rows={3} maxLength={name==='contacts'?2000:name==='schedule'?3000:4000} defaultValue={info[name]}/></Field>)}
+    <button disabled={busy}>Зберегти інформацію</button>
+   </form>
+  </details>
+  <details className="unit-editor-section">
+   <summary>Опублікувати новину або оголошення</summary>
+   <form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;void save({kind:'publish',...Object.fromEntries(new FormData(form))},form);}}>
+    <Field label="Тип"><select name="type"><option value="news">Новина</option><option value="announcement">Оголошення</option></select></Field>
+    <Field label="Заголовок"><input name="title" required maxLength={100}/></Field>
+    <Field label="Текст"><textarea name="body" required rows={4} maxLength={3000}/></Field>
+    <button disabled={busy}>Опублікувати</button>
+   </form>
+  </details>
+  <details className="unit-editor-section">
+   <summary>Надати або відкликати доступ бійця</summary>
+   <form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);void save({kind:'member',staticId:data.get('staticId'),grant:data.get('grant')==='yes'},form);}}>
+    <p>Вкажіть Static ID бійця з активним кадровим профілем. Переведення з іншого підрозділу виконує адміністратор.</p>
+    <Field label="Static ID"><input name="staticId" inputMode="numeric" pattern="[0-9]{1,30}" required/></Field>
+    <Field label="Дія"><select name="grant"><option value="yes">Надати доступ</option><option value="no">Відкликати доступ</option></select></Field>
+    <button disabled={busy}>Зберегти доступ</button>
+   </form>
+  </details>
+  <details className="unit-editor-section">
+   <summary>Керувати публікаціями</summary>
+   <form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const id=new FormData(form).get('id');if(id&&confirm('Видалити вибрану публікацію?'))void save({kind:'remove-news',id},form);}}>
+    <Field label="Публікація"><select name="id" required defaultValue=""><option value="">Оберіть публікацію</option>{news.map(item=><option key={item.id} value={item.id}>{item.title}</option>)}</select></Field>
+    <button disabled={busy||news.length===0}>Видалити вибрану публікацію</button>
+   </form>
+  </details>
+ </section>;
+}

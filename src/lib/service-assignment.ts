@@ -16,7 +16,9 @@ const assignment=z.object({
 
 export async function assignService(input:unknown,actor:Viewer){
  const p=assignment.parse(input);
- if(p.commander&&!p.unitId)throw new HttpError('Для командира оберіть підрозділ.');
+ const leadPosition=/^(командир|командир підрозділу|заступник командира|заступник командира підрозділу|зам\.?\s*командира)$/iu.test(p.position);
+ const canManage=p.commander||leadPosition;
+ if(canManage&&!p.unitId)throw new HttpError('Для командира оберіть підрозділ.');
  return transaction(async c=>{
   await lockAdmin(c,actor);
   await lockStaticClaims(c);
@@ -43,7 +45,7 @@ export async function assignService(input:unknown,actor:Viewer){
   `,values);
   const key='service:'+profile.id;
   const {rows:[old]}=await c.query('SELECT value FROM settings WHERE key=$1',[key]);
-  const details={joinedOn:p.joinedOn,position:p.position,commanderUnitId:p.commander?p.unitId:null};
+  const details={joinedOn:p.joinedOn,position:p.position,commanderUnitId:canManage?p.unitId:null};
   await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=excluded.value',[key,JSON.stringify(details)]);
   await c.query("UPDATE profile_claims SET status='approved',reason='Кадровий профіль призначено адміністратором',reviewed_by=$1 WHERE user_id=$2 AND static_id::numeric=$3::text::numeric AND status='pending'",[actor.id,p.userId,staticId]);
   await audit(c,actor,'personnel.assign',profile.id,{profile:previous??null,details:old?.value??null},{...p,staticId,details});

@@ -8,7 +8,7 @@ import {AdminWorkspace} from '@/components/admin-workspace';
 import {PortalPreview} from '@/components/portal-preview';
 import {adminPortalRoutes,portalPreviews} from '@/lib/portal-navigation';
 import {Personal} from '@/components/personal';
-import {CommandRoster} from '@/components/command-roster';
+import {UnitSpace} from '@/components/unit-space';
 import {ServiceTablet} from '@/components/service-tablet';
 export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string}>}){
  const {slug}=await params;const path=slug.join('/');
@@ -22,7 +22,7 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
  </section>;
  if(path==='weekly-bonus/report')return <ReportForm/>;
  if(['login','register','recover','setup'].includes(path))return <AuthScreen passwordChanged={path==='login'&&(await searchParams).password==='changed'} mode={path as 'login'|'register'|'recover'|'setup'}/>;
- if(path==='my-unit'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/weekly-bonus/me');return <CommandRoster userId={u.id}/>;}
+ if(path==='my-unit'||slug[0]==='units'&&slug.length===2){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/weekly-bonus/me');return <UnitSpace userId={u.id} unitId={slug[1]}/>;}
  if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword} overview={u.mustChangePassword?null:<ServiceTablet user={u}/>}/>;}
  if(slug[0]==='portal'&&slug.length===2&&Object.hasOwn(portalPreviews,slug[1])){
   const section=slug[1];

@@ -25,10 +25,10 @@ export function Personnel(){
   <Field label="Прізвище"><input name="lastName" defaultValue={assignment.last_name??assignment.name.split(' ').slice(1).join(' ')} required/></Field>
   <Field label="Підрозділ"><select name="unit" defaultValue={assignment.unit_id??''}><option value="">Не призначено</option>{catalog.data?.units.filter(u=>u.active).map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></Field>
   <Field label="Звання"><select name="rank" defaultValue={assignment.rank??''}><option value="">Не призначено</option>{catalog.data?.ranks.map(r=><option key={r.id} value={r.id}>{r.name}</option>)}</select></Field>
-  <Field label="Посада"><input name="position" maxLength={100} defaultValue={assignment.details?.position??''}/></Field>
+  <Field label="Посада"><input name="position" maxLength={100} defaultValue={assignment.details?.position??''}/><small>Посади «Командир» і «Заступник командира» надають керування підрозділом.</small></Field>
   <Field label="Дата вступу"><input name="joinedOn" type="date" defaultValue={assignment.details?.joinedOn??''}/></Field>
  </div>
- <label className="checkbox"><input name="commander" type="checkbox" defaultChecked={!!assignment.details?.commanderUnitId&&assignment.details.commanderUnitId===assignment.unit_id}/>Надати перегляд складу цього підрозділу</label>
+ <label className="checkbox"><input name="commander" type="checkbox" defaultChecked={!!assignment.details?.commanderUnitId&&assignment.details.commanderUnitId===assignment.unit_id}/>Делегувати керування сторінкою та складом</label>
  {error&&<Notice error>{error}</Notice>}<button disabled={busy}>Зберегти службові дані</button>
  </form></Modal>}{token&&<Modal title="Тимчасовий пароль" onClose={()=>setToken('')}><Notice>Скопіюйте пароль і передайте власнику. Після закриття він зникне. Гравець має змінити його в кабінеті.</Notice><code className="recovery-code">{token}</code></Modal>}{account&&<Modal title="Редагувати обліковий запис" onClose={()=>setAccount(null)}>
  <form className="stack" onSubmit={e=>{e.preventDefault();const f=new FormData(e.currentTarget);void run('admin/accounts/edit',{userId:account.id,name:f.get('name'),staticId:f.get('staticId')||undefined});}}>
