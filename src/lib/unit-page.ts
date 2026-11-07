@@ -8,15 +8,16 @@ import {HttpError} from './security';
 import {canonicalStaticId} from './validation';
 import type {Viewer} from './domain';
 
-type Access={id:string;name:string;editor:boolean};
+type Access={id:string;name:string;editor:boolean;appoint:boolean};
 const accessSql=`
- SELECT unit.id,unit.name,(account.role='admin' OR global_grant.id IS NOT NULL OR coalesce(d.value->>'commanderUnitId'=unit.id::text AND d.value->>'leadershipRole' IN ('commander','deputy'),false)) AS editor
+ SELECT unit.id,unit.name,(account.role='admin' OR global_grant.id IS NOT NULL OR coalesce(p.rank BETWEEN 11 AND 12 AND d.value->>'commanderUnitId'=unit.id::text AND d.value->>'leadershipRole' IN ('commander','deputy'),false)) AS editor,
+ (account.role='admin' OR global_grant.id IS NOT NULL) AS appoint
  FROM units unit
  JOIN app_user account ON account.id=$1 AND NOT account.must_change_password
  LEFT JOIN LATERAL (
   SELECT leader.id FROM personnel leader
-  JOIN settings grant_record ON grant_record.key='service:'||leader.id::text AND grant_record.value->>'leadershipRole'='leadership'
-  WHERE leader.user_id=account.id AND leader.active
+  WHERE leader.user_id=account.id AND leader.active AND leader.rank BETWEEN 13 AND 15
+  LIMIT 1
  ) global_grant ON true
  LEFT JOIN personnel p ON p.user_id=account.id AND p.active AND p.unit_id=unit.id
  LEFT JOIN settings d ON d.key='service:'||p.id::text
@@ -49,20 +50,21 @@ const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('publish-news-draft'),id:z.uuid()}),
  z.object({kind:z.literal('remove-news'),id:z.string().uuid()}),
  z.object({kind:z.literal('assignment'),staticId:canonicalStaticId,rank:z.number().int().positive().max(2147483647).nullable(),position:z.string().trim().max(100)}),
+ z.object({kind:z.literal('command'),staticId:canonicalStaticId,role:z.enum(['member','commander','deputy'])}),
  z.object({kind:z.literal('member'),staticId:canonicalStaticId,grant:z.boolean()}),
 ]);
 
 async function changeMembership(c:PoolClient,actor:Viewer,unitId:string,id:string,grant:boolean){
  await c.query("SELECT pg_advisory_xact_lock(hashtext('static-account-claims'))");
  const {rows}=await c.query(`
-  SELECT p.id,p.unit_id,p.user_id,u.role,d.value->>'commanderUnitId' AS command_unit,d.value->>'leadershipRole' AS leadership_role
+  SELECT p.id,p.rank,p.unit_id,p.user_id,u.role,d.value->>'commanderUnitId' AS command_unit,d.value->>'leadershipRole' AS leadership_role
   FROM personnel p JOIN app_user u ON u.id=p.user_id
   LEFT JOIN settings d ON d.key='service:'||p.id::text
   WHERE p.static_id::numeric=$1::text::numeric AND p.active
   FOR UPDATE OF p
  `,[id]);
  const target=rows[0];
- if(rows.length!==1||!target||target.role==='admin'||target.leadership_role==='leadership'||target.command_unit||target.user_id===actor.id||
+ if(rows.length!==1||!target||target.role==='admin'||target.rank>=11||target.leadership_role==='leadership'||target.command_unit||target.user_id===actor.id||
     (grant?target.unit_id!==null&&target.unit_id!==unitId:target.unit_id!==unitId)){
   throw new HttpError('Дія доступна для бійця без підрозділу або зі складу вашого підрозділу. Переведення й призначення командирів виконує адміністратор.',409);
  }
@@ -85,13 +87,26 @@ export async function updateUnitPage(unitId:string,input:unknown,actor:Viewer){
    await changeMembership(c,actor,id,action.staticId,action.grant);
    return {saved:true};
   }
+  if(action.kind==='command'){
+   if(!access.appoint)throw new HttpError('Командира або заступника призначає керуючий склад.',403);
+   const {rows:[target]}=await c.query(`SELECT p.id,d.value AS details FROM personnel p
+    JOIN app_user u ON u.id=p.user_id LEFT JOIN settings d ON d.key='service:'||p.id::text
+    WHERE p.unit_id=$1 AND p.active AND p.rank BETWEEN 11 AND 12 AND p.static_id::numeric=$2::text::numeric
+    AND p.user_id<>$3 AND u.role<>'admin' FOR UPDATE OF p`,[id,action.staticId,actor.id]);
+   if(!target)throw new HttpError('Оберіть бійця 11–12 рангу з цього підрозділу.',403);
+   const details={...target.details,leadershipRole:action.role,commanderUnitId:action.role==='member'?null:id};
+   await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=excluded.value',['service:'+target.id,JSON.stringify(details)]);
+   await audit(c,actor,'unit.command',target.id,target.details??null,details);
+   return {saved:true};
+  }
   if(action.kind==='assignment'){
    const {rows:[target]}=await c.query(`SELECT p.id,p.rank,d.value AS details FROM personnel p
     LEFT JOIN app_user u ON u.id=p.user_id LEFT JOIN settings d ON d.key='service:'||p.id::text
     WHERE p.unit_id=$1 AND p.active AND p.static_id::numeric=$2::text::numeric
     AND p.user_id IS DISTINCT FROM $3 AND coalesce(u.role,'member')<>'admin'
-    AND coalesce(d.value->>'leadershipRole','member')='member' FOR UPDATE OF p`,[id,action.staticId,actor.id]);
+    AND (p.rank IS NULL OR p.rank<11) AND coalesce(d.value->>'leadershipRole','member')='member' FOR UPDATE OF p`,[id,action.staticId,actor.id]);
    if(!target)throw new HttpError('Редагувати можна лише бійця цього підрозділу без командної ролі.',403);
+   if(action.rank!==null&&action.rank>=11)throw new HttpError('Керівні звання призначаються через кадрове адміністрування.',403);
    if(action.rank!==null&&!(await c.query('SELECT 1 FROM ranks WHERE id=$1',[action.rank])).rowCount)throw new HttpError('Звання не знайдено.');
    const details={...target.details,position:action.position};
    await c.query('UPDATE personnel SET rank=$1 WHERE id=$2',[action.rank,target.id]);

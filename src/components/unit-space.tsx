@@ -23,11 +23,11 @@ export async function UnitSpace({userId,unitId,mode='personal',ownOnly=false}:{u
  if(!unit||(mode!=='personal'&&!unit.editor))notFound();
  const [content,roster,ranks]=await Promise.all([loadUnitContent(unit.id),query<RosterPerson>(`
   SELECT p.static_id,p.first_name,p.last_name,k.name AS rank_name,d.value->>'position' AS position,p.active,
-  CASE WHEN $2::boolean THEN (SELECT count(*)::int FROM settings result WHERE result.key LIKE 'service-result:%' AND result.value->>'member'=p.user_id AND result.value->>'unit'=p.unit_id::text AND result.value->>'status'='passed') ELSE 0 END AS completed
+  CASE WHEN $2::boolean THEN (SELECT count(*)::int FROM settings result WHERE result.key LIKE 'service-result:%' AND result.value->>'member'=p.user_id AND result.value->>'status'='passed') ELSE 0 END AS completed
   FROM personnel p LEFT JOIN ranks k ON k.id=p.rank LEFT JOIN settings d ON d.key='service:'||p.id::text
   WHERE p.unit_id=$1 AND ($2::boolean OR p.active) ORDER BY p.rank DESC NULLS LAST,p.last_name,p.first_name
  `,[unit.id,mode==='roster']),unit.editor?query<{id:number;name:string}>('SELECT id,name FROM ranks ORDER BY id'):[]]);
- const editor=mode!=='personal'?<UnitEditor mode={mode} ranks={ranks} unitId={unit.id} info={content} news={content.news.map(({id,title,draft,archived})=>({id,title,draft,archived}))}/>:null;
+ const editor=mode!=='personal'?<UnitEditor canAppoint={unit.appoint} mode={mode} ranks={ranks} unitId={unit.id} info={content} news={content.news.map(({id,title,draft,archived})=>({id,title,draft,archived}))}/>:null;
  if(mode==='content')return <div id="content">{editor}<div className="home-card-grid portal-shortcuts">
   <CardLink href={'/command/'+unit.id+'/calendar'} title="Додати подію" image="/portal-art/cabinet/calendar.webp"/>
   <CardLink href={'/command/'+unit.id+'/documents'} title="Додати документ" image="/portal-art/cabinet/documents.webp"/>
@@ -43,7 +43,7 @@ export async function UnitSpace({userId,unitId,mode='personal',ownOnly=false}:{u
   <header className="portal-preview-header"><span className="pill prime">Внутрішня сторінка</span><h1>{unit.name}</h1><p>Новини, службова інформація й особовий склад підрозділу.</p>
   </header>
   <nav className="home-card-grid portal-shortcuts" aria-label="Розділи підрозділу">
-   <CardLink href="/portal/promotion-points#promotion-submit" title="Звіт на підвищення" image="/portal-art/unit-actions/rank.webp" icon={<ClipboardList size={19}/>}/>
+   <CardLink href="/portal/promotion-points/submit" title="Звіт на підвищення" image="/portal-art/unit-actions/rank.webp" icon={<ClipboardList size={19}/>}/>
    <CardLink href="#unit-news" title="Новини" image="/portal-art/unit-actions/news.webp" icon={<Megaphone size={19}/>}/>
    <CardLink href="#unit-roster" title="Особовий склад" image={unitCover(unit.name)||'/portal-art/home/service.webp'} icon={<Users size={19}/>}/>
    <CardLink href="/portal/calendar" title="Календар і участь" image="/portal-art/cabinet/calendar.webp" icon={<CalendarDays size={19}/>}/>

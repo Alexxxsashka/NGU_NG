@@ -162,11 +162,15 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
     {module==='training'&&canEdit(entry.unit)&&data.results.filter(row=>row.entry===entry.id&&row.links?.length).map(row=><p key={row.member}>
      {roster.find(person=>person.id===row.member)?.name}: {row.links?.map((link,index)=><a key={link} href={link} target="_blank" rel="noopener noreferrer">Доказ {index+1} </a>)}
     </p>)}
-    {module==='training'&&<p>{ownResult?.status==='passed'?'Зараховано':ownResult?'Потрібно повторити':'Результат ще не внесено'}</p>}
+    {module==='training'&&<p>{ownResult?.status==='passed'?'Зараховано':ownResult?.status==='retry'?'Потрібно повторити':'Результат ще не внесено'}</p>}
+    {module==='training'&&!entry.draft&&canEdit(entry.unit)&&entry.unit===data.trainingUnit&&<form className="stack" onSubmit={e=>void save(e,f=>({kind:'enroll',id:entry.id,member:f.get('member')}))}>
+     <Field label="Призначити етап бійцю"><select name="member" required defaultValue=""><option value="">Оберіть бійця</option>{data.people.filter(person=>!data.results.some(row=>row.entry===entry.id&&row.member===person.id)).map(person=><option key={person.id} value={person.id}>{person.name}</option>)}</select></Field>
+     <button disabled={busy}>Призначити етап</button>
+    </form>}
     {module==='training'&&!entry.draft&&canEdit(entry.unit)&&<form className="stack" onSubmit={e=>void save(e,f=>({kind:'result',id:entry.id,member:f.get('member'),status:f.get('status'),note:f.get('note')}))}>
-     <Field label="Боєць"><select name="member" required><option value="">Оберіть бійця</option>{data.people.filter(person=>person.unit===entry.unit).map(person=>{
+     <Field label="Боєць"><select name="member" required><option value="">Оберіть бійця</option>{data.people.filter(person=>(person.unit===entry.unit||data.results.some(row=>row.entry===entry.id&&row.member===person.id))).map(person=>{
       const result=data.results.find(row=>row.entry===entry.id&&row.member===person.id);
-      return <option key={person.id} value={person.id}>{person.name}{result?(result.status==='passed'?' · зараховано':' · повторити'):''}</option>;
+      return <option key={person.id} value={person.id}>{person.name}{result?(result.status==='passed'?' · зараховано':result.status==='retry'?' · повторити':' · призначено'):''}</option>;
      })}</select></Field>
      <Field label="Результат"><select name="status"><option value="passed">Зараховано</option><option value="retry">Повторити</option></select></Field>
      <Field label="Рекомендація"><textarea name="note" maxLength={2000}/></Field><button disabled={busy}>Зберегти результат</button>

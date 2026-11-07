@@ -7,7 +7,7 @@ import {loadCabinetActivity} from '@/lib/cabinet-activity';
 import {CardLink} from './card-link';
 
 const shortcuts=[
- ['/portal/promotion-points#promotion-submit','Звіт на підвищення','Подати завдання, додати докази й переглянути бали.','unit-actions/rank',ClipboardList],
+ ['/portal/promotion-points/submit','Звіт на підвищення','Подати завдання, додати докази й переглянути бали.','unit-actions/rank',ClipboardList],
  ['/my-unit','Мій підрозділ','Склад, новини й службова інформація.','cabinet/unit',Users],
  ['/portal/requests','Службові заявки','Подання заявок і рішення командування.','cabinet/requests',ClipboardList],
  ['/portal/training','КМБ','Етапи підготовки та результати.','cabinet/training',GraduationCap],

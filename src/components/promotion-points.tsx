@@ -9,7 +9,7 @@ import {IllustratedSummary} from './illustrated-summary';
 import {api,Field,Loading,Modal,Notice,useResource} from './ui';
 
 const status={clarification:'Потребує уточнення',pending:'На перевірці',approved:'Зараховано',rejected:'Відхилено'};
-export function PromotionPoints({unitId,mode='personal'}:{unitId?:string;mode?:'personal'|'review'|'catalog'}){
+export function PromotionPoints({unitId,screen='',mode='personal'}:{unitId?:string;screen?:string;mode?:'personal'|'review'|'catalog'}){
  const resource=useResource<Awaited<ReturnType<typeof promotionPoints>>>('promotion-points'+(unitId?'?unit='+unitId:''));
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
  async function save(event:FormEvent<HTMLFormElement>,make:(fd:FormData)=>unknown){
@@ -29,16 +29,29 @@ export function PromotionPoints({unitId,mode='personal'}:{unitId?:string;mode?:'
   {(error||resource.error)&&<Notice error>{error||resource.error}</Notice>}{saved&&<Notice>Запис збережено.</Notice>}
   {!data&&!resource.error&&<Loading/>}
   {data&&<>
-   {mode!=='review'&&<section className="panel portal-shortcuts">
+   {mode==='personal'&&<nav className="panel portal-shortcuts" aria-label="Звіти й підвищення">
+    {[['','Огляд'],['/tasks','Що виконати'],['/submit','Подати виконання'],['/history','Що я виконав']].map(([suffix,label])=><Link key={suffix} href={'/portal/promotion-points'+suffix} aria-current={suffix.slice(1)===screen?'page':undefined}>{label}</Link>)}
+    <Link href="/portal/personnel-actions">Запит на підвищення</Link>
+   </nav>}
+   {(mode==='catalog'||mode==='personal'&&!screen)&&<section className="panel portal-shortcuts">
     <h2>{mode==='catalog'?'Спільні правила':'Мій прогрес'}</h2>
     {mode==='personal'&&(data.profile?<p>{promotionRankName(data.profile.rank,data.profile.rank_name)} · {data.points} підтверджених балів{data.step?' із '+data.step[2]+' до звання «'+data.step[1]+'»':''}.</p>:<p>Для обліку балів потрібен активний профіль зі званням і підрозділом.</p>)}
     {mode==='personal'&&data.step&&<progress aria-label="Прогрес до наступного звання" max={data.step[2]} value={Math.min(data.points,data.step[2])}/>}
-    {mode==='personal'&&<p><Link href="/portal/personnel-actions">Запит на нове звання</Link></p>}
+    {mode==='personal'&&data.step&&<p>До порога залишилося {Math.max(0,data.step[2]-data.points)} балів.</p>}
+    {mode==='personal'&&data.profile&&<p><Link href={data.credits.some(entry=>entry.status==='clarification')?'/portal/promotion-points/history':data.step&&data.points>=data.step[2]?'/portal/personnel-actions':'/portal/promotion-points/tasks'}>
+     {data.credits.some(entry=>entry.status==='clarification')?'Переглянути запит на уточнення':data.step&&data.points>=data.step[2]?'Перевірити умови підвищення':'Переглянути завдання'}
+    </Link></p>}
     <p>Бали зараховуються за фактично виконані RP-дії з відповідними відіграваннями. Повторно зараховувати ту саму дію заборонено.</p>
     <p>Для підвищення також потрібні нормативи, атестації, перевірки та рішення командування.</p>
     <details><summary>Шкала підвищень</summary><ul>{promotionLadder.map(([from,to,points])=><li key={from}>{from} → {to} · {points} балів</li>)}</ul></details>
    </section>}
-   {mode==='personal'&&data.profile&&<details id="promotion-submit" className="account-action profile-action cabinet-target" open>
+   {mode==='personal'&&screen==='tasks'&&<section className="panel"><h2>Доступні завдання</h2>
+    <p>Підтверджені бали, нормативи, атестації та рішення командування враховуються під час підвищення.</p>
+    {!available.length&&<p>Наразі доступних завдань немає.</p>}
+    <ul>{available.map(task=><li key={task.id}><strong>{task.name} · {task.points} б.</strong>{task.requirements&&<p>{task.requirements}</p>}</li>)}</ul>
+   </section>}
+   {mode==='personal'&&screen==='submit'&&!data.profile&&<Notice>Для подання звіту потрібен активний профіль зі званням і підрозділом.</Notice>}
+   {mode==='personal'&&screen==='submit'&&data.profile&&<details id="promotion-submit" className="account-action profile-action cabinet-target" open>
     <IllustratedSummary title="Подати звіт із завданнями" image="/portal-art/cabinet/training.webp"/>
     <PromotionReportForm key={data.actorId} actorId={data.actorId} tasks={available} onSaved={resource.refresh}/>
    </details>}
@@ -66,7 +79,7 @@ export function PromotionPoints({unitId,mode='personal'}:{unitId?:string;mode?:'
      <button disabled={busy}>Зарахувати бали</button>
     </form></details>
    </section>}
-   {mode!=='catalog'&&<section className="panel"><h2>{mode==='review'?'Черга перевірки':'Мої виконання'}</h2>
+   {(mode==='review'||mode==='personal'&&screen==='history')&&<section className="panel"><h2>{mode==='review'?'Черга перевірки':'Мої виконання'}</h2>
     {!data.credits.length&&<p>Виконань поки немає.</p>}
     {Object.entries(groups).map(([id,entries])=>{
      const items=entries??[];
@@ -74,7 +87,7 @@ export function PromotionPoints({unitId,mode='personal'}:{unitId?:string;mode?:'
      return <article className="report-card report-list-row" key={id}>
       <div className="report-row-identity"><strong>{items[0]?.name}</strong><small>{items[0]?.createdAt?new Date(items[0].createdAt).toLocaleDateString('uk-UA'):''}</small></div>
       <dl className="report-row-totals"><div><dt>Завдань</dt><dd>{items.length}</dd></div><div><dt>Балів у звіті</dt><dd>{items.reduce((sum,item)=>sum+item.rate*item.quantity,0)}</dd></div><div><dt>Зараховано</dt><dd>{approved}</dd></div></dl>
-      <button type="button" className="secondary" aria-haspopup="dialog" onClick={()=>setSelected(id)}>Відкрити звіт</button>
+      <small>{[...new Set(items.map(item=>status[item.status]))].join(" · ")}</small><button type="button" className="secondary" aria-haspopup="dialog" onClick={()=>setSelected(id)}>Відкрити звіт</button>
       {selected===id&&<Modal title={'Звіт на підвищення · '+items[0]?.name} className="report-dialog" onClose={()=>setSelected(null)}><div className="report-dialog-scroll" tabIndex={0} role="region" aria-label="Завдання звіту"><div className="report-body">{items.map(entry=><details className="audit-row" key={entry.id}>
      <summary><strong>{entry.title} · {entry.rate*entry.quantity} б.</strong> · {entry.name} · {status[entry.status]}</summary>
      <p>{entry.quantity} × {entry.rate} б. · {new Date(entry.createdAt).toLocaleDateString('uk-UA')}</p>

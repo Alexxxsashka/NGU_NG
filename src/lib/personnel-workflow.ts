@@ -30,13 +30,13 @@ export async function personnelWorkflow(actor:Viewer,unitId:string|null=null){
    ((cardinality($2::text[])=0 AND value->>'userId'=$1) OR value->>'unitId'=ANY($2::text[])) ORDER BY value->>'createdAt' DESC LIMIT 100`,[actor.id,units.map(unit=>unit.id)]),
   units.length?query<{id:string;name:string;static_id:string;unit_id:string|null;rank:number|null;active:boolean|null}>(`SELECT u.id,u.name,p.unit_id,p.rank,p.active,coalesce(p.static_id,substring(u.username from '^static_([0-9]+)$')) AS static_id
    FROM app_user u LEFT JOIN personnel p ON p.user_id=u.id LEFT JOIN settings d ON d.key='service:'||p.id::text
-   WHERE cardinality($2::uuid[])>0 AND u.id<>$1 AND u.role<>'admin' AND (coalesce(d.value->>'leadershipRole','member')='member' OR $3::boolean OR (d.value->>'leadershipRole' IN ('commander','deputy') AND EXISTS(SELECT 1 FROM personnel leader JOIN settings g ON g.key='service:'||leader.id::text WHERE leader.user_id=$1 AND leader.active AND g.value->>'leadershipRole'='leadership')))
+   WHERE cardinality($2::uuid[])>0 AND u.id<>$1 AND u.role<>'admin' AND (coalesce(d.value->>'leadershipRole','member')='member' OR $3::boolean OR (d.value->>'leadershipRole' IN ('commander','deputy') AND EXISTS(SELECT 1 FROM personnel leader WHERE leader.user_id=$1 AND leader.active AND leader.rank BETWEEN 13 AND 15)))
    AND (p.unit_id IS NULL OR p.unit_id=ANY($2::uuid[])) AND coalesce(p.static_id,substring(u.username from '^static_([0-9]+)$')) IS NOT NULL
    ORDER BY u.name`,[actor.id,units.map(unit=>unit.id),actor.role==='admin']):[],
   units.length?query<{id:string;created_at:string;after:{action:string;author:string;actorStaticId?:string;name:string;staticId:string;fromRankName?:string;rankName?:string;fromUnitName?:string;unitName?:string;reason:string;links:string[]}}>(
    `SELECT id,created_at,after FROM audit_logs WHERE action='personnel.record'
     AND (after->>'fromUnit'=ANY($1::text[]) OR after->>'unitId'=ANY($1::text[])) ORDER BY created_at DESC,id DESC LIMIT 100`,[units.map(unit=>unit.id)]):[],
-  query("SELECT 1 FROM personnel p JOIN settings s ON s.key='service:'||p.id::text WHERE p.user_id=$1 AND p.active AND s.value->>'leadershipRole'='leadership'",[actor.id]),
+  query("SELECT 1 FROM personnel p WHERE p.user_id=$1 AND p.active AND p.rank BETWEEN 13 AND 15",[actor.id]),
  ]);
  const progress=await promotionProgress(actor.id);
  const destinations=unitId?(await accessibleUnits(actor.id)).filter(unit=>unit.editor):[];
@@ -84,10 +84,11 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
   const {rows:[target]}=await c.query(`SELECT u.name,u.role,p.id,p.static_id,p.first_name,p.last_name,p.active,p.rank,p.unit_id,
    substring(u.username from '^static_([0-9]+)$') AS login_id,coalesce(d.value->>'leadershipRole','member') AS leadership_role
    FROM app_user u LEFT JOIN personnel p ON p.user_id=u.id LEFT JOIN settings d ON d.key='service:'||p.id::text WHERE u.id=$1 FOR UPDATE OF u`,[targetId]);
-  const canManageTarget=target?.leadership_role==='member'||author.role==='admin'||(author.leadership_role==='leadership'&&['commander','deputy'].includes(target?.leadership_role));
+  const canManageTarget=target?.leadership_role==='member'||author.role==='admin'||(author.rank>=13&&author.rank<=15&&['commander','deputy'].includes(target?.leadership_role));
   if(!target||target.role==='admin'||!canManageTarget||!(target.static_id||target.login_id))
    throw new HttpError('Цей зареєстрований боєць поза межами ваших кадрових повноважень.',403);
   const type=action.kind==='record'?action.action:'promote';
+  if(author.role!=='admin'&&target.rank>=11&&target.rank>=author.rank)throw new HttpError('Цей кадровий профіль поза вашими повноваженнями.',403);
   const nextRank=action.kind==='record'?action.rank:promotion!.rank;
   const destination=action.kind==='record'?action.unitId:undefined;
   if(type==='admit'){
@@ -96,7 +97,7 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
   }else if(!target.active||!canEdit(target.unit_id))throw new HttpError('Боєць поза вашим підрозділом.',403);
   if(promotion&&(target.unit_id!==promotion.unitId||target.rank!==promotion.fromRank))throw new HttpError('Звання або підрозділ змінилися після подання звіту.',409);
   if(type==='transfer'&&(!canEdit(destination)||destination===target.unit_id||
-   (author.role!=='admin'&&author.leadership_role!=='leadership')))throw new HttpError('Переведення між підрозділами виконує керівний склад.',403);
+   (author.role!=='admin'&&!(author.rank>=13&&author.rank<=15))))throw new HttpError('Переведення між підрозділами виконує керівний склад.',403);
   const changesRank=type==='admit'||type==='promote'||type==='demote';
   if(changesRank&&(!nextRank||(type==='promote'&&(!target.rank||nextRank<=target.rank))||(type==='demote'&&(!target.rank||nextRank>=target.rank))))
    throw new HttpError('Оберіть звання відповідно до кадрової дії.',409);
@@ -110,6 +111,7 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
     throw new HttpError('Потрібні '+progress.step[2]+' підтверджених балів та наступне звання '+progress.step[1]+'.',409);
   }
   const unitId=type==='admit'||type==='transfer'?destination!:target.unit_id;
+  if(changesRank&&nextRank!>=11&&(author.role!=='admin'&&nextRank!>=author.rank||nextRank===15))throw new HttpError('Для призначення на це звання потрібна окрема процедура.',403);
   const rankId=changesRank?nextRank!:target.rank;
   const active=type!=='dismiss';
   const staticId=target.static_id||target.login_id;
@@ -122,7 +124,7 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
    personId=(await c.query('INSERT INTO personnel(static_id,first_name,last_name,user_id,unit_id,rank,active) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
     [staticId,first,last.join(' '),targetId,unitId,rankId,active])).rows[0].id;
   }
-  if((type==='dismiss'||type==='transfer')&&target.leadership_role!=='member'){
+  if((type==='dismiss'||type==='transfer'||changesRank&&rankId!==11&&rankId!==12)&&target.leadership_role!=='member'){
    await c.query('UPDATE settings SET value=value||$2::jsonb WHERE key=$1',['service:'+personId,JSON.stringify({leadershipRole:'member',commanderUnitId:null})]);
   }
   if(type==='admit')await c.query("UPDATE profile_claims SET status='approved',reason=$3,reviewed_by=$4 WHERE user_id=$1 AND static_id::numeric=$2::text::numeric AND status='pending'",[targetId,staticId,action.reason,actor.id]);

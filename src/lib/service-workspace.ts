@@ -5,6 +5,7 @@ import {query,transaction} from '@/db';
 import {audit} from './admin';
 import {evidence} from './validation';
 import {HttpError} from './security';
+import {accessibleUnits} from './unit-page';
 import {workspaceUnits} from './workspace-scope';
 import type {Viewer} from './domain';
 
@@ -26,6 +27,7 @@ const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('publish-draft'),id:uuid}),
  z.object({kind:z.literal('training-proof'),id:uuid,links:z.array(evidence).min(1).max(20)}),
  z.object({kind:z.literal('archive'),id:uuid}),
+ z.object({kind:z.literal('enroll'),id:uuid,member:z.string().min(1).max(100)}),
  z.object({kind:z.literal('result'),id:uuid,member:z.string().min(1).max(100),status:z.enum(['passed','retry']),note:z.string().trim().max(2000).optional()}),
 ]);
 
@@ -35,44 +37,54 @@ type Entry={
 };
 const prefix='service-entry:';
 
+const trainingUnitSql=`SELECT id FROM units WHERE active AND (
+ id::text=(SELECT value->>'unitId' FROM settings WHERE key='training:kmb') OR
+ (NOT EXISTS(SELECT 1 FROM settings WHERE key='training:kmb') AND (name='НЦП' OR name='Навчальний центр підготовки')))
+ ORDER BY id LIMIT 1`;
+
+export async function kmbUnitId(){
+ const [unit]=await query<{id:string}>(trainingUnitSql);
+ return unit?.id;
+}
+
 export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:string|null=null,unitId:string|null=null){
  const membership=await query<{unit_id:string|null}>('SELECT p.unit_id FROM personnel p JOIN units u ON u.id=p.unit_id AND u.active WHERE p.user_id=$1 AND p.active',[actor.id]);
- const units=unitId?await workspaceUnits(actor.id,unitId):[];
+ const trainingUnit=module==='training'?await kmbUnitId():undefined;
+ const units=(unitId?await workspaceUnits(actor.id,unitId):[]).filter(unit=>module!=='training'||unit.id===trainingUnit);
  const personalUnit=membership[0]?.unit_id;
  const readUnits=unitId?units.map(unit=>unit.id):personalUnit?[personalUnit]:[];
  const editors=units.filter(unit=>unit.editor).map(unit=>unit.id);
  const [rows,people,results,targets,attendance,authority,ranks]=await Promise.all([
   query<{value:Entry}>(`SELECT value FROM settings WHERE key LIKE 'service-entry:%' AND value->>'module'=$1
-   AND (($5::boolean AND $1='requests' AND value->>'author'=$2) OR value->>'unit'=ANY($3::text[]) OR value->>'targetUnit'=ANY($4::text[]))
+   AND (($5::boolean AND $1='requests' AND value->>'author'=$2) OR value->>'unit'=ANY($3::text[]) OR value->>'targetUnit'=ANY($4::text[]) OR ($5::boolean AND $1='training' AND EXISTS(SELECT 1 FROM personnel WHERE user_id=$2 AND active) AND EXISTS(
+    SELECT 1 FROM settings enrollment WHERE enrollment.key='service-result:'||(settings.value->>'id')||':'||$2)))
    AND ($7::boolean OR coalesce(value->>'draft','false')='false')
    AND (coalesce(value->>'archived','false')='false' OR ($1='regulations' AND value->>'unit'=ANY($3::text[]))) ORDER BY (value->>'id'=$6) DESC NULLS LAST, CASE WHEN $1='calendar' THEN value->>'date' END ASC, value->>'createdAt' DESC LIMIT 200`,
    [module,actor.id,module==='requests'?editors:readUnits,module==='requests'?editors:[],!unitId,focus,!!unitId]),
   (module==='training'||module==='calendar')&&editors.length?query<{id:string;name:string;unit:string}>(
-   "SELECT user_id AS id,first_name||' '||last_name AS name,unit_id AS unit FROM personnel WHERE active AND user_id IS NOT NULL AND unit_id=ANY($1::uuid[]) ORDER BY last_name",[editors]):[],
+   "SELECT user_id AS id,first_name||' '||last_name AS name,unit_id AS unit FROM personnel WHERE active AND user_id IS NOT NULL AND ($2::boolean OR unit_id=ANY($1::uuid[])) ORDER BY last_name",[editors,module==='training']):[],
   module==='training'?query<{value:{entry:string;member:string;status?:string;links?:string[];note?:string}}>(`SELECT value FROM settings WHERE key LIKE 'service-result:%' AND
    (value->>'member'=$1 OR value->>'unit'=ANY($2::text[]))`,[actor.id,editors]):[],
   module==='requests'?query<{id:string;name:string}>('SELECT id,name FROM units WHERE active ORDER BY sort_order,name'):[],
   module==='calendar'?query<{value:{entry:string;member:string;status:string}}>(`SELECT value FROM settings WHERE key LIKE 'service-attendance:%' AND (value->>'member'=$1 OR value->>'unit'=ANY($2::text[]))`,[actor.id,editors]):[],
-  module==='requests'?query("SELECT 1 FROM personnel p JOIN settings s ON s.key='service:'||p.id::text WHERE p.user_id=$1 AND p.active AND s.value->>'leadershipRole'='leadership'",[actor.id]):[],
+  module==='requests'?query("SELECT 1 FROM personnel p WHERE p.user_id=$1 AND p.active AND p.rank BETWEEN 13 AND 15",[actor.id]):[],
   module==='requests'&&unitId?query<{id:number;name:string}>('SELECT id,name FROM ranks ORDER BY id'):[],
  ]);
- return {units,entries:rows.map(({value})=>value),people,results:results.map(({value})=>value),targets,ranks,attendance:attendance.map(row=>row.value),memberUnit:personalUnit,canTransfer:actor.role==='admin'||authority.length>0,actorId:actor.id,admin:actor.role==='admin'};
+ return {units,entries:rows.map(({value})=>value),people,results:results.map(({value})=>value),trainingUnit,targets,ranks,attendance:attendance.map(row=>row.value),memberUnit:personalUnit,canTransfer:actor.role==='admin'||authority.length>0,actorId:actor.id,admin:actor.role==='admin'};
 }
 
 export async function changeServiceWorkspace(actor:Viewer,input:unknown){
  const action=operation.parse(input);
  return transaction(async c=>{
   await c.query("SELECT pg_advisory_xact_lock(hashtext('admin-access'))");
-  const {rows:[account]}=await c.query(`SELECT u.role,p.id,p.unit_id,d.value->>'leadershipRole' AS leadership_role FROM app_user u LEFT JOIN personnel p ON p.user_id=u.id AND p.active LEFT JOIN settings d ON d.key='service:'||p.id::text
+  const {rows:[account]}=await c.query(`SELECT u.role,p.id,p.unit_id,p.rank FROM app_user u LEFT JOIN personnel p ON p.user_id=u.id AND p.active LEFT JOIN settings d ON d.key='service:'||p.id::text
    WHERE u.id=$1 AND NOT u.must_change_password`,[actor.id]);
   if(!account)throw new HttpError('Увійдіть повторно.',403);
-  const {rows:scopes}=await c.query<{id:string}>(`SELECT u.id FROM units u LEFT JOIN settings grant_record ON grant_record.key='service:'||$2::text
-   WHERE u.active AND ($1='admin' OR grant_record.value->>'leadershipRole'='leadership' OR
-    (u.id=$3::uuid AND grant_record.value->>'commanderUnitId'=u.id::text AND grant_record.value->>'leadershipRole' IN ('commander','deputy')))`,
-   [account.role,account.id??null,account.unit_id??null]);
-  const editors=new Set(scopes.map(scope=>scope.id));
+  const editors=new Set((await accessibleUnits(actor.id,null,c)).filter(unit=>unit.editor).map(unit=>unit.id));
+  const {rows:[trainingUnit]}=await c.query<{id:string}>(trainingUnitSql);
   const write=async(key:string,value:unknown)=>{await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=excluded.value',[key,JSON.stringify(value)]);};
   if(action.kind==='request'||action.kind==='publish'){
+   if(action.kind==='publish'&&action.module==='training'&&action.unit!==trainingUnit?.id)throw new HttpError('Програмою КМБ керує НЦП.',403);
    if(action.kind==='publish'&&!editors.has(action.unit))throw new HttpError('Ви не керуєте цим підрозділом.',403);
    if(action.kind==='request'&&action.type==='Переведення'&&(!action.targetUnit||action.targetUnit===account.unit_id||
      !(await c.query('SELECT id FROM units WHERE id=$1 AND active',[action.targetUnit])).rowCount))throw new HttpError('Оберіть інший чинний підрозділ.');
@@ -104,7 +116,7 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
   const {rows:[row]}=await c.query<{value:Entry}>('SELECT value FROM settings WHERE key=$1 FOR UPDATE',[prefix+action.id]);
   const entry=row?.value;
   if(!entry||entry.archived)throw new HttpError('Запис не знайдено.',404);
-  const canEdit=!!entry.unit&&editors.has(entry.unit);
+  const canEdit=!!entry.unit&&editors.has(entry.unit)&&(entry.module!=='training'||entry.unit===trainingUnit?.id);
   if(action.kind==='resubmit'){
    if(entry.module!=='requests'||entry.author!==actor.id||entry.status!=='clarification')throw new HttpError('Уточнення недоступне.',403);
    const next={...entry,status:'pending',replies:[...entry.replies??[],{body:action.body,links:action.links,at:new Date().toISOString()}]};
@@ -120,11 +132,11 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    const {rows:[person]}=await c.query(`SELECT p.id,p.unit_id,p.active,p.rank,u.role,d.value AS details
     FROM personnel p JOIN app_user u ON u.id=p.user_id LEFT JOIN settings d ON d.key='service:'||p.id::text
     WHERE p.user_id=$1 FOR UPDATE OF p`,[entry.author]);
-   if(!person||person.role==='admin'||(person.details?.leadershipRole&&person.details.leadershipRole!=='member')||person.unit_id!==entry.unit)
+   if(!person||person.role==='admin'||person.rank>=11||(person.details?.leadershipRole&&person.details.leadershipRole!=='member')||person.unit_id!==entry.unit)
     throw new HttpError('Потрібна актуальна кадрова картка звичайного бійця.',409);
    const next={...entry,appliedAt:new Date().toISOString()};
    if(admission){
-    if((person.active&&person.unit_id)||(person.unit_id&&!editors.has(person.unit_id)&&account.role!=='admin'&&account.leadership_role!=='leadership')||!action.rank||!(await c.query('SELECT 1 FROM ranks WHERE id=$1',[action.rank])).rowCount)
+    if((person.active&&person.unit_id)||(person.unit_id&&!editors.has(person.unit_id)&&account.role!=='admin'&&!(account.rank>=13&&account.rank<=15))||!action.rank||action.rank>=11||!(await c.query('SELECT 1 FROM ranks WHERE id=$1',[action.rank])).rowCount)
      throw new HttpError('Перевірте попереднє призначення та оберіть початкове звання.',409);
     await c.query('UPDATE personnel SET unit_id=$1,rank=$2,active=true WHERE id=$3',[scope,action.rank,person.id]);
     const date=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Kyiv'}).format(new Date());
@@ -143,14 +155,14 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    await write(prefix+entry.id,next);
    await audit(c,actor,'service.request.decision',entry.id,entry,next,action.body);
   }else if(action.kind==='transfer'){
-   if(account.role!=='admin'&&account.leadership_role!=='leadership')throw new HttpError('Переведення застосовує керівний склад.',403);
+   if(account.role!=='admin'&&!(account.rank>=13&&account.rank<=15))throw new HttpError('Переведення застосовує керівний склад.',403);
    if(entry.author===actor.id||entry.module!=='requests'||entry.title!=='Переведення'||entry.status!=='approved'||!entry.targetUnit||!editors.has(entry.targetUnit))
     throw new HttpError('Заявка недоступна для переведення.',409);
    if(entry.appliedAt)return {saved:true};
-   const {rows:[person]}=await c.query(`SELECT p.id,p.unit_id,d.value->>'leadershipRole' AS leadership_role,u.role
+   const {rows:[person]}=await c.query(`SELECT p.id,p.unit_id,p.rank,u.role
     FROM personnel p JOIN app_user u ON u.id=p.user_id LEFT JOIN settings d ON d.key='service:'||p.id::text
     WHERE p.user_id=$1 AND p.active FOR UPDATE OF p`,[entry.author]);
-   if(!person||person.unit_id!==entry.unit||person.role==='admin'||(person.leadership_role&&person.leadership_role!=='member'))
+   if(!person||person.unit_id!==entry.unit||person.role==='admin'||person.rank>=11||(person.leadership_role&&person.leadership_role!=='member'))
     throw new HttpError('Кадровий профіль змінився або потребує окремого призначення.',409);
    await c.query('UPDATE personnel SET unit_id=$1 WHERE id=$2',[entry.targetUnit,person.id]);
    const next={...entry,appliedAt:new Date().toISOString()};
@@ -184,7 +196,7 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    await write(prefix+entry.id,next);
    await audit(c,actor,'service.publish',entry.id,entry,next);
   }else if(action.kind==='training-proof'){
-   if(entry.module!=='training'||entry.draft||!entry.requiresProof||entry.unit!==account.unit_id)throw new HttpError('Етап недоступний для подання доказів.',403);
+   if(entry.module!=='training'||entry.draft||!entry.requiresProof||(!account.id||entry.unit!==account.unit_id&&!(await c.query('SELECT 1 FROM settings WHERE key=$1',['service-result:'+entry.id+':'+actor.id])).rowCount))throw new HttpError('Етап недоступний для подання доказів.',403);
    const key='service-result:'+entry.id+':'+actor.id;
    const {rows:[previous]}=await c.query('SELECT value FROM settings WHERE key=$1',[key]);
    if(previous?.value?.status==='passed')throw new HttpError('Етап уже зараховано.',409);
@@ -195,8 +207,15 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    if(!canEdit||entry.module==='requests')throw new HttpError('Архівування недоступне.',403);
    await write(prefix+entry.id,{...entry,archived:true});
    await audit(c,actor,'service.archive',entry.id,entry,{...entry,archived:true});
+  }else if(action.kind==='enroll'){
+   if(!canEdit||entry.module!=='training'||entry.unit!==trainingUnit?.id||entry.draft||
+    !(await c.query('SELECT 1 FROM personnel WHERE user_id=$1 AND active',[action.member])).rowCount)
+    throw new HttpError('Призначити етап КМБ може командування НЦП.',403);
+   const next={entry:entry.id,unit:entry.unit,member:action.member};
+   const saved=await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT DO NOTHING',['service-result:'+entry.id+':'+action.member,JSON.stringify(next)]);
+   if(saved.rowCount)await audit(c,actor,'service.training.enroll',entry.id,null,next);
   }else{
-   if(!canEdit||entry.module!=='training'||entry.draft||!(await c.query('SELECT id FROM personnel WHERE user_id=$1 AND unit_id=$2 AND active',[action.member,entry.unit])).rowCount)
+   if(!canEdit||entry.module!=='training'||entry.unit!==trainingUnit?.id||entry.draft||!(await c.query('SELECT id FROM personnel WHERE user_id=$1 AND active AND (unit_id=$2 OR EXISTS(SELECT 1 FROM settings WHERE key=$3))',[action.member,entry.unit,'service-result:'+entry.id+':'+action.member])).rowCount)
     throw new HttpError('Результат можна вказати для бійця цього підрозділу.',403);
    const key='service-result:'+entry.id+':'+action.member;
    const {rows:[old]}=await c.query('SELECT value FROM settings WHERE key=$1',[key]);

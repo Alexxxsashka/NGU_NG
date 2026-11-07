@@ -2,6 +2,7 @@ import Link from 'next/link';
 import {notFound,redirect} from 'next/navigation';
 import {query} from '@/db';
 import {accessibleUnits} from '@/lib/unit-page';
+import {kmbUnitId} from '@/lib/service-workspace';
 import {commandSections} from '@/lib/command-sections';
 import type {Viewer} from '@/lib/domain';
 import {CardLink} from './card-link';
@@ -22,6 +23,8 @@ export async function CommandWorkspace({actor,unitId,section}:{actor:Viewer;unit
  const unit=units.find(unit=>unit.id===unitId);
  const view=commandSections.find(([key])=>key===section);
  if(!unit||!view)notFound();
+ const managesKmb=unit.id===await kmbUnitId();
+ if(section==='training'&&!managesKmb)notFound();
  const root='/command/'+unit.id;
  if(section==='overview'){
   const [counts]=await query<{people:number;requests:number;reports:number;promotions:number;event:string|null}>(`SELECT
@@ -37,7 +40,7 @@ export async function CommandWorkspace({actor,unitId,section}:{actor:Viewer;unit
    'promotion-decisions':counts.promotions+' на розгляді',calendar:counts.event??'Запланованих подій поки немає.',
   };
   return <div id="content"><header className="portal-preview-header"><h1>{unit.name}</h1><p>Робочий простір командування</p></header>
-   <div className="home-card-grid portal-shortcuts">{commandSections.filter(([key])=>key!=='overview').map(([key,label,art])=><CardLink key={key} href={root+'/'+key} title={label} image={'/portal-art/'+art+'.webp'} description={descriptions[key]}/>)}</div>
+   <div className="home-card-grid portal-shortcuts">{commandSections.filter(([key])=>key!=='overview'&&(key!=='training'||managesKmb)).map(([key,label,art])=><CardLink key={key} href={root+'/'+key} title={label} image={'/portal-art/'+art+'.webp'} description={descriptions[key]}/>)}</div>
   </div>;
  }
  return <><nav className="portal-crumb" aria-label="Шлях до розділу"><Link href={root+'/overview'}>{unit.name}</Link><span>/</span><span>{view[1]}</span></nav>

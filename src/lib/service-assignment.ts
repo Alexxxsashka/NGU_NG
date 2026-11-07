@@ -17,6 +17,8 @@ const assignment=z.object({
 export async function assignService(input:unknown,actor:Viewer){
  const p=assignment.parse(input);
  const unitCommand=p.leadershipRole==='commander'||p.leadershipRole==='deputy';
+ if(unitCommand&&p.rank!==11&&p.rank!==12)throw new HttpError('Командир і заступник повинні мати 11 або 12 ранг.');
+ if(p.leadershipRole==='leadership'&&!(p.rank&&p.rank>=13&&p.rank<=15))throw new HttpError('Керуючий склад має ранги 13–15.');
  if(unitCommand&&!p.unitId)throw new HttpError('Для командира або заступника оберіть підрозділ.');
  return transaction(async c=>{
   await lockAdmin(c,actor);
@@ -63,7 +65,7 @@ export function commandRoster(userId:string){
   JOIN personnel p ON p.unit_id=u.id AND p.active
   LEFT JOIN ranks k ON k.id=p.rank
   LEFT JOIN settings d ON d.key='service:'||p.id::text
-  WHERE leader.user_id=$1 AND leader.active
+  WHERE leader.user_id=$1 AND leader.active AND leader.rank BETWEEN 11 AND 12
   ORDER BY p.rank DESC NULLS LAST,p.last_name,p.first_name
  `,[userId]);
 }
