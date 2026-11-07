@@ -7,6 +7,7 @@ import {HttpError} from './security';
 import {evidence} from './validation';
 import {promotionProgress} from './promotion-points';
 import {promotionRankName} from './promotion-rules';
+import {workspaceUnits} from './workspace-scope';
 import {accessibleUnits} from './unit-page';
 import type {Viewer} from './domain';
 
@@ -18,15 +19,15 @@ const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('record'),action:z.enum(actions),userId:z.string().min(1).max(100),rank:rank.optional(),unitId:z.uuid().optional(),qualified:z.boolean().optional(),...proof}),
  z.object({kind:z.literal('decide'),id:z.uuid(),approve:z.boolean(),qualified:z.boolean().optional(),reason:proof.reason}),
 ]);
-type Promotion={id:string;userId:string;name:string;staticId:string;unitId:string;fromRank:number;rank:number;reason:string;links:string[];status:string;decision?:string;createdAt:string};
+type Promotion={id:string;userId:string;name:string;staticId:string;unitId:string;fromRank:number;rank:number;reason:string;links:string[];status:string;decision?:string;createdAt:string;creditIds?:string[]};
 
-export async function personnelWorkflow(actor:Viewer){
- const units=(await accessibleUnits(actor.id)).filter(unit=>unit.editor);
+export async function personnelWorkflow(actor:Viewer,unitId:string|null=null){
+ const units=await workspaceUnits(actor.id,unitId);
  const [me,ranks,promotions,people,history,leadership]=await Promise.all([
   query<{rank:number|null;unit_id:string|null;active:boolean}>('SELECT rank,unit_id,active FROM personnel WHERE user_id=$1',[actor.id]),
   query<{id:number;name:string}>('SELECT id,name FROM ranks ORDER BY id'),
   query<{value:Promotion}>(`SELECT value FROM settings WHERE key LIKE 'promotion-report:%' AND
-   (value->>'userId'=$1 OR value->>'unitId'=ANY($2::text[])) ORDER BY value->>'createdAt' DESC LIMIT 100`,[actor.id,units.map(unit=>unit.id)]),
+   ((cardinality($2::text[])=0 AND value->>'userId'=$1) OR value->>'unitId'=ANY($2::text[])) ORDER BY value->>'createdAt' DESC LIMIT 100`,[actor.id,units.map(unit=>unit.id)]),
   units.length?query<{id:string;name:string;static_id:string;unit_id:string|null;rank:number|null;active:boolean|null}>(`SELECT u.id,u.name,p.unit_id,p.rank,p.active,coalesce(p.static_id,substring(u.username from '^static_([0-9]+)$')) AS static_id
    FROM app_user u LEFT JOIN personnel p ON p.user_id=u.id LEFT JOIN settings d ON d.key='service:'||p.id::text
    WHERE cardinality($2::uuid[])>0 AND u.id<>$1 AND u.role<>'admin' AND (coalesce(d.value->>'leadershipRole','member')='member' OR $3::boolean OR (d.value->>'leadershipRole' IN ('commander','deputy') AND EXISTS(SELECT 1 FROM personnel leader JOIN settings g ON g.key='service:'||leader.id::text WHERE leader.user_id=$1 AND leader.active AND g.value->>'leadershipRole'='leadership')))
@@ -38,7 +39,8 @@ export async function personnelWorkflow(actor:Viewer){
   query("SELECT 1 FROM personnel p JOIN settings s ON s.key='service:'||p.id::text WHERE p.user_id=$1 AND p.active AND s.value->>'leadershipRole'='leadership'",[actor.id]),
  ]);
  const progress=await promotionProgress(actor.id);
- return {units,progress:{points:progress.points,step:progress.step},canTransfer:actor.role==='admin'||leadership.length>0,me:me[0],ranks,promotions:promotions.map(row=>row.value),people,history,actorId:actor.id};
+ const destinations=unitId?(await accessibleUnits(actor.id)).filter(unit=>unit.editor):[];
+ return {units,destinations,progress:{points:progress.points,step:progress.step},canTransfer:actor.role==='admin'||leadership.length>0,me:me[0],ranks,promotions:promotions.map(row=>row.value),people,history,actorId:actor.id};
 }
 
 export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
@@ -64,7 +66,7 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
    if(!progress.step||promotionRankName(action.rank,destinationRank.name).toLocaleLowerCase('uk')!==progress.step[1].toLocaleLowerCase('uk')||progress.points<progress.step[2])
     throw new HttpError('Потрібні підтверджені бали й наступне звання за шкалою підвищень.',409);
    const entry:Promotion={id:randomUUID(),userId:actor.id,name:author.name,staticId:author.static_id,unitId:author.unit_id,
-    fromRank:author.rank,rank:action.rank,reason:action.reason,links:action.links,status:'pending',createdAt:new Date().toISOString()};
+    fromRank:author.rank,rank:action.rank,reason:action.reason,links:action.links,status:'pending',creditIds:progress.creditIds,createdAt:new Date().toISOString()};
    await c.query('INSERT INTO settings(key,value) VALUES($1,$2)',['promotion-report:'+entry.id,JSON.stringify(entry)]);
    await audit(c,actor,'personnel.promotion.submit',entry.id,null,entry);
    return {saved:true};
@@ -127,7 +129,7 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
   const record={action:type,author:author.name,actorStaticId:author.static_id,name:target.name,staticId,member:targetId,
    fromUnit:target.unit_id,unitId,fromUnitName:units.find(unit=>unit.id===target.unit_id)?.name,unitName:units.find(unit=>unit.id===unitId)?.name,
    fromRankName:rankName(target.rank),rankName:rankName(rankId),reason:action.reason,
-   qualified:type==='promote'?action.qualified:undefined,links:action.kind==='record'?action.links:promotion!.links,promotionId:promotion?.id};
+   qualified:type==='promote'?action.qualified:undefined,links:action.kind==='record'?action.links:promotion!.links,promotionId:promotion?.id,creditIds:promotion?.creditIds};
   await audit(c,actor,'personnel.record',personId,{unitId:target.unit_id,rank:target.rank,active:target.active},record,action.reason);
   if(promotion){
    const next={...promotion,status:'approved',decision:action.reason};

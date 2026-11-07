@@ -19,6 +19,7 @@ type ServiceCard={
  unit_id:string|null;
  leadership_role:string|null;
  joined_on:string|null;
+ joined_verified:boolean;
  callsign:string|null;
  bio:string|null;
  position:string|null;
@@ -32,7 +33,7 @@ export async function ServiceTablet({user,editable=true}:{user:Viewer;editable?:
  const Heading=editable?'h1':'h2';
  const [card]=await query<ServiceCard>(`
   SELECT p.static_id,CASE WHEN u.active THEN u.id END AS unit_id,p.first_name,p.last_name,p.active,p.rank,CASE WHEN u.active THEN u.name END AS unit_name,k.name AS rank_name,
-         details.value->>'leadershipRole' AS leadership_role,details.value->>'joinedOn' AS joined_on,details.value->>'callsign' AS callsign,details.value->>'bio' AS bio,details.value->>'position' AS position,
+         details.value->>'leadershipRole' AS leadership_role,details.value->>'joinedOn' AS joined_on,coalesce(details.value->>'joinedOnVerified'='true',false) AS joined_verified,details.value->>'callsign' AS callsign,details.value->>'bio' AS bio,details.value->>'position' AS position,
          totals.reports,totals.approved_quantity,totals.approved_points,totals.pending_items
   FROM personnel p
   LEFT JOIN units u ON u.id=p.unit_id
@@ -98,7 +99,7 @@ export async function ServiceTablet({user,editable=true}:{user:Viewer;editable?:
   <section className="portal-shortcuts" aria-labelledby="cabinet-security">
    <h2 id="cabinet-security">Особисті дані та безпека</h2>
    <div className="cabinet-security-grid">
-    {card?.active&&<PersonalServiceForm today={today} details={{joinedOn,callsign:card.callsign??'',bio:card.bio??''}}/>}
+    {card?.active&&<PersonalServiceForm today={today} details={{joinedOn,joinedVerified:card.joined_verified,callsign:card.callsign??'',bio:card.bio??''}}/>}
     <PasswordAction/>
    </div>
   </section>

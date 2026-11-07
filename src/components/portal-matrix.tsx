@@ -7,7 +7,7 @@ import {adminPortalRoutes,portalPreviews,serviceModules,visiblePortalGroups} fro
 import {PortalIcon} from './portal-icon';
 
 const covers:Record<string,string>={
- Головне:'cabinet',Служба:'service',Підготовка:'training',Звітність:'reports',Документи:'documents',Управління:'command',
+ Головне:'cabinet','Моя служба':'service',Підготовка:'training','Моя звітність':'reports',Документи:'documents',Управління:'command',
 };
 const art:Record<string,string>={
  '/portal/promotion-points':'cabinet/training','/portal/personnel-actions':'unit-actions/rank','/portal/notifications':'workflows/notifications','/cabinet':'tablet','/my-unit':'home/service','/weekly-bonus':'weekly','/weekly-bonus/report':'home/reports',
@@ -30,9 +30,8 @@ export function PortalMatrix({signedIn=false,admin=false}:{signedIn?:boolean;adm
  const tabs=useRef<(HTMLButtonElement|null)[]>([]);
  const groups=visiblePortalGroups(admin,signedIn).map(group=>{
   const links:Array<readonly [string,string]>=group.links.filter(([href])=>href!=='/');
-  if(group.title==='Звітність'){
+  if(group.title==='Моя звітність'){
    links.splice(1,0,['/weekly-bonus/report','Подати звіт']);
-   if(signedIn)links.splice(2,0,['/weekly-bonus/me','Мої звіти']);
   }
   return {...group,links};
  }).filter(group=>group.links.length);

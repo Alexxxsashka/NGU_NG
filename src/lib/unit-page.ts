@@ -34,7 +34,7 @@ const contentFields=z.object({
  rules:z.string().trim().max(4000), contacts:z.string().trim().max(2000),
 });
 type Content=z.infer<typeof contentFields>;
-type News={id:string;title:string;body:string;kind:'news'|'announcement';publishedAt:string};
+type News={id:string;title:string;body:string;kind:'news'|'announcement';publishedAt:string;draft?:boolean;archived?:boolean};
 type UnitContent=Content&{news:News[]};
 const emptyContent:UnitContent={overview:'',schedule:'',rules:'',contacts:'',news:[]};
 
@@ -45,7 +45,8 @@ export async function loadUnitContent(unitId:string){
 
 const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('content'),content:contentFields}),
- z.object({kind:z.literal('publish'),type:z.enum(['news','announcement']),title:z.string().trim().min(1).max(100),body:z.string().trim().min(1).max(3000)}),
+ z.object({kind:z.literal('publish'),type:z.enum(['news','announcement']),title:z.string().trim().min(1).max(100),body:z.string().trim().min(1).max(3000),draft:z.boolean().optional()}),
+ z.object({kind:z.literal('publish-news-draft'),id:z.uuid()}),
  z.object({kind:z.literal('remove-news'),id:z.string().uuid()}),
  z.object({kind:z.literal('assignment'),staticId:canonicalStaticId,rank:z.number().int().positive().max(2147483647).nullable(),position:z.string().trim().max(100)}),
  z.object({kind:z.literal('member'),staticId:canonicalStaticId,grant:z.boolean()}),
@@ -104,10 +105,13 @@ export async function updateUnitPage(unitId:string,input:unknown,actor:Viewer){
   let after:UnitContent;
   if(action.kind==='content')after={...before,...action.content};
   else if(action.kind==='publish'){
-   if(before.news.length>=50)throw new HttpError('Видаліть стару публікацію перед додаванням нової.',409);
-   after={...before,news:[{id:randomUUID(),title:action.title,body:action.body,kind:action.type,publishedAt:new Date().toISOString()},...before.news]};
+   if(before.news.filter(news=>!news.archived).length>=50)throw new HttpError('Видаліть стару публікацію перед додаванням нової.',409);
+   after={...before,news:[{id:randomUUID(),title:action.title,body:action.body,kind:action.type,draft:action.draft,publishedAt:new Date().toISOString()},...before.news]};
   }else{
-   after={...before,news:before.news.filter(news=>news.id!==action.id)};
+   const item=before.news.find(news=>news.id===action.id);
+   if(!item||item.archived||(action.kind==='publish-news-draft'&&!item.draft))throw new HttpError('Публікація недоступна.',409);
+   after={...before,news:before.news.map(news=>news.id!==action.id?news:action.kind==='publish-news-draft'?
+    {...news,draft:false,publishedAt:new Date().toISOString()}:{...news,archived:true})};
   }
   await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=excluded.value',[key,JSON.stringify(after)]);
   await audit(c,actor,'unit.page.'+action.kind,id,before,after);

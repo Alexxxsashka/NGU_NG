@@ -1,14 +1,35 @@
 'use client';
-import {useState,type FormEvent} from 'react';
+import {useEffect,useState,type FormEvent} from 'react';
 import {Plus,Trash2} from 'lucide-react';
 import {evidenceLines} from '@/lib/report-limits';
 import {api,Field,Notice} from './ui';
 
-type Task={id:string;name:string;points:number;unitId:string|null};
+type Task={id:string;name:string;points:number;unitId:string|null;requirements?:string};
 type Row={id:number;taskId:string;quantity:string;links:string};
-export function PromotionReportForm({tasks,onSaved}:{tasks:Task[];onSaved:()=>Promise<void>}){
+export function PromotionReportForm({tasks,onSaved,actorId}:{actorId:string;tasks:Task[];onSaved:()=>Promise<void>}){
  const [rows,setRows]=useState<Row[]>([{id:0,taskId:'',quantity:'1',links:''}]);
  const [nextId,setNextId]=useState(1),[busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
+ const [loaded,setLoaded]=useState(false),[storageError,setStorageError]=useState(false);
+ const draftKey='ngu.promotion-draft:'+actorId;
+ useEffect(()=>{
+  try{
+   const raw=sessionStorage.getItem(draftKey);
+   if(raw){
+    const previous=JSON.parse(raw) as Row[];
+    if(Array.isArray(previous)&&previous.length>0&&previous.length<=50&&previous.every(row=>typeof row.id==='number'&&typeof row.taskId==='string'&&typeof row.quantity==='string'&&typeof row.links==='string')){
+     setRows(previous);setNextId(Math.max(...previous.map(row=>row.id))+1);
+    }
+   }
+  }catch{setStorageError(true);}
+  setLoaded(true);
+ },[draftKey]);
+ useEffect(()=>{
+  if(!loaded)return;
+  try{
+   if(rows.some(row=>row.taskId||row.links||row.quantity!=='1'))sessionStorage.setItem(draftKey,JSON.stringify(rows));
+   else sessionStorage.removeItem(draftKey);
+  }catch{setStorageError(true);}
+ },[draftKey,loaded,rows]);
  const update=(id:number,patch:Partial<Row>)=>setRows(current=>current.map(row=>row.id===id?{...row,...patch}:row));
  const points=rows.reduce((sum,row)=>sum+(tasks.find(task=>task.id===row.taskId)?.points??0)*Number(row.quantity),0);
  async function submit(event:FormEvent<HTMLFormElement>){
@@ -37,16 +58,17 @@ export function PromotionReportForm({tasks,onSaved}:{tasks:Task[];onSaved:()=>Pr
      </select></Field>
      <Field label="Кількість"><input type="number" min={1} max={100} step={1} required disabled={busy} value={row.quantity} onChange={e=>update(row.id,{quantity:e.target.value})}/></Field>
     </div>
+    {tasks.find(task=>task.id===row.taskId)?.requirements&&<p className="muted">{tasks.find(task=>task.id===row.taskId)?.requirements}</p>}
     <Field label="Посилання на докази"><textarea required rows={3} disabled={busy} value={row.links} placeholder="Одне HTTPS-посилання на рядок" onChange={e=>update(row.id,{links:e.target.value})}/><small>{evidenceLines(row.links).length} / 20 посилань</small></Field>
    </div>)}
    <button type="button" className="secondary full" disabled={busy||rows.length>=50} onClick={()=>{setRows(current=>[...current,{id:nextId,taskId:'',quantity:'1',links:''}]);setNextId(id=>id+1);}}><Plus size={17}/>Додати завдання</button>
   </div>
-  <aside className="report-aside"><section className="panel summary-panel"><h2>Підсумок звіту</h2><dl>
+  <aside className="report-aside"><section className="panel summary-panel"><h2>Підсумок звіту</h2><p className="muted">{storageError?'Чернетку не вдалося зберегти в браузері.':'Чернетка зберігається в цій вкладці.'}</p><dl>
    <div><dt>Завдань</dt><dd>{rows.filter(row=>row.taskId).length}</dd></div>
    <div><dt>Виконань</dt><dd>{rows.reduce((sum,row)=>sum+(row.taskId?Number(row.quantity):0),0)}</dd></div>
    <div className="points-total"><dt>Балів</dt><dd>{points.toLocaleString('uk-UA')}</dd></div>
   </dl><p className="muted">Бали будуть зараховані після перевірки.</p>
-  <button disabled={busy}>{busy?'Надсилаємо…':'Подати звіт'}</button></section>
+  <button disabled={busy||!loaded}>{busy?'Надсилаємо…':'Подати звіт'}</button></section>
   {error&&<Notice error>{error}</Notice>}{saved&&<Notice>Звіт надіслано на перевірку.</Notice>}</aside>
  </form>;
 }

@@ -363,3 +363,7 @@ dialog::backdrop {background:#05080bbc}
 .notification-read { justify-self: start; }
 
 .personnel-cover { --feature-cover: url("/portal-art/unit-actions/rank.webp"); }
+
+.workspace-switch { display:flex; justify-content:space-between; align-items:end; flex-wrap:wrap; gap:12px; margin-bottom:18px; }
+.workspace-switch .actions { margin:0; }
+.workspace-switch [aria-current=page] { border-color:var(--gold); }

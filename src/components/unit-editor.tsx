@@ -15,7 +15,7 @@ const actions=[
  {id:'rank',title:'Змінити звання й посаду бійця',description:'Оновити кадрові дані за Static ID.',icon:Shield},
  {id:'archive',title:'Керувати публікаціями',description:'Вибрати й видалити публікацію.',icon:Archive},
 ] as const;
-export function UnitEditor({unitId,info,news,ranks}:{ranks:{id:number;name:string}[];unitId:string;info:Info;news:{id:string;title:string}[]}){
+export function UnitEditor({unitId,info,news,ranks,mode}:{mode:'content'|'roster';ranks:{id:number;name:string}[];unitId:string;info:Info;news:{id:string;title:string;draft?:boolean;archived?:boolean}[]}){
  const [selected,setSelected]=useState<(typeof actions)[number]|null>(null);
  const router=useRouter();
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
@@ -26,10 +26,10 @@ export function UnitEditor({unitId,info,news,ranks}:{ranks:{id:number;name:strin
   finally{setBusy(false);}
  }
  return <section className="panel" id="unit-management">
-  <h2>Керування внутрішньою сторінкою</h2>
-  <p className="muted">Службова інформація, публікації й особовий склад.</p>
+  <h2>{mode==='content'?'Редагування внутрішньої сторінки':'Керування складом'}</h2>
+  <p className="muted">{mode==='content'?'Службова інформація та публікації.':'Доступ до підрозділу, звання та посади.'}</p>
   {message&&<Notice>{message}</Notice>}{error&&!selected&&<Notice error>{error}</Notice>}
-  <div className="home-card-grid">{actions.map(action=><button key={action.id} type="button" aria-haspopup="dialog"
+  <div className="home-card-grid">{actions.filter(action=>(action.id==='access'||action.id==='rank')===(mode==='roster')).map(action=><button key={action.id} type="button" aria-haspopup="dialog"
    className="home-route-card home-action-card" disabled={busy} onClick={()=>{setError('');setMessage('');setSelected(action);}}>
    <CardFace title={action.title} description={action.description} image={'/portal-art/unit-actions/'+action.id+'.webp'} icon={<action.icon size={19} aria-hidden="true"/>}/>
   </button>)}</div>
@@ -39,11 +39,11 @@ export function UnitEditor({unitId,info,news,ranks}:{ranks:{id:number;name:strin
     {infoFields.map(([name,label])=><Field key={name} label={label}><textarea name={name} rows={3} maxLength={name==='contacts'?2000:name==='schedule'?3000:4000} defaultValue={info[name]}/></Field>)}
     <button disabled={busy}>Зберегти інформацію</button>
    </form>}
-   {selected.id==='news'&&<form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;void save({kind:'publish',...Object.fromEntries(new FormData(form))},form);}}>
+   {selected.id==='news'&&<form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);void save({kind:'publish',type:data.get('type'),title:data.get('title'),body:data.get('body'),draft:data.has('draft')},form);}}>
     <Field label="Тип"><select name="type"><option value="news">Новина</option><option value="announcement">Оголошення</option></select></Field>
     <Field label="Заголовок"><input name="title" required maxLength={100}/></Field>
     <Field label="Текст"><textarea name="body" required rows={4} maxLength={3000}/></Field>
-    <button disabled={busy}>Опублікувати</button>
+    <label className="checkbox"><input type="checkbox" name="draft"/>Зберегти як чернетку</label><p>Після публікації повідомлення бачить склад підрозділу.</p><button disabled={busy}>Зберегти</button>
    </form>}
    {selected.id==='access'&&<form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);void save({kind:'member',staticId:data.get('staticId'),grant:data.get('grant')==='yes'},form);}}>
     <p>Вкажіть Static ID бійця з активним кадровим профілем. Переведення з іншого підрозділу виконує адміністратор.</p>
@@ -57,9 +57,9 @@ export function UnitEditor({unitId,info,news,ranks}:{ranks:{id:number;name:strin
     <Field label="Посада"><input name="position" maxLength={100}/></Field>
     <button disabled={busy}>Зберегти призначення</button>
    </form>}
-   {selected.id==='archive'&&<form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const id=new FormData(form).get('id');if(id&&confirm('Видалити вибрану публікацію?'))void save({kind:'remove-news',id},form);}}>
-    <Field label="Публікація"><select name="id" required defaultValue=""><option value="">Оберіть публікацію</option>{news.map(item=><option key={item.id} value={item.id}>{item.title}</option>)}</select></Field>
-    <button disabled={busy||news.length===0}>Видалити вибрану публікацію</button>
+   {selected.id==='archive'&&<form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const id=new FormData(form).get('id');const action=(e.nativeEvent as SubmitEvent).submitter?.getAttribute('value');if(id&&(action==='publish'||confirm('Архівувати вибрану публікацію?')))void save({kind:action==='publish'?'publish-news-draft':'remove-news',id},form);}}>
+    <Field label="Публікація"><select name="id" required defaultValue=""><option value="">Оберіть публікацію</option>{news.filter(item=>!item.archived).map(item=><option key={item.id} value={item.id}>{item.title}{item.draft?' · чернетка':''}</option>)}</select></Field>
+    <div className="actions"><button value="publish" disabled={busy||!news.some(item=>item.draft&&!item.archived)}>Опублікувати чернетку</button><button value="archive" disabled={busy||!news.some(item=>!item.archived)}>Архівувати</button></div>
    </form>}
   </Modal>}
  </section>;

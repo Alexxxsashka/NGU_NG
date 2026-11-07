@@ -6,7 +6,7 @@ import {Pencil} from 'lucide-react';
 import {IllustratedSummary} from './illustrated-summary';
 import {api,Field,Notice} from './ui';
 
-type Details={joinedOn:string|null;callsign:string;bio:string};
+type Details={joinedOn:string|null;joinedVerified?:boolean;callsign:string;bio:string};
 export function PersonalServiceForm({details,today}:{details:Details;today:string}){
  const router=useRouter();
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
@@ -25,7 +25,7 @@ export function PersonalServiceForm({details,today}:{details:Details;today:strin
   <form className="stack account-action-content" onSubmit={save}>
    <p className="muted">Звання, посаду й підрозділ змінює уповноважене командування.</p>
    <div className="form-grid">
-    <Field label="Дата вступу до НГУ"><input type="date" name="joinedOn" defaultValue={details.joinedOn??''} max={today}/></Field>
+    <Field label="Дата вступу до НГУ"><input type="date" name="joinedOn" readOnly={details.joinedVerified} defaultValue={details.joinedOn??''} max={today}/></Field>
     <Field label="Позивний"><input name="callsign" defaultValue={details.callsign} maxLength={40}/></Field>
    </div>
    <Field label="Коротко про себе"><textarea name="bio" defaultValue={details.bio} maxLength={500} rows={3}/></Field>

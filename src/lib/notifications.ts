@@ -14,6 +14,10 @@ export async function notifications(userId:string):Promise<Notification[]>{
    '/portal/personnel-actions#promotion-'||a.entity_id,a.created_at::text
   FROM audit_logs a WHERE a.action='personnel.promotion.decision' AND a.after->>'userId'=$1
   UNION ALL
+  SELECT 'application:'||a.id,'Заявку застосовано: '||(a.after->>'title'),
+   '/portal/requests?entry='||(a.after->>'id')||'#service-'||(a.after->>'id'),a.created_at::text
+  FROM audit_logs a WHERE a.action='service.request.applied' AND a.after->>'author'=$1
+  UNION ALL
   SELECT 'personnel:'||a.id,'Кадрова зміна у вашій особовій справі','/cabinet#cabinet-history',a.created_at::text
   FROM audit_logs a WHERE a.action='personnel.record' AND a.after->>'member'=$1
   UNION ALL
@@ -38,7 +42,7 @@ export async function notifications(userId:string):Promise<Notification[]>{
    '/portal/orders?entry='||(s.value->>'id')||'#service-'||(s.value->>'id'),s.value->>'createdAt'
   FROM settings s JOIN personnel p ON p.user_id=$1 AND p.active AND p.unit_id::text=s.value->>'unit'
   JOIN units u ON u.id=p.unit_id AND u.active
-  WHERE s.key LIKE 'service-entry:%' AND s.value->>'module'='orders' AND coalesce(s.value->>'archived','false')='false'
+  WHERE s.key LIKE 'service-entry:%' AND s.value->>'module'='orders' AND coalesce(s.value->>'archived','false')='false' AND coalesce(s.value->>'draft','false')='false'
  )
  SELECT id,title,href,created,EXISTS(SELECT 1 FROM settings seen WHERE seen.key='notification-read:'||$1||':'||events.id) AS read
  FROM events WHERE created IS NOT NULL ORDER BY created::timestamptz DESC,id LIMIT 50`,[userId]);

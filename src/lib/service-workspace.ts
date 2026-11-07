@@ -3,8 +3,9 @@ import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
 import {query,transaction} from '@/db';
 import {audit} from './admin';
+import {evidence} from './validation';
 import {HttpError} from './security';
-import {accessibleUnits} from './unit-page';
+import {workspaceUnits} from './workspace-scope';
 import type {Viewer} from './domain';
 
 import {serviceModules,type ServiceModule} from './portal-navigation';
@@ -12,42 +13,50 @@ const moduleSchema=z.enum(serviceModules);
 const title=z.string().trim().min(1).max(120);
 const body=z.string().trim().min(1).max(5000);
 const uuid=z.string().uuid();
-const requestTypes=['Переведення','Відпустка','Вступ або поновлення','Звільнення або оскарження'] as const;
+const requestTypes=['Переведення','Відпустка','Вступ або поновлення','Звільнення або оскарження','Звільнення','Виправлення особової справи'] as const;
 const operation=z.discriminatedUnion('kind',[
- z.object({kind:z.literal('request'),type:z.enum(requestTypes),body,targetUnit:uuid.optional()}),
- z.object({kind:z.literal('decide'),id:uuid,status:z.enum(['approved','rejected']),body}),
+ z.object({kind:z.literal('request'),type:z.enum(requestTypes),body,targetUnit:uuid.optional(),from:z.iso.date().optional(),to:z.iso.date().optional(),links:z.array(evidence).max(20).default([])}),
+ z.object({kind:z.literal('decide'),id:uuid,status:z.enum(['approved','rejected','clarification']),body}),
  z.object({kind:z.literal('publish'),module:moduleSchema.exclude(['requests']),unit:uuid,title,body,
-  url:z.url({protocol:/^https$/}).max(2048).refine(value=>{const link=new URL(value);return !link.username&&!link.password;}).optional(),date:z.iso.date().optional(),revision:title.optional(),category:title.optional(),replaces:uuid.optional()}),
+  url:z.url({protocol:/^https$/}).max(2048).refine(value=>{const link=new URL(value);return !link.username&&!link.password;}).optional(),date:z.iso.date().optional(),revision:title.optional(),category:title.optional(),replaces:uuid.optional(),draft:z.boolean().optional(),requiresProof:z.boolean().optional(),responsible:title.optional()}),
+ z.object({kind:z.literal('resubmit'),id:uuid,body,links:z.array(evidence).max(20).default([])}),
+ z.object({kind:z.literal('apply'),id:uuid,rank:z.number().int().positive().optional()}),
  z.object({kind:z.literal('transfer'),id:uuid}),
  z.object({kind:z.literal('attendance'),id:uuid,member:z.string().min(1).max(100).optional(),status:z.enum(['confirmed','declined','present','absent'])}),
+ z.object({kind:z.literal('publish-draft'),id:uuid}),
+ z.object({kind:z.literal('training-proof'),id:uuid,links:z.array(evidence).min(1).max(20)}),
  z.object({kind:z.literal('archive'),id:uuid}),
- z.object({kind:z.literal('result'),id:uuid,member:z.string().min(1).max(100),status:z.enum(['passed','retry'])}),
+ z.object({kind:z.literal('result'),id:uuid,member:z.string().min(1).max(100),status:z.enum(['passed','retry']),note:z.string().trim().max(2000).optional()}),
 ]);
 
 type Entry={
  id:string;module:ServiceModule;unit:string|null;author:string;name:string;title:string;body:string;createdAt:string;
- targetUnit?:string;url?:string;date?:string;revision?:string;category?:string;replaces?:string;appliedAt?:string;status?:'pending'|'approved'|'rejected';decision?:string;decidedBy?:string;decidedAt?:string;archived?:boolean;
+ targetUnit?:string;from?:string;to?:string;links?:string[];replies?:{body:string;links:string[];at:string}[];url?:string;date?:string;revision?:string;category?:string;replaces?:string;draft?:boolean;requiresProof?:boolean;responsible?:string;appliedAt?:string;status?:'pending'|'approved'|'rejected'|'clarification';decision?:string;decidedBy?:string;decidedAt?:string;archived?:boolean;
 };
 const prefix='service-entry:';
 
-export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:string|null=null){
- const units=await accessibleUnits(actor.id);
+export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:string|null=null,unitId:string|null=null){
+ const membership=await query<{unit_id:string|null}>('SELECT p.unit_id FROM personnel p JOIN units u ON u.id=p.unit_id AND u.active WHERE p.user_id=$1 AND p.active',[actor.id]);
+ const units=unitId?await workspaceUnits(actor.id,unitId):[];
+ const personalUnit=membership[0]?.unit_id;
+ const readUnits=unitId?units.map(unit=>unit.id):personalUnit?[personalUnit]:[];
  const editors=units.filter(unit=>unit.editor).map(unit=>unit.id);
- const [rows,people,results,targets,attendance,authority,membership]=await Promise.all([
+ const [rows,people,results,targets,attendance,authority,ranks]=await Promise.all([
   query<{value:Entry}>(`SELECT value FROM settings WHERE key LIKE 'service-entry:%' AND value->>'module'=$1
-   AND (value->>'author'=$2 OR ($1='requests' AND $5::boolean) OR value->>'unit'=ANY($3::text[]) OR value->>'targetUnit'=ANY($4::text[]))
+   AND (($5::boolean AND $1='requests' AND value->>'author'=$2) OR value->>'unit'=ANY($3::text[]) OR value->>'targetUnit'=ANY($4::text[]))
+   AND ($7::boolean OR coalesce(value->>'draft','false')='false')
    AND (coalesce(value->>'archived','false')='false' OR ($1='regulations' AND value->>'unit'=ANY($3::text[]))) ORDER BY (value->>'id'=$6) DESC NULLS LAST, CASE WHEN $1='calendar' THEN value->>'date' END ASC, value->>'createdAt' DESC LIMIT 200`,
-   [module,actor.id,module==='requests'?editors:units.map(unit=>unit.id),module==='requests'?editors:[],actor.role==='admin',focus]),
+   [module,actor.id,module==='requests'?editors:readUnits,module==='requests'?editors:[],!unitId,focus,!!unitId]),
   (module==='training'||module==='calendar')&&editors.length?query<{id:string;name:string;unit:string}>(
    "SELECT user_id AS id,first_name||' '||last_name AS name,unit_id AS unit FROM personnel WHERE active AND user_id IS NOT NULL AND unit_id=ANY($1::uuid[]) ORDER BY last_name",[editors]):[],
-  module==='training'?query<{value:{entry:string;member:string;status:string}}>(`SELECT value FROM settings WHERE key LIKE 'service-result:%' AND
+  module==='training'?query<{value:{entry:string;member:string;status?:string;links?:string[];note?:string}}>(`SELECT value FROM settings WHERE key LIKE 'service-result:%' AND
    (value->>'member'=$1 OR value->>'unit'=ANY($2::text[]))`,[actor.id,editors]):[],
   module==='requests'?query<{id:string;name:string}>('SELECT id,name FROM units WHERE active ORDER BY sort_order,name'):[],
   module==='calendar'?query<{value:{entry:string;member:string;status:string}}>(`SELECT value FROM settings WHERE key LIKE 'service-attendance:%' AND (value->>'member'=$1 OR value->>'unit'=ANY($2::text[]))`,[actor.id,editors]):[],
   module==='requests'?query("SELECT 1 FROM personnel p JOIN settings s ON s.key='service:'||p.id::text WHERE p.user_id=$1 AND p.active AND s.value->>'leadershipRole'='leadership'",[actor.id]):[],
-  module==='calendar'?query<{unit_id:string|null}>('SELECT unit_id FROM personnel WHERE user_id=$1 AND active',[actor.id]):[],
+  module==='requests'&&unitId?query<{id:number;name:string}>('SELECT id,name FROM ranks ORDER BY id'):[],
  ]);
- return {units,entries:rows.map(({value})=>value),people,results:results.map(({value})=>value),targets,attendance:attendance.map(row=>row.value),memberUnit:membership[0]?.unit_id,canTransfer:actor.role==='admin'||authority.length>0,actorId:actor.id,admin:actor.role==='admin'};
+ return {units,entries:rows.map(({value})=>value),people,results:results.map(({value})=>value),targets,ranks,attendance:attendance.map(row=>row.value),memberUnit:personalUnit,canTransfer:actor.role==='admin'||authority.length>0,actorId:actor.id,admin:actor.role==='admin'};
 }
 
 export async function changeServiceWorkspace(actor:Viewer,input:unknown){
@@ -67,18 +76,27 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    if(action.kind==='publish'&&!editors.has(action.unit))throw new HttpError('Ви не керуєте цим підрозділом.',403);
    if(action.kind==='request'&&action.type==='Переведення'&&(!action.targetUnit||action.targetUnit===account.unit_id||
      !(await c.query('SELECT id FROM units WHERE id=$1 AND active',[action.targetUnit])).rowCount))throw new HttpError('Оберіть інший чинний підрозділ.');
+   if(action.kind==='request'){
+    if(action.type==='Відпустка'&&(!action.from||!action.to||action.from>action.to))throw new HttpError('Вкажіть коректні дати відпустки.');
+    if(action.type==='Вступ або поновлення'&&(!action.targetUnit||!(await c.query('SELECT 1 FROM units WHERE id=$1 AND active',[action.targetUnit])).rowCount))
+     throw new HttpError('Оберіть підрозділ для вступу.');
+   }
    if(action.kind==='publish'&&action.module==='calendar'&&!action.date)throw new HttpError('Вкажіть дату події.');
    if(action.kind==='publish'&&action.replaces){
     const {rows:[previous]}=await c.query<{value:Entry}>('SELECT value FROM settings WHERE key=$1 FOR UPDATE',[prefix+action.replaces]);
-    if(action.module!=='regulations'||!previous||previous.value.module!==action.module||previous.value.unit!==action.unit||previous.value.archived||!action.revision)
+    if(action.module!=='regulations'||!previous||previous.value.module!==action.module||previous.value.unit!==action.unit||previous.value.archived||previous.value.draft||!action.revision)
      throw new HttpError('Оберіть чинний документ того самого підрозділу й укажіть редакцію.',409);
-    await write(prefix+action.replaces,{...previous.value,archived:true});
-    await audit(c,actor,'service.archive',action.replaces,previous.value,{...previous.value,archived:true});
+    if(!action.draft){
+     await write(prefix+action.replaces,{...previous.value,archived:true});
+     await audit(c,actor,'service.archive',action.replaces,previous.value,{...previous.value,archived:true});
+    }
    }
+   const previousUnit=action.kind==='request'&&action.type==='Вступ або поновлення'&&!account.unit_id?
+    (await c.query<{unit_id:string|null}>('SELECT unit_id FROM personnel WHERE user_id=$1',[actor.id])).rows[0]?.unit_id:null;
    const id=randomUUID();
-   const entry:Entry={id,module:action.kind==='request'?'requests':action.module,unit:action.kind==='request'?account.unit_id??null:action.unit,
+   const entry:Entry={id,module:action.kind==='request'?'requests':action.module,unit:action.kind==='request'?account.unit_id??previousUnit??null:action.unit,
     author:actor.id,name:actor.name,title:action.kind==='request'?action.type:action.title,body:action.body,createdAt:new Date().toISOString(),
-    ...(action.kind==='request'?{status:'pending' as const,targetUnit:action.type==='Переведення'?action.targetUnit:undefined}:{url:action.url,date:action.date,revision:action.revision,category:action.category,replaces:action.replaces})};
+    ...(action.kind==='request'?{status:'pending' as const,targetUnit:['Переведення','Вступ або поновлення'].includes(action.type)?action.targetUnit:undefined,from:action.from,to:action.to,links:action.links}:{url:action.url,date:action.date,revision:action.revision,category:action.category,replaces:action.replaces,draft:action.draft,requiresProof:action.requiresProof,responsible:action.responsible})};
    await write(prefix+id,entry);
    await audit(c,actor,'service.'+action.kind,id,null,entry);
    return {saved:true};
@@ -87,7 +105,37 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
   const entry=row?.value;
   if(!entry||entry.archived)throw new HttpError('Запис не знайдено.',404);
   const canEdit=!!entry.unit&&editors.has(entry.unit);
-  if(action.kind==='decide'){
+  if(action.kind==='resubmit'){
+   if(entry.module!=='requests'||entry.author!==actor.id||entry.status!=='clarification')throw new HttpError('Уточнення недоступне.',403);
+   const next={...entry,status:'pending',replies:[...entry.replies??[],{body:action.body,links:action.links,at:new Date().toISOString()}]};
+   await write(prefix+entry.id,next);
+   await audit(c,actor,'service.request.resubmit',entry.id,entry,next);
+  }else if(action.kind==='apply'){
+   if(entry.module!=='requests'||entry.status!=='approved'||entry.author===actor.id||!['Вступ або поновлення','Звільнення','Відпустка'].includes(entry.title))
+    throw new HttpError('Заявка недоступна для виконання.',409);
+   const admission=entry.title==='Вступ або поновлення';
+   const scope=admission?entry.targetUnit:entry.unit;
+   if(!scope||!editors.has(scope))throw new HttpError('Виконання поза межами ваших повноважень.',403);
+   if(entry.appliedAt)return {saved:true};
+   const {rows:[person]}=await c.query(`SELECT p.id,p.unit_id,p.active,p.rank,u.role,d.value AS details
+    FROM personnel p JOIN app_user u ON u.id=p.user_id LEFT JOIN settings d ON d.key='service:'||p.id::text
+    WHERE p.user_id=$1 FOR UPDATE OF p`,[entry.author]);
+   if(!person||person.role==='admin'||(person.details?.leadershipRole&&person.details.leadershipRole!=='member')||person.unit_id!==entry.unit)
+    throw new HttpError('Потрібна актуальна кадрова картка звичайного бійця.',409);
+   const next={...entry,appliedAt:new Date().toISOString()};
+   if(admission){
+    if((person.active&&person.unit_id)||(person.unit_id&&!editors.has(person.unit_id)&&account.role!=='admin'&&account.leadership_role!=='leadership')||!action.rank||!(await c.query('SELECT 1 FROM ranks WHERE id=$1',[action.rank])).rowCount)
+     throw new HttpError('Перевірте попереднє призначення та оберіть початкове звання.',409);
+    await c.query('UPDATE personnel SET unit_id=$1,rank=$2,active=true WHERE id=$3',[scope,action.rank,person.id]);
+    const date=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Kyiv'}).format(new Date());
+    await write('service:'+person.id,{...person.details,joinedOn:date,joinedOnVerified:true});
+   }else{
+    if(!person.active)throw new HttpError('Службовий профіль неактивний.',409);
+    if(entry.title==='Звільнення')await c.query('UPDATE personnel SET active=false WHERE id=$1',[person.id]);
+   }
+   await write(prefix+entry.id,next);
+   await audit(c,actor,'service.request.applied',person.id,{unitId:person.unit_id,rank:person.rank,active:person.active},{...next,unitId:scope,rank:admission?action.rank:person.rank,active:entry.title!=='Звільнення'});
+  }else if(action.kind==='decide'){
    if(entry.module!=='requests'||entry.author===actor.id||(!canEdit&&account.role!=='admin'&&!(entry.targetUnit&&editors.has(entry.targetUnit))))throw new HttpError('Рішення недоступне.',403);
    if(entry.status!=='pending')throw new HttpError('Рішення вже зафіксовано.',409);
    // Requests record a decision. Existing personnel controls apply changes to the roster.
@@ -109,7 +157,7 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    await write(prefix+entry.id,next);
    await audit(c,actor,'unit.transfer',person.id,{unitId:person.unit_id},{unitId:entry.targetUnit,entryId:entry.id,member:entry.author});
   }else if(action.kind==='attendance'){
-   if(entry.module!=='calendar'||!entry.unit||!entry.date)throw new HttpError('Це не подія календаря.',409);
+   if(entry.module!=='calendar'||entry.draft||!entry.unit||!entry.date)throw new HttpError('Це не подія календаря.',409);
    const tracking=action.status==='present'||action.status==='absent';
    const member=tracking?action.member:actor.id;
    const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Kyiv'}).format(new Date());
@@ -123,16 +171,37 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    const next={entry:entry.id,unit:entry.unit,member,status:action.status};
    await write(key,next);
    await audit(c,actor,'service.attendance',entry.id,previous?.value??null,next);
+  }else if(action.kind==='publish-draft'){
+   if(!canEdit||!entry.draft)throw new HttpError('Публікація чернетки недоступна.',403);
+   if(entry.replaces){
+    const {rows:[previous]}=await c.query<{value:Entry}>('SELECT value FROM settings WHERE key=$1 FOR UPDATE',[prefix+entry.replaces]);
+    if(!previous||previous.value.module!==entry.module||previous.value.unit!==entry.unit||previous.value.archived||previous.value.draft)
+     throw new HttpError('Попередня редакція вже змінилася.',409);
+    await write(prefix+entry.replaces,{...previous.value,archived:true});
+    await audit(c,actor,'service.archive',entry.replaces,previous.value,{...previous.value,archived:true});
+   }
+   const next={...entry,draft:false,createdAt:new Date().toISOString()};
+   await write(prefix+entry.id,next);
+   await audit(c,actor,'service.publish',entry.id,entry,next);
+  }else if(action.kind==='training-proof'){
+   if(entry.module!=='training'||entry.draft||!entry.requiresProof||entry.unit!==account.unit_id)throw new HttpError('Етап недоступний для подання доказів.',403);
+   const key='service-result:'+entry.id+':'+actor.id;
+   const {rows:[previous]}=await c.query('SELECT value FROM settings WHERE key=$1',[key]);
+   if(previous?.value?.status==='passed')throw new HttpError('Етап уже зараховано.',409);
+   const next={...previous?.value,entry:entry.id,unit:entry.unit,member:actor.id,links:[...new Set(action.links)]};
+   await write(key,next);
+   await audit(c,actor,'service.training.proof',entry.id,previous?.value??null,next);
   }else if(action.kind==='archive'){
    if(!canEdit||entry.module==='requests')throw new HttpError('Архівування недоступне.',403);
    await write(prefix+entry.id,{...entry,archived:true});
    await audit(c,actor,'service.archive',entry.id,entry,{...entry,archived:true});
   }else{
-   if(!canEdit||entry.module!=='training'||!(await c.query('SELECT id FROM personnel WHERE user_id=$1 AND unit_id=$2 AND active',[action.member,entry.unit])).rowCount)
+   if(!canEdit||entry.module!=='training'||entry.draft||!(await c.query('SELECT id FROM personnel WHERE user_id=$1 AND unit_id=$2 AND active',[action.member,entry.unit])).rowCount)
     throw new HttpError('Результат можна вказати для бійця цього підрозділу.',403);
    const key='service-result:'+entry.id+':'+action.member;
    const {rows:[old]}=await c.query('SELECT value FROM settings WHERE key=$1',[key]);
-   const next={entry:entry.id,unit:entry.unit,member:action.member,status:action.status};
+   if(action.status==='passed'&&entry.requiresProof&&!old?.value?.links?.length)throw new HttpError('Для цього етапу боєць має подати докази.',409);
+   const next={...old?.value,entry:entry.id,unit:entry.unit,member:action.member,status:action.status,note:action.note};
    await write(key,next);
    await audit(c,actor,'service.training.result',entry.id,old?.value??null,next);
   }

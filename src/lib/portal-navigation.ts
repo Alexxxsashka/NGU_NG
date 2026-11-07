@@ -2,10 +2,10 @@ export const serviceModules=['requests','training','calendar','regulations','ann
 export type ServiceModule=(typeof serviceModules)[number];
 
 export const portalGroups = [
- {title:'Головне', links:[['/','Головна'],['/cabinet','Особистий кабінет']]},
- {title:'Служба', links:[['/portal/logistics','Логістика й забезпечення']]},
+ {title:'Головне', links:[['/','Головна'],['/cabinet','Особистий кабінет'],['/portal/notifications','Сповіщення']]},
+ {title:'Моя служба', links:[['/my-unit','Мій підрозділ'],['/portal/requests','Мої заявки'],['/portal/calendar','Календар'],['/portal/training','Мій КМБ'],['/portal/regulations','Документи підрозділу'],['/portal/logistics','Логістика й забезпечення']]},
  {title:'Підготовка', links:[['/portal/lectures','Лекції та матеріали'],['/portal/exercises','Тренування й атестації']]},
- {title:'Звітність', links:[['/weekly-bonus','Щотижневе преміювання'],['/portal/audit','Журнал аудиту']]},
+ {title:'Моя звітність', links:[['/weekly-bonus/me','Мої тижневі звіти'],['/portal/promotion-points','Мої завдання й бали'],['/portal/personnel-actions','Запит на нове звання'],['/weekly-bonus','Щотижневе преміювання'],['/portal/audit','Журнал аудиту']]},
  {title:'Документи', links:[['/portal/orders','Накази та розпорядження'],['/portal/announcements','Оголошення']]},
  {title:'Управління', links:[['/portal/command','Панель командування'],['/portal/administration','Адміністрування']]},
 ] as const;
@@ -62,8 +62,8 @@ export function visiblePortalGroups(isAdmin:boolean,signedIn=false){
  return portalGroups.map(group=>({
   title:group.title,
   links:[
-   ...group.links.filter(([href])=>isAdmin||!href.startsWith('/portal/')||(signedIn&&serviceModules.some(module=>href==='/portal/'+module))),
-   ...(isAdmin?adminGroupLinks[group.title]??[]:[]),
+   ...group.links.filter(([href])=>isAdmin||(href==='/'||href==='/weekly-bonus')||(signedIn&&(!href.startsWith('/portal/')||['/portal/notifications','/portal/personnel-actions','/portal/promotion-points'].includes(href)||serviceModules.some(module=>href==='/portal/'+module)))),
+   ...(isAdmin?(adminGroupLinks[group.title]??[]).filter(([href])=>!group.links.some(([existing])=>existing===href)):[]),
   ],
  })).filter(group=>group.links.length>0);
 }

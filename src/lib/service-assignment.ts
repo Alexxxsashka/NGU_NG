@@ -87,6 +87,7 @@ export async function savePersonalServiceDetails(input:unknown,actor:Viewer){
   if(!profile)throw new HttpError('Потрібен активний кадровий профіль.',403);
   const key='service:'+profile.id;
   const {rows:[old]}=await c.query("SELECT value FROM settings WHERE key=$1",[key]);
+  if(old?.value?.joinedOnVerified)details.joinedOn=old.value.joinedOn??null;
   const before={joinedOn:old?.value?.joinedOn??null,callsign:old?.value?.callsign??'',bio:old?.value?.bio??''};
   await c.query(`
    INSERT INTO settings(key,value) VALUES($1,$2::jsonb)
