@@ -1,3 +1,6 @@
+import {CabinetActivity} from './cabinet-activity';
+import {PasswordAction} from './personal';
+import {dateLabel} from '@/lib/domain';
 import {PersonalServiceForm} from './personal-service-form';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -28,7 +31,7 @@ type ServiceCard={
 export async function ServiceTablet({user,editable=true}:{user:Viewer;editable?:boolean}){
  const Heading=editable?'h1':'h2';
  const [card]=await query<ServiceCard>(`
-  SELECT p.static_id,CASE WHEN u.active THEN u.id END AS unit_id,p.first_name,p.last_name,p.active,p.rank,u.name AS unit_name,k.name AS rank_name,
+  SELECT p.static_id,CASE WHEN u.active THEN u.id END AS unit_id,p.first_name,p.last_name,p.active,p.rank,CASE WHEN u.active THEN u.name END AS unit_name,k.name AS rank_name,
          details.value->>'leadershipRole' AS leadership_role,details.value->>'joinedOn' AS joined_on,details.value->>'callsign' AS callsign,details.value->>'bio' AS bio,details.value->>'position' AS position,
          totals.reports,totals.approved_quantity,totals.approved_points,totals.pending_items
   FROM personnel p
@@ -45,13 +48,17 @@ export async function ServiceTablet({user,editable=true}:{user:Viewer;editable?:
   ) totals
   WHERE p.user_id=$1
  `,[user.id]);
+ const [account]=card?[]:await query<{username:string|null}>('SELECT username FROM app_user WHERE id=$1',[user.id]);
+ const staticId=card?.static_id??account?.username?.match(/^static_([0-9]+)$/)?.[1];
  const number=(value:string)=>BigInt(value).toLocaleString('uk-UA');
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Kyiv'}).format(new Date());
- const days=card?.joined_on&&card.active?Math.max(0,Math.round((Date.parse(today)-Date.parse(card.joined_on))/86400000)):null;
+ const joinedOn=card?.joined_on&&Number.isFinite(Date.parse(card.joined_on))?card.joined_on:null;
+ const days=joinedOn&&card?.active?Math.max(0,Math.round((Date.parse(today)-Date.parse(joinedOn))/86400000)):null;
  const facts=[
   {label:'Звання',value:card?.rank_name??(card?.rank!=null?String(card.rank):'Не призначено'),icon:Shield},
-  {label:'Підрозділ',value:card?.unit_name??'Не призначено',icon:Users},
+  {label:'Підрозділ',value:card?.unit_name??'Очікує призначення',icon:Users},
   {label:'Посада',value:card?.position||'Не призначено',icon:Layers3},
+  {label:'Дата вступу',value:joinedOn?dateLabel(joinedOn):'Не вказано',icon:CalendarDays},
   {label:'Днів у фракції',value:days===null?'—':days.toLocaleString('uk-UA'),icon:CalendarDays},
  ];
  const totals=card?.active?[
@@ -68,8 +75,8 @@ export async function ServiceTablet({user,editable=true}:{user:Viewer;editable?:
     <Heading id="service-tablet-title">{card?card.first_name+' '+card.last_name:user.name}</Heading>
     <div className="service-status">
      {card?.callsign&&<span>Позивний <strong>{card.callsign}</strong></span>}
-     {card&&<span>Static ID <strong>{card.static_id}</strong></span>}
-     <span className={'pill '+(card?.active?'approved':'prime')}>{card?(card.active?'Активний профіль':'Архівний профіль'):'Профіль очікує прив’язки'}</span>
+     {staticId&&<span>Static ID <strong>{staticId}</strong></span>}
+     <span className={'pill '+(card?.active?'approved':'prime')}>{card?(card.active?(card.unit_id?'Активний профіль':'Очікує призначення'):'Архівний профіль'):'Профіль очікує прив’язки'}</span>
     </div>
    </div>
   </header>
@@ -82,10 +89,19 @@ export async function ServiceTablet({user,editable=true}:{user:Viewer;editable?:
     <Icon size={19} aria-hidden="true"/><dt>{label}</dt><dd>{number(value)}</dd>
    </div>)}</dl>
   </section>}
-  {card?.active&&(card.unit_id||card.leadership_role==='leadership')&&<div className="service-actions">
+  {!editable&&card?.active&&(card.unit_id||card.leadership_role==='leadership')&&<div className="service-actions">
    <Link className="button secondary" href={card.leadership_role==='leadership'?'/my-unit':'/units/'+card.unit_id}><Users size={17} aria-hidden="true"/> {card.leadership_role==='leadership'?'Усі підрозділи':'Мій підрозділ'}</Link>
   </div>}
  </section>
- {editable&&card?.active&&<PersonalServiceForm today={today} details={{joinedOn:card.joined_on,callsign:card.callsign??'',bio:card.bio??''}}/>}
+ {editable&&<>
+  <CabinetActivity user={user} today={today} joinedOn={joinedOn}/>
+  <section className="portal-shortcuts" aria-labelledby="cabinet-security">
+   <h2 id="cabinet-security">Особисті дані та безпека</h2>
+   <div className="cabinet-security-grid">
+    {card?.active&&<PersonalServiceForm today={today} details={{joinedOn,callsign:card.callsign??'',bio:card.bio??''}}/>}
+    <PasswordAction/>
+   </div>
+  </section>
+ </>}
  </>;
 }

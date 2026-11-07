@@ -1,6 +1,6 @@
 'use client';
 
-import {useState,type FormEvent} from 'react';
+import {useEffect,useRef,useState,type FormEvent} from 'react';
 import type {serviceWorkspace} from '@/lib/service-workspace';
 import type {ServiceModule} from '@/lib/portal-navigation';
 import {IllustratedSummary} from './illustrated-summary';
@@ -17,8 +17,14 @@ const actions:Record<ServiceModule,string>={
 const artwork:Record<ServiceModule,string>={requests:'transfer',training:'briefing',calendar:'assembly',regulations:'garrison',announcements:'command',orders:'approval',lectures:'radio'};
 const statusLabels={pending:'На розгляді',approved:'Погоджено',rejected:'Відхилено'};
 
-export function ServiceWorkspace({module}:{module:ServiceModule}){
- const {data,error,refresh}=useResource<Awaited<ReturnType<typeof serviceWorkspace>>>('service/'+module);
+export function ServiceWorkspace({module,focus}:{module:ServiceModule;focus?:string}){
+ const {data,error,refresh}=useResource<Awaited<ReturnType<typeof serviceWorkspace>>>('service/'+module+(focus?'?entry='+encodeURIComponent(focus):''));
+ const visitedEntry=useRef<string|null>(null);
+ useEffect(()=>{
+  if(!focus||visitedEntry.current===focus||!data?.entries.some(entry=>entry.id===focus))return;
+  document.getElementById('service-'+focus)?.scrollIntoView({block:'start'});
+  visitedEntry.current=focus;
+ },[data,focus]);
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[failure,setFailure]=useState('');
  async function save(event:FormEvent<HTMLFormElement>,make:(fields:FormData)=>unknown){
   event.preventDefault();
@@ -61,7 +67,7 @@ export function ServiceWorkspace({module}:{module:ServiceModule}){
   {data?.entries.length===0&&<p>Записів поки немає.</p>}
   {data?.entries.map(entry=>{
    const ownResult=data.results.find(result=>result.entry===entry.id&&result.member===data.actorId);
-   return <article className="panel" key={entry.id}>
+   return <article className="panel cabinet-target" id={'service-'+entry.id} key={entry.id}>
     <h2>{entry.title}</h2>
     <p className="muted">{data.units.find(unit=>unit.id===entry.unit)?.name||data.targets.find(unit=>unit.id===entry.unit)?.name||'Без підрозділу'} · {entry.name}</p>
     {entry.targetUnit&&<p>Бажаний підрозділ: {data.targets.find(unit=>unit.id===entry.targetUnit)?.name||'Архівний'}</p>}

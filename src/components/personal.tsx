@@ -1,18 +1,14 @@
 'use client';
-import Image from 'next/image';
-import {ChevronDown} from 'lucide-react';
+import {LockKeyhole} from 'lucide-react';
+import {IllustratedSummary} from './illustrated-summary';
 import type {ReactNode} from 'react';
 import {useRouter} from 'next/navigation';
 import {useState} from 'react';
 import {api,Notice,Field} from './ui';
-function AccountAction({title, image, children}:{title:string;image:string;children:ReactNode}){
- return <details className="account-action narrow">
-  <summary>
-   <Image src={image} alt="" fill sizes="(max-width: 700px) 100vw, 620px"/>
-   <span>{title}</span>
-   <ChevronDown size={22} aria-hidden="true"/>
-  </summary>
-  <div className="account-action-content">{children}</div>
+export function PasswordAction(){
+ return <details className="account-action profile-action">
+  <IllustratedSummary title="Змінити пароль" image="/portal-art/cabinet/security.webp" icon={<LockKeyhole size={18} aria-hidden="true"/>}/>
+  <div className="account-action-content"><PasswordForm required={false}/></div>
  </details>;
 }
 
@@ -44,6 +40,6 @@ export function Personal({mustChangePassword,overview}:{mustChangePassword:boole
    <Notice>Ви увійшли з тимчасовим паролем. Установіть новий пароль, щоб відкрити кабінет.</Notice>
    <PasswordForm required/>
   </section>:
-  <>{overview}<AccountAction title="Змінити пароль" image="/account-password.png"><PasswordForm required={false}/></AccountAction></>
+  overview
  }</div>;
 }

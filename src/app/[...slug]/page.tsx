@@ -15,7 +15,7 @@ import {Personal} from '@/components/personal';
 import {UnitSpace} from '@/components/unit-space';
 import {ServiceWorkspace} from '@/components/service-workspace';
 import {ServiceTablet} from '@/components/service-tablet';
-export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string;next?:string}>}){
+export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string;next?:string;entry?:string;report?:string}>}){
  const {slug}=await params;const path=slug.join('/');
  if(path==='weekly-bonus')return <div id="content"><section className="panel portal-preview-header weekly-bonus-banner">
   <h1>Щотижневе преміювання</h1>
@@ -40,7 +40,7 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
  }
  if(['login','register','recover','setup'].includes(path))return <AuthScreen returnToReport={(await searchParams).next==='report'} passwordChanged={path==='login'&&(await searchParams).password==='changed'} mode={path as 'login'|'register'|'recover'|'setup'}/>;
  if(path==='my-unit'||slug[0]==='units'&&slug.length===2){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <UnitSpace userId={u.id} unitId={slug[1]}/>;}
- if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <section id="content"><h1>Мої звіти</h1><details className="account-action profile-action service-reports"><IllustratedSummary title="Журнал звітів" image="/portal-art/catalog/report-journal.webp"/><div className="account-action-content"><ReportList personal/></div></details></section>;}
+ if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <section id="content"><h1>Мої звіти</h1><details className="account-action profile-action service-reports" open={!!(await searchParams).report}><IllustratedSummary title="Журнал звітів" image="/portal-art/catalog/report-journal.webp"/><div className="account-action-content"><ReportList personal/></div></details></section>;}
  if(path==='cabinet'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword} overview={u.mustChangePassword?null:<ServiceTablet user={u}/>}/>;}
  if(slug[0]==='portal'&&slug.length===2&&Object.hasOwn(portalPreviews,slug[1])){
   const section=slug[1];
@@ -49,7 +49,7 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
   if(serviceModules.includes(section as ServiceModule)){
    if(!user)redirect('/login');
    if(user.mustChangePassword)redirect('/cabinet');
-   return <ServiceWorkspace key={section} module={section as ServiceModule}/>;
+   return <ServiceWorkspace key={section} module={section as ServiceModule} focus={(await searchParams).entry}/>;
   }
   if(!user||user.role!=='admin'||user.mustChangePassword)notFound();
   if(Object.hasOwn(adminPortalRoutes,section))redirect(adminPortalRoutes[section]);

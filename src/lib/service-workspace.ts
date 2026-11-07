@@ -28,14 +28,14 @@ type Entry={
 };
 const prefix='service-entry:';
 
-export async function serviceWorkspace(actor:Viewer,module:ServiceModule){
+export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:string|null=null){
  const units=await accessibleUnits(actor.id);
  const editors=units.filter(unit=>unit.editor).map(unit=>unit.id);
  const [rows,people,results,targets]=await Promise.all([
   query<{value:Entry}>(`SELECT value FROM settings WHERE key LIKE 'service-entry:%' AND value->>'module'=$1
    AND (value->>'author'=$2 OR ($1='requests' AND $5::boolean) OR value->>'unit'=ANY($3::text[]) OR value->>'targetUnit'=ANY($4::text[]))
-   AND coalesce(value->>'archived','false')='false' ORDER BY CASE WHEN $1='calendar' THEN value->>'date' END ASC, value->>'createdAt' DESC LIMIT 200`,
-   [module,actor.id,module==='requests'?editors:units.map(unit=>unit.id),module==='requests'?editors:[],actor.role==='admin']),
+   AND coalesce(value->>'archived','false')='false' ORDER BY (value->>'id'=$6) DESC NULLS LAST, CASE WHEN $1='calendar' THEN value->>'date' END ASC, value->>'createdAt' DESC LIMIT 200`,
+   [module,actor.id,module==='requests'?editors:units.map(unit=>unit.id),module==='requests'?editors:[],actor.role==='admin',focus]),
   module==='training'&&editors.length?query<{id:string;name:string;unit:string}>(
    "SELECT user_id AS id,first_name||' '||last_name AS name,unit_id AS unit FROM personnel WHERE active AND user_id IS NOT NULL AND unit_id=ANY($1::uuid[]) ORDER BY last_name",[editors]):[],
   module==='training'?query<{value:{entry:string;member:string;status:string}}>(`SELECT value FROM settings WHERE key LIKE 'service-result:%' AND

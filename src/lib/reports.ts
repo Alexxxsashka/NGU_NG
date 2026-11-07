@@ -1,6 +1,7 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import Decimal from 'decimal.js';
+import {z} from 'zod';
 import {taskReward} from './rewards';
 import { query,transaction } from '@/db';
 import { hash,HttpError,throttle,member } from './security';
@@ -58,9 +59,9 @@ export async function submitReport(request:Request,input:unknown){
     return {reportId:id,number,week:p.week,points:total,quantity:p.entries.reduce((n,e)=>n+e.quantity,0)};
   });
 }
-export type Filters={from:string;to:string;unit:string;search:string;status:string;time:string;page:number};
-export function filters(url:URL):Filters{const f=url.searchParams;const from=week.parse(f.get('from')||currentWeek()),to=week.parse(f.get('to')||from);if(from>to)throw new HttpError('Початок періоду має передувати завершенню.');if((+new Date(to)-+new Date(from))/86400000>366)throw new HttpError('Оберіть період до одного року.');return {from,to,unit:f.get('unit')||'',search:(f.get('search')||'').slice(0,80),status:f.get('status')||'',time:f.get('time')||'',page:Math.max(1,Math.min(10000,Math.floor(Number(f.get('page')))||1))};}
-export function reportWhere(f:Filters,personnelId?:string,authorId?:string){const values:unknown[]=[f.from,f.to];const clauses=['r.week_start BETWEEN $1 AND $2'];const add=(sql:string,v:unknown)=>{values.push(v);clauses.push(sql.replace('?',`$${values.length}`));};if(f.unit)add('r.unit_id::text=?',f.unit);if(f.search)add("(r.static_id || ' ' || r.first_name || ' ' || r.last_name) ILIKE ?",'%'+f.search.replace(/[%_\\]/g,'\\$&')+'%');if(f.status)add('i.status=?',itemStatus.parse(f.status));if(f.time)add('i.time_category=?',f.time);if(authorId){values.push(authorId,personnelId??null);clauses.push('(r.author_id=$'+(values.length-1)+' OR r.personnel_id=$'+values.length+'::uuid)');}else if(personnelId)add('r.personnel_id::text=?',personnelId);return {sql:clauses.join(' AND '),values};}
+export type Filters={from:string;to:string;unit:string;search:string;status:string;time:string;page:number;report?:string};
+export function filters(url:URL):Filters{const f=url.searchParams;const from=week.parse(f.get('from')||currentWeek()),to=week.parse(f.get('to')||from);if(from>to)throw new HttpError('Початок періоду має передувати завершенню.');if((+new Date(to)-+new Date(from))/86400000>366)throw new HttpError('Оберіть період до одного року.');return {from,to,unit:f.get('unit')||'',search:(f.get('search')||'').slice(0,80),status:f.get('status')||'',time:f.get('time')||'',report:f.has('report')?z.uuid().parse(f.get('report')):undefined,page:Math.max(1,Math.min(10000,Math.floor(Number(f.get('page')))||1))};}
+export function reportWhere(f:Filters,personnelId?:string,authorId?:string){const values:unknown[]=[f.from,f.to];const clauses=['r.week_start BETWEEN $1 AND $2'];const add=(sql:string,v:unknown)=>{values.push(v);clauses.push(sql.replace('?',`$${values.length}`));};if(f.report)add('r.id=?::uuid',f.report);if(f.unit)add('r.unit_id::text=?',f.unit);if(f.search)add("(r.static_id || ' ' || r.first_name || ' ' || r.last_name) ILIKE ?",'%'+f.search.replace(/[%_\\]/g,'\\$&')+'%');if(f.status)add('i.status=?',itemStatus.parse(f.status));if(f.time)add('i.time_category=?',f.time);if(authorId){values.push(authorId,personnelId??null);clauses.push('(r.author_id=$'+(values.length-1)+' OR r.personnel_id=$'+values.length+'::uuid)');}else if(personnelId)add('r.personnel_id::text=?',personnelId);return {sql:clauses.join(' AND '),values};}
 export async function listReports(f:Filters,u:Viewer,personal=false){
   let profile;if(personal){profile=(await query('SELECT * FROM personnel WHERE user_id=$1 AND active=true',[u.id]))[0];}
   const w=reportWhere(f,profile?.id,personal?u.id:undefined);

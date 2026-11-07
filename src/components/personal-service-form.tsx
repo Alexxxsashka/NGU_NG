@@ -21,9 +21,9 @@ export function PersonalServiceForm({details,today}:{details:Details;today:strin
   finally{setBusy(false);}
  }
  return <details className="account-action profile-action">
-  <IllustratedSummary title="Редагувати особисті дані" image="/portal-art/profile.webp" icon={<Pencil size={18} aria-hidden="true"/>}/>
+  <IllustratedSummary title="Редагувати особисті дані" image="/portal-art/cabinet/profile.webp" icon={<Pencil size={18} aria-hidden="true"/>}/>
   <form className="stack account-action-content" onSubmit={save}>
-   <p className="muted">Звання, посаду та підрозділ змінює уповноважений адміністратор у кадровому розділі.</p>
+   <p className="muted">Звання, посаду й підрозділ змінює уповноважене командування.</p>
    <div className="form-grid">
     <Field label="Дата вступу до НГУ"><input type="date" name="joinedOn" defaultValue={details.joinedOn??''} max={today}/></Field>
     <Field label="Позивний"><input name="callsign" defaultValue={details.callsign} maxLength={40}/></Field>
