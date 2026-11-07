@@ -6,7 +6,7 @@ import {
 import type {LucideIcon} from 'lucide-react';
 
 const icons:Record<string,LucideIcon>={
- '/':House,'/weekly-bonus/me':UserRound,'/weekly-bonus':Wallet,
+ '/':House,'/cabinet':UserRound,'/my-unit':Users,'/weekly-bonus/me':UserRound,'/weekly-bonus':Wallet,
  '/portal/notifications':Bell,'/portal/personnel':Users,'/portal/structure':Network,
  '/portal/personnel-actions':FileBadge,'/portal/calendar':CalendarDays,'/portal/requests':ClipboardList,
  '/portal/logistics':Boxes,'/portal/training':GraduationCap,'/portal/lectures':FolderOpen,

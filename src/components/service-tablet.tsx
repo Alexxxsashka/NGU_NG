@@ -26,6 +26,7 @@ type ServiceCard={
 };
 
 export async function ServiceTablet({user,editable=true}:{user:Viewer;editable?:boolean}){
+ const Heading=editable?'h1':'h2';
  const [card]=await query<ServiceCard>(`
   SELECT p.static_id,CASE WHEN u.active THEN u.id END AS unit_id,p.first_name,p.last_name,p.active,p.rank,u.name AS unit_name,k.name AS rank_name,
          details.value->>'leadershipRole' AS leadership_role,details.value->>'joinedOn' AS joined_on,details.value->>'callsign' AS callsign,details.value->>'bio' AS bio,details.value->>'position' AS position,
@@ -64,7 +65,7 @@ export async function ServiceTablet({user,editable=true}:{user:Viewer;editable?:
    <Image src="/ngu-emblem.svg" alt="" width={76} height={76}/>
    <div>
     <div className="service-kicker">Службовий планшет НГУ</div>
-    <h1 id="service-tablet-title">{card?card.first_name+' '+card.last_name:user.name}</h1>
+    <Heading id="service-tablet-title">{card?card.first_name+' '+card.last_name:user.name}</Heading>
     <div className="service-status">
      {card?.callsign&&<span>Позивний <strong>{card.callsign}</strong></span>}
      {card&&<span>Static ID <strong>{card.static_id}</strong></span>}

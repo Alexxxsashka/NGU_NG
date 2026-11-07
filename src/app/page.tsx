@@ -1,12 +1,11 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import {ArrowUpRight} from 'lucide-react';
 import {headers} from 'next/headers';
 import {viewer} from '@/lib/auth';
 import {PortalDashboard} from '@/components/portal-dashboard';
 import {redirect} from 'next/navigation';
 import {PortalIcon} from '@/components/portal-icon';
-import {visiblePortalGroups} from '@/lib/portal-navigation';
+import {PortalMatrix} from '@/components/portal-matrix';
 
 export default async function Home(){
  const user=await viewer(await headers()).catch(()=>null);
@@ -27,12 +26,6 @@ export default async function Home(){
     </div>
    </div>
   </section>
-  <section className="portal-index" aria-labelledby="portal-index-title">
-   <h2 id="portal-index-title">Розділи порталу</h2>
-   <div className="portal-index-grid">{visiblePortalGroups(false).map(group=><section className="portal-index-group" key={group.title}>
-    <h3><PortalIcon href={group.links[0][0]} size={22}/>{group.title}</h3>
-    {group.links.map(([href,label])=><Link key={href} href={href}><PortalIcon href={href}/><span>{label}</span>{href.startsWith('/portal/')&&<small>У розробці</small>}<ArrowUpRight aria-hidden="true" size={15}/></Link>)}
-   </section>)}</div>
-  </section>
+  <PortalMatrix/>
  </div>;
 }

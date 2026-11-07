@@ -195,7 +195,7 @@ dialog::backdrop {background:#05080bbc}
 .service-identity img { width: clamp(44px,9vw,76px); height: auto; flex: none; }
 .service-identity > div { min-width: 0; }
 .service-kicker { color: #c4a35f; font-size: 12px; }
-.service-identity h1 { margin-block: 4px 8px; font-size: clamp(28px,5vw,54px); line-height: 1.08; overflow-wrap: anywhere; }
+.service-identity :is(h1,h2) { margin-block: 4px 8px; font-size: clamp(28px,5vw,54px); line-height: 1.08; overflow-wrap: anywhere; }
 .service-status { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; color: var(--muted); }
 .service-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,150px),1fr)); gap: 1px; background: var(--line); }
 .service-grid > div { display: grid; align-content: start; gap: 4px; padding: 16px 18px; background: var(--surface); }
@@ -260,3 +260,50 @@ dialog::backdrop {background:#05080bbc}
 .account-action[open] > summary span svg { transform: none; }
 
 .portal-reference p { margin: 0; max-width: 72ch; }
+
+.home-briefing {
+ position: relative; isolation: isolate; overflow: hidden;
+ display: flex; align-items: center; gap: clamp(14px, 3vw, 30px);
+ padding: clamp(20px, 4vw, 42px); border: 1px solid var(--line); border-radius: var(--radius);
+ background: var(--surface);
+}
+.home-briefing-art { object-fit: cover; object-position: right center; z-index: -2; }
+.home-briefing::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, #0d131a 16%, #0d131ae8 52%, #0d131a66); }
+.home-briefing-emblem { flex: 0 0 auto; width: clamp(42px, 7vw, 68px); height: auto; }
+.home-briefing h1 { margin: 4px 0; overflow-wrap: anywhere; }
+.home-briefing p { color: var(--gold); margin: 0; }
+.home-briefing span { color: var(--muted); }
+.home-directory { margin: 30px 0; }
+.home-directory-heading { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
+.home-directory-heading h2 { margin: 0; }
+.home-directory-heading > span { color: var(--muted); font-size: .82rem; }
+.home-tablist { display: flex; gap: 8px; overflow-x: auto; padding: 4px 4px 12px; margin: 0 -4px 12px; }
+.home-tablist button {
+ position: relative; isolation: isolate; flex: 0 0 auto; min-width: 112px; min-height: 52px;
+ justify-content: center; overflow: hidden; padding: 10px 14px;
+ background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+}
+.home-tablist button img { object-fit: cover; z-index: -2; }
+.home-tablist button::before { content: ''; position: absolute; inset: 0; z-index: -1; background: #0d131ac4; }
+.home-tablist button[aria-selected=true] { color: var(--gold); border-color: var(--gold); box-shadow: inset 0 -2px var(--gold); }
+.home-tablist button:hover { color: var(--gold); }
+.home-tablist button:focus-visible, .home-route-card:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.home-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.home-route-card {
+ display: flex; flex-direction: column; overflow: hidden; color: var(--ink); text-decoration: none;
+ background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.home-route-card:hover { color: var(--ink); border-color: var(--gold); }
+.home-route-art { position: relative; aspect-ratio: 16 / 9; background: #101820; }
+.home-route-art img { object-fit: cover; }
+.home-route-art .pill { position: absolute; top: 10px; right: 10px; }
+.home-route-copy { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 10px; padding: 14px; }
+.home-route-copy h3 { margin: 0 0 4px; overflow-wrap: anywhere; }
+.home-route-copy p { margin: 0; color: var(--muted); font-size: .82rem; }
+.home-route-copy > svg, .home-route-icon { color: var(--gold); }
+@media (max-width: 1050px) { .home-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) {
+ .home-card-grid { grid-template-columns: 1fr; }
+ .home-directory { margin: 24px 0; }
+ .home-tablist button { min-width: 98px; }
+}

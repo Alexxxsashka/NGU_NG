@@ -3,6 +3,8 @@ import {query} from '@/db';
 import {currentWeek,statusLabels} from '@/lib/domain';
 import type {Viewer} from '@/lib/domain';
 import {accessibleUnits,loadUnitContent} from '@/lib/unit-page';
+import Image from 'next/image';
+import {PortalMatrix} from './portal-matrix';
 import {ServiceTablet} from './service-tablet';
 
 export async function PortalDashboard({user}:{user:Viewer}){
@@ -22,7 +24,12 @@ export async function PortalDashboard({user}:{user:Viewer}){
  ]);
  const latest=news.flat().sort((a,b)=>b.publishedAt.localeCompare(a.publishedAt))[0];
  return <div id="content">
-  <ServiceTablet user={user} editable={false}/>
+  <header className="home-briefing">
+   <Image className="home-briefing-art" src="/portal-art/home/cabinet.webp" alt="" fill sizes="(max-width: 700px) 100vw, 80vw"/>
+   <Image className="home-briefing-emblem" src="/ngu-emblem.svg" alt="" width={68} height={68}/>
+   <div><p>Службовий портал НГУ</p><h1>{user.name}</h1><span>{managed.length>1?'Огляд командування':managed.length?'Кабінет командування підрозділу':'Особистий робочий простір'}</span></div>
+  </header>
+  <PortalMatrix signedIn admin={user.role==='admin'} hasUnits={units.length>0}/>
   <div className="portal-feature-grid">
    <section><h2>Цього тижня</h2>{reports.length?<ul>{reports.map(report=><li key={report.number}>{report.number} · {statusLabels[report.status]||report.status}</li>)}</ul>:<p>Звітів за цей тиждень ще немає.</p>}
     <Link className="button secondary" href="/weekly-bonus">Щотижневе преміювання</Link></section>
@@ -33,5 +40,6 @@ export async function PortalDashboard({user}:{user:Viewer}){
    <ul>{managed.map(unit=><li key={unit.id}><Link href={'/units/'+unit.id}>{unit.name}</Link> · {roster.find(row=>row.unit_id===unit.id)?.total??0} у складі</li>)}</ul>
    <Link className="button secondary" href="/portal/requests">Черга службових заявок</Link>
   </section>}
+  <ServiceTablet user={user} editable={false}/>
  </div>;
 }
