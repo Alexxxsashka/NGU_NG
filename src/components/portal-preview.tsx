@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import {ArrowUpRight, HardHat, Home, PanelTop} from 'lucide-react';
 import {portalGuides} from '@/lib/portal-guides';
+import {IllustratedSummary} from './illustrated-summary';
 import {PortalIcon} from './portal-icon';
 import {portalAdminLinks,portalGroups,portalPreviews} from '@/lib/portal-navigation';
 
@@ -21,7 +22,7 @@ export function PortalPreview({slug,showAdminLinks=false}:{slug:string;showAdmin
   <section className="portal-guide">
    <h2>{guide.title}</h2>
    {guide.format==='steps'?<ol className="portal-steps">{guide.topics.map(([name,description])=><li key={name}><h3>{name}</h3><p>{description}</p></li>)}</ol>:
-    guide.format==='reference'?<div className="portal-reference">{guide.topics.map(([name,description])=><details key={name}><summary>{name}</summary><p>{description}</p></details>)}</div>:
+    guide.format==='reference'?<div className="portal-reference">{guide.topics.map(([name,description,artwork])=><details key={name}>{artwork?<IllustratedSummary title={name} artwork={artwork}/>:<summary>{name}</summary>}<p>{description}</p></details>)}</div>:
     <div className="portal-feature-grid">{guide.topics.map(([name,description])=><section key={name}><h3>{name}</h3><p>{description}</p></section>)}</div>}
    {guide.link&&<Link className="button secondary" href={guide.link[0]}>{guide.link[1]}<ArrowUpRight size={16} aria-hidden="true"/></Link>}
   </section>

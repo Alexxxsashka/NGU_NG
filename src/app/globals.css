@@ -264,3 +264,31 @@ dialog::backdrop {background:#05080bbc}
 .account-action[open] > summary img,.account-action[open] > summary::before { display: none; }
 .account-action[open] > summary > svg { transform: rotate(180deg); }
 .account-action[open] > summary span svg { transform: none; }
+
+details > .illustrated-summary {
+ position: relative;
+ isolation: isolate;
+ display: flex;
+ align-items: center;
+ justify-content: space-between;
+ gap: 1rem;
+ min-height: 112px;
+ padding: 16px 20px;
+ overflow: hidden;
+ list-style: none;
+}
+.illustrated-summary::-webkit-details-marker { display: none; }
+.illustrated-summary-art { position: absolute; inset: 0 0 0 auto; width: 75%; max-width: 620px; z-index: -2; }
+.illustrated-summary img { object-fit: cover; object-position: center 44%; }
+.illustrated-summary::before {
+ content: "";
+ position: absolute;
+ inset: 0;
+ z-index: -1;
+ background: linear-gradient(90deg, #0d131a 4%, #0d131ae0 32%, #0d131a33 78%, #0d131a9c);
+}
+.illustrated-summary:focus-visible { outline-offset: -3px; }
+details[open] > .illustrated-summary { min-height: 0; }
+details[open] > .illustrated-summary-art,
+details[open] > .illustrated-summary::before { display: none; }
+details[open] > .illustrated-summary svg { transform: rotate(180deg); }
