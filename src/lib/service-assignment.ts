@@ -45,7 +45,7 @@ export async function assignService(input:unknown,actor:Viewer){
   `,values);
   const key='service:'+profile.id;
   const {rows:[old]}=await c.query('SELECT value FROM settings WHERE key=$1',[key]);
-  const details={joinedOn:p.joinedOn,position:p.position,commanderUnitId:canManage?p.unitId:null};
+  const details={...old?.value,joinedOn:p.joinedOn,position:p.position,commanderUnitId:canManage?p.unitId:null};
   await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=excluded.value',[key,JSON.stringify(details)]);
   await c.query("UPDATE profile_claims SET status='approved',reason='Кадровий профіль призначено адміністратором',reviewed_by=$1 WHERE user_id=$2 AND static_id::numeric=$3::text::numeric AND status='pending'",[actor.id,p.userId,staticId]);
   await audit(c,actor,'personnel.assign',profile.id,{profile:previous??null,details:old?.value??null},{...p,staticId,details});
@@ -67,4 +67,33 @@ export function commandRoster(userId:string){
   WHERE leader.user_id=$1 AND leader.active
   ORDER BY p.rank DESC NULLS LAST,p.last_name,p.first_name
  `,[userId]);
+}
+
+const personalDetails=z.strictObject({
+ joinedOn:z.iso.date().nullable(),
+ callsign:z.string().trim().max(40),
+ bio:z.string().trim().max(500),
+});
+
+export async function savePersonalServiceDetails(input:unknown,actor:Viewer){
+ const details=personalDetails.parse(input);
+ const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Kyiv'}).format(new Date());
+ if(details.joinedOn&&details.joinedOn>today)throw new HttpError('Дата вступу не може бути в майбутньому.');
+ return transaction(async c=>{
+  await c.query("SELECT pg_advisory_xact_lock(hashtext('admin-access'))");
+  const {rows:[profile]}=await c.query(`
+   SELECT p.id FROM personnel p JOIN app_user u ON u.id=p.user_id
+   WHERE p.user_id=$1 AND p.active AND NOT u.must_change_password FOR UPDATE OF p
+  `,[actor.id]);
+  if(!profile)throw new HttpError('Потрібен активний кадровий профіль.',403);
+  const key='service:'+profile.id;
+  const {rows:[old]}=await c.query("SELECT value FROM settings WHERE key=$1",[key]);
+  const before={joinedOn:old?.value?.joinedOn??null,callsign:old?.value?.callsign??'',bio:old?.value?.bio??''};
+  await c.query(`
+   INSERT INTO settings(key,value) VALUES($1,$2::jsonb)
+   ON CONFLICT(key) DO UPDATE SET value=settings.value||excluded.value
+  `,[key,JSON.stringify(details)]);
+  await audit(c,actor,'personnel.self-details',profile.id,before,details);
+  return {saved:true};
+ });
 }

@@ -10,7 +10,7 @@ import { week,staticId } from '@/lib/validation';
 import { filters,listReports,submitReport } from '@/lib/reports';
 import { saveTask,changePeriod,reviewItems,deleteReportItem,adjustAward,saveSettings,savePerson,reviewClaim,linkReport,changeRole,issueRecovery } from '@/lib/admin';
 import { updateUnitPage } from '@/lib/unit-page';
-import { assignService } from '@/lib/service-assignment';
+import { assignService,savePersonalServiceDetails } from '@/lib/service-assignment';
 import { unitMatrix } from '@/lib/matrix';
 import { bootstrap,recover } from '@/lib/accounts';
 import { register,editAccount,deleteAccount,issueTemporaryPassword,changePassword,lockStaticClaims,reserveStatic } from '@/lib/player-accounts';
@@ -39,6 +39,7 @@ export async function POST(request:Request,ctx:Context){try{
   const input=await readBody(request,path==='admin/import'?2_500_000:path==='reports'?MAX_REPORT_BYTES:100_000);
   if(path==='reports')return json(await submitReport(request,input));
   if(path==='register')return json(await register(request,input));
+  if(path==='me/service-details')return json(await savePersonalServiceDetails(input,await member(request)));
   if(path==='me/password'){const u=await viewer(request.headers);if(!u)throw new HttpError('Увійдіть у свій обліковий запис.',401);return json(await changePassword(request,input,u));}
   if(path==='bootstrap')return json(await bootstrap(request,input));
   if(path==='recover')return json(await recover(request,input));

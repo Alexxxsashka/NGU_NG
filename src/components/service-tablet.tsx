@@ -1,3 +1,4 @@
+import {PersonalServiceForm} from './personal-service-form';
 import Image from 'next/image';
 import Link from 'next/link';
 import {Award, CalendarDays, ClipboardList, Layers3, Shield, Target, Users} from 'lucide-react';
@@ -14,6 +15,8 @@ type ServiceCard={
  active:boolean;
  unit_id:string|null;
  joined_on:string|null;
+ callsign:string|null;
+ bio:string|null;
  position:string|null;
  reports:string;
  approved_quantity:string;
@@ -24,7 +27,7 @@ type ServiceCard={
 export async function ServiceTablet({user}:{user:Viewer}){
  const [card]=await query<ServiceCard>(`
   SELECT p.static_id,CASE WHEN u.active THEN u.id END AS unit_id,p.first_name,p.last_name,p.active,p.rank,u.name AS unit_name,k.name AS rank_name,
-         details.value->>'joinedOn' AS joined_on,details.value->>'position' AS position,
+         details.value->>'joinedOn' AS joined_on,details.value->>'callsign' AS callsign,details.value->>'bio' AS bio,details.value->>'position' AS position,
          totals.reports,totals.approved_quantity,totals.approved_points,totals.pending_items
   FROM personnel p
   LEFT JOIN units u ON u.id=p.unit_id
@@ -55,13 +58,14 @@ export async function ServiceTablet({user}:{user:Viewer}){
   {label:'Підтверджені бали',value:card.approved_points,icon:Award},
   {label:'Завдання на перевірці',value:card.pending_items,icon:Layers3},
  ]:null;
- return <section className="service-tablet" aria-labelledby="service-tablet-title">
+ return <><section className="service-tablet" aria-labelledby="service-tablet-title">
   <header className="service-identity">
    <Image src="/ngu-emblem.svg" alt="" width={76} height={76}/>
    <div>
     <div className="service-kicker">Службовий планшет НГУ</div>
     <h1 id="service-tablet-title">{card?card.first_name+' '+card.last_name:user.name}</h1>
     <div className="service-status">
+     {card?.callsign&&<span>Позивний <strong>{card.callsign}</strong></span>}
      {card&&<span>Static ID <strong>{card.static_id}</strong></span>}
      <span className={'pill '+(card?.active?'approved':'prime')}>{card?(card.active?'Активний профіль':'Архівний профіль'):'Профіль очікує прив’язки'}</span>
     </div>
@@ -79,5 +83,7 @@ export async function ServiceTablet({user}:{user:Viewer}){
   {card?.active&&card.unit_id&&<div className="service-actions">
    <Link className="button secondary" href={'/units/'+card.unit_id}><Users size={17} aria-hidden="true"/>Мій підрозділ</Link>
   </div>}
- </section>;
+ </section>
+ {card?.active&&<PersonalServiceForm today={today} details={{joinedOn:card.joined_on,callsign:card.callsign??'',bio:card.bio??''}}/>}
+ </>;
 }
