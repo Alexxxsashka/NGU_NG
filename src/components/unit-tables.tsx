@@ -8,14 +8,7 @@ import type {AdminCatalog} from './task-editor';
 import {Filters,initialFilters,filterQuery} from './report-list';
 import {useResource,Notice,Loading,Empty,Refresh} from './ui';
 type Matrix={columns:{id:string;name:string;active:boolean;time_category:string}[];people:{static_id:string;first_name:string;last_name:string;rank:number;reports:number;cells:{task_id:string;quantity:number;points:number;approved_points:number;approved_amount:string}[]}[]};
-const unitArtwork=[
- [/^нцп|навчальний центр/,'training'],
- [/^всп|^звп|військової поліції|військова служба правопорядку/,'police'],
- [/^ссо|nord division/,'nord'],
- [/^злп|логістичного призначення/,'logistics'],
- [/^оаз|авіаційний загін/,'aviation'],
- [/^старший склад/,'command'],
-] as const;
+import {unitCover} from '@/lib/unit-artwork';
 
 export function UnitTables({unitId}:{unitId?:string}){
  const catalog=useResource<AdminCatalog>('admin/catalog'),[f,setF]=useState(()=>({...initialFilters(),unit:unitId||''})),[onlyUsed,setOnlyUsed]=useState(true),[hidden,setHidden]=useState<string[]>([]);
@@ -23,10 +16,9 @@ export function UnitTables({unitId}:{unitId?:string}){
  const unit=catalog.data?.units.find(u=>u.id===unitId);const used=new Set(resource.data?.people.flatMap(p=>p.cells.map(c=>c.task_id))||[]);const columns=resource.data?.columns.filter(c=>(!onlyUsed||used.has(c.id))&&!hidden.includes(c.id))||[];
  if(!unitId)return catalog.error?<Notice error>{catalog.error}</Notice>:catalog.loading?<Loading/>:
   <div className="unit-grid">{catalog.data?.units.map(unit=>{
-   const name=unit.name.trim().toLocaleLowerCase('uk-UA');
-   const art=unitArtwork.find(([pattern])=>pattern.test(name))?.[1];
+   const art=unitCover(unit.name);
    return <Link className={'unit-card unit-poster '+(!unit.active?'archived':'')} key={unit.id} href={'/admin/weekly-bonus/units/'+unit.id}>
-    {art?<div className="unit-poster-art"><Image src={'/units/'+art+'.webp'} alt="" fill sizes="(max-width: 700px) 100vw, (max-width: 1200px) 50vw, 33vw"/></div>:
+    {art?<div className="unit-poster-art"><Image src={art} alt="" fill sizes="(max-width: 700px) 100vw, (max-width: 1200px) 50vw, 33vw"/></div>:
      <div className="unit-poster-art unit-poster-fallback"><Image src="/ngu-emblem.svg" alt="" width={66} height={66}/></div>}
     <div className="unit-poster-caption">
      <div><h2>{unit.name}</h2><p>{unit.active?'Завдання, особовий склад і тижневі підсумки':'Архівний підрозділ'}</p></div>

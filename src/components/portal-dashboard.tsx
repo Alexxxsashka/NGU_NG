@@ -4,6 +4,8 @@ import {currentWeek,statusLabels} from '@/lib/domain';
 import type {Viewer} from '@/lib/domain';
 import {accessibleUnits,loadUnitContent} from '@/lib/unit-page';
 import Image from 'next/image';
+import {unitCover} from '@/lib/unit-artwork';
+import {CardLink} from './card-link';
 import {PortalMatrix} from './portal-matrix';
 import {ServiceTablet} from './service-tablet';
 
@@ -34,10 +36,10 @@ export async function PortalDashboard({user}:{user:Viewer}){
    <section><h2>Цього тижня</h2>{reports.length?<ul>{reports.map(report=><li key={report.number}>{report.number} · {statusLabels[report.status]||report.status}</li>)}</ul>:<p>Звітів за цей тиждень ще немає.</p>}
     <Link className="button secondary" href="/weekly-bonus">Щотижневе преміювання</Link></section>
    <section><h2>Остання новина підрозділу</h2>{latest?<Link href={'/units/'+latest.unit.id+'#unit-news'}>{latest.title} · {latest.unit.name}</Link>:<p>Новин підрозділу поки немає.</p>}</section>
-   <section><h2>Моя служба</h2><div className="actions"><Link href="/cabinet">Особистий кабінет</Link><Link href="/portal/requests">Заявки</Link><Link href="/portal/training">КМБ</Link><Link href="/portal/calendar">Календар</Link></div></section>
   </div>
   {managed.length>0&&<section className="panel"><h2>{user.role==='admin'||managed.length>1?'Огляд підрозділів':'Мій підрозділ'}</h2>
-   <ul>{managed.map(unit=><li key={unit.id}><Link href={'/units/'+unit.id}>{unit.name}</Link> · {roster.find(row=>row.unit_id===unit.id)?.total??0} у складі</li>)}</ul>
+   <div className="home-card-grid portal-shortcuts">{managed.map(unit=><CardLink key={unit.id} href={'/units/'+unit.id} title={unit.name}
+    description={(roster.find(row=>row.unit_id===unit.id)?.total??0)+' у складі'} image={unitCover(unit.name)||'/portal-art/home/service.webp'}/>)}</div>
    <Link className="button secondary" href="/portal/requests">Черга службових заявок</Link>
   </section>}
   <ServiceTablet user={user} editable={false}/>

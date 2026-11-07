@@ -3,6 +3,7 @@ import {query} from '@/db';
 import {headers} from 'next/headers';
 import {redirect,notFound} from 'next/navigation';
 import {viewer} from '@/lib/auth';
+import {CardLink} from '@/components/card-link';
 import {IllustratedSummary} from '@/components/illustrated-summary';
 import {ReportList} from '@/components/report-list';
 import {ReportForm} from '@/components/report-form';
@@ -16,14 +17,14 @@ import {ServiceWorkspace} from '@/components/service-workspace';
 import {ServiceTablet} from '@/components/service-tablet';
 export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string;next?:string}>}){
  const {slug}=await params;const path=slug.join('/');
- if(path==='weekly-bonus')return <section id="content" className="panel portal-preview-header weekly-bonus-banner">
+ if(path==='weekly-bonus')return <div id="content"><section className="panel portal-preview-header weekly-bonus-banner">
   <h1>Щотижневе преміювання</h1>
   <p>Подавайте звіти за виконані завдання та переглядайте підтверджені результати.</p>
-  <div className="actions">
-   <Link className="button" href="/weekly-bonus/report">Подати звіт</Link>
-   <Link className="button secondary" href="/weekly-bonus/me">Мої звіти</Link>
-  </div>
- </section>;
+ </section>
+ <nav className="home-card-grid portal-shortcuts" aria-label="Щотижневе преміювання">
+  <CardLink href="/weekly-bonus/report" title="Подати звіт" description="Додати завдання й докази виконання." image="/portal-art/home/reports.webp"/>
+  <CardLink href="/weekly-bonus/me" title="Мої звіти" description="Історія, рішення та виплати." image="/portal-art/catalog/report-journal.webp"/>
+ </nav></div>;
  if(path==='weekly-bonus/report'){
   const user=await viewer(await headers());
   if(user?.mustChangePassword)redirect('/cabinet');

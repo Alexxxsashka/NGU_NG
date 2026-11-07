@@ -2,8 +2,7 @@
 
 import {useId,useRef,useState,type KeyboardEvent} from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
-import {ArrowUpRight} from 'lucide-react';
+import {CardLink} from './card-link';
 import {adminPortalRoutes,portalPreviews,serviceModules,visiblePortalGroups} from '@/lib/portal-navigation';
 import {PortalIcon} from './portal-icon';
 
@@ -12,7 +11,7 @@ const covers:Record<string,string>={
 };
 const art:Record<string,string>={
  '/cabinet':'tablet','/my-unit':'home/service','/weekly-bonus':'weekly','/weekly-bonus/report':'home/reports',
- '/weekly-bonus/me':'home/reports','/portal/requests':'home/service','/portal/calendar':'calendar',
+ '/weekly-bonus/me':'catalog/report-journal','/portal/requests':'home/service','/portal/calendar':'calendar',
  '/portal/training':'training','/portal/lectures':'home/training','/portal/regulations':'home/documents',
  '/portal/orders':'home/documents','/portal/announcements':'home/command','/portal/payments':'weekly',
 };
@@ -64,15 +63,8 @@ export function PortalMatrix({signedIn=false,admin=false,hasUnits=false}:{signed
     const slug=href.startsWith('/portal/')?href.slice(8):'';
     const preview=slug?portalPreviews[slug]:undefined;
     const pending=!!preview&&slug!=='payments'&&!serviceModules.some(module=>module===slug)&&!Object.hasOwn(adminPortalRoutes,slug);
-    return <Link className="home-route-card" key={href} href={href}>
-     <div className="home-route-art">
-      <Image src={'/portal-art/'+(art[href]||'home/'+(covers[title]||'cabinet'))+'.webp'} alt="" fill sizes="(max-width: 520px) 100vw, (max-width: 1050px) 50vw, 33vw"/>
-      {pending&&<span className="pill prime">У розробці</span>}
-     </div>
-     <div className="home-route-copy"><span className="home-route-icon"><PortalIcon href={href} size={19}/></span>
-      <div><h3>{label}</h3><p>{descriptions[href]||preview?.description}</p></div><ArrowUpRight size={18} aria-hidden="true"/>
-     </div>
-    </Link>;
+    return <CardLink key={href} href={href} title={label} description={descriptions[href]||preview?.description}
+     image={'/portal-art/'+(art[href]||'home/'+(covers[title]||'cabinet'))+'.webp'} icon={<PortalIcon href={href} size={19}/>} badge={pending?'У розробці':undefined}/>;
    })}</div>}
   </div>)}
  </section>;

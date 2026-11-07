@@ -222,9 +222,6 @@ dialog::backdrop {background:#05080bbc}
 .unit-news-item + .unit-news-item { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 18px; }
 .unit-news-item h3 { margin: 8px 0 0; }
 .unit-news-item time { color: var(--muted); font-size: 12px; }
-.unit-editor-section { border-top: 1px solid var(--line); padding: 12px 0; }
-.unit-editor-section summary { cursor: pointer; color: var(--gold); font-weight: 700; }
-.unit-editor-section form { margin-top: 12px; }
 
 .portal-nav-group > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; list-style: none; cursor: pointer; }
 .portal-nav-group > summary::-webkit-details-marker { display: none; }
@@ -298,8 +295,6 @@ dialog::backdrop {background:#05080bbc}
 .home-route-art img { object-fit: cover; }
 .home-route-art .pill { position: absolute; top: 10px; right: 10px; }
 .home-route-copy { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 10px; padding: 14px; }
-.home-route-copy h3 { margin: 0 0 4px; overflow-wrap: anywhere; }
-.home-route-copy p { margin: 0; color: var(--muted); font-size: .82rem; }
 .home-route-copy > svg, .home-route-icon { color: var(--gold); }
 @media (max-width: 1050px) { .home-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) {
@@ -307,3 +302,17 @@ dialog::backdrop {background:#05080bbc}
  .home-directory { margin: 24px 0; }
  .home-tablist button { min-width: 98px; }
 }
+
+.home-route-art { display: block; }
+.home-route-copy-plain { grid-template-columns: minmax(0, 1fr) auto; }
+.home-route-copy strong { display: block; margin-bottom: 4px; overflow-wrap: anywhere; font: 800 1.2rem/1.2 "Roboto Condensed", Arial, sans-serif; }
+.home-route-copy small { display: block; color: var(--muted); font-size: .82rem; font-weight: 400; line-height: 1.45; }
+.home-action-card { width: 100%; padding: 0; text-align: left; align-items: stretch; justify-content: flex-start; gap: 0; }
+.home-action-card:hover:not(:disabled) { background: var(--surface); }
+.home-action-card .home-route-copy { width: 100%; }
+.home-card-grid > details { align-self: start; }
+.home-card-grid > details > summary { list-style: none; cursor: pointer; }
+.home-card-grid > details > summary::-webkit-details-marker { display: none; }
+.home-card-grid > details[open] > summary .home-route-art { display: none; }
+.home-card-grid > details[open] > summary .home-route-copy > svg { transform: rotate(180deg); }
+.portal-shortcuts { margin-block: 20px; }

@@ -1,4 +1,5 @@
-import Link from 'next/link';
+import {CardLink} from './card-link';
+import {unitCover} from '@/lib/unit-artwork';
 import {notFound,redirect} from 'next/navigation';
 import {CalendarDays,ClipboardList,FileText,Megaphone,Shield,Users} from 'lucide-react';
 import {query} from '@/db';
@@ -12,7 +13,7 @@ export async function UnitSpace({userId,unitId}:{userId:string;unitId?:string}){
   if(units.length===1)redirect('/units/'+units[0].id);
   return <section id="content" className="panel">
    <h1>{units.length>1?'Підрозділи':'Мої підрозділи'}</h1>
-   {units.length?<div className="actions">{units.map(unit=><Link key={unit.id} className="button secondary" href={'/units/'+unit.id}><Shield size={18}/>{unit.name}</Link>)}</div>:<p>Після призначення до підрозділу його сторінка з’явиться в кабінеті.</p>}
+   {units.length?<div className="home-card-grid">{units.map(unit=><CardLink key={unit.id} href={'/units/'+unit.id} title={unit.name} image={unitCover(unit.name)||'/portal-art/home/service.webp'} icon={<Shield size={19}/>}/>)}</div>:<p>Після призначення до підрозділу його сторінка з’явиться в кабінеті.</p>}
   </section>;
  }
  const unit=units[0];
@@ -30,8 +31,16 @@ export async function UnitSpace({userId,unitId}:{userId:string;unitId?:string}){
  ] as const;
  return <div id="content">
   <header className="portal-preview-header"><span className="pill prime">Внутрішня сторінка</span><h1>{unit.name}</h1><p>Новини, службова інформація й особовий склад підрозділу.</p>
-   <div className="actions"><a className="button secondary" href="#unit-news"><Megaphone size={17}/>Новини</a><a className="button secondary" href="#unit-roster"><Users size={17}/>Склад</a>{unit.editor&&<><a className="button" href="#unit-management">Керування</a><Link className="button secondary" href="/portal/regulations">Додати документ</Link><Link className="button secondary" href="/portal/calendar">Додати подію</Link></>}</div>
   </header>
+  <nav className="home-card-grid portal-shortcuts" aria-label="Розділи підрозділу">
+   <CardLink href="#unit-news" title="Новини" image="/portal-art/unit-actions/news.webp" icon={<Megaphone size={19}/>}/>
+   <CardLink href="#unit-roster" title="Особовий склад" image={unitCover(unit.name)||'/portal-art/home/service.webp'} icon={<Users size={19}/>}/>
+   {unit.editor&&<>
+    <CardLink href="#unit-management" title="Керування підрозділом" image="/portal-art/home/command.webp" icon={<Shield size={19}/>}/>
+    <CardLink href="/portal/regulations" title="Додати документ" image="/portal-art/home/documents.webp" icon={<FileText size={19}/>}/>
+    <CardLink href="/portal/calendar" title="Додати подію" image="/portal-art/calendar.webp" icon={<CalendarDays size={19}/>}/>
+   </>}
+  </nav>
   <div className="portal-feature-grid">{sections.map(([title,body,Icon])=><section key={title}><h2><Icon size={18}/>{title}</h2><p className="unit-copy">{body||'Інформацію ще не додано.'}</p></section>)}</div>
   <section className="panel" id="unit-news"><h2>Новини й оголошення</h2>
    {content.news.length?content.news.map(news=><article key={news.id} className="unit-news-item">

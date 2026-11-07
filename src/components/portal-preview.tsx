@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import {ArrowUpRight, HardHat, Home, PanelTop} from 'lucide-react';
+import {ArrowUpRight, ChevronDown, HardHat, Home} from 'lucide-react';
 import {portalGuides} from '@/lib/portal-guides';
-import {IllustratedSummary} from './illustrated-summary';
+import {CardFace,CardLink} from './card-link';
 import {PortalIcon} from './portal-icon';
 import {portalAdminLinks,portalGroups,portalPreviews} from '@/lib/portal-navigation';
 
@@ -22,13 +22,15 @@ export function PortalPreview({slug,showAdminLinks=false}:{slug:string;showAdmin
   <section className="portal-guide">
    <h2>{guide.title}</h2>
    {guide.format==='steps'?<ol className="portal-steps">{guide.topics.map(([name,description])=><li key={name}><h3>{name}</h3><p>{description}</p></li>)}</ol>:
-    guide.format==='reference'?<div className="portal-reference">{guide.topics.map(([name,description,artwork])=><details key={name} className={artwork?"account-action profile-action":undefined}>{artwork?<IllustratedSummary title={name} image={'/portal-art/catalog/'+artwork+'.webp'}/>:<summary>{name}</summary>}<div className="account-action-content"><p>{description}</p></div></details>)}</div>:
+    guide.format==='reference'?<div className="home-card-grid portal-reference">{guide.topics.map(([name,description,artwork])=><details key={name} className="home-route-card">
+     <summary><CardFace title={name} image={artwork?'/portal-art/catalog/'+artwork+'.webp':'/portal-art/home/documents.webp'} indicator={<ChevronDown size={19} aria-hidden="true"/>}/></summary>
+     <div className="account-action-content"><p>{description}</p></div></details>)}</div>:
     <div className="portal-feature-grid">{guide.topics.map(([name,description])=><section key={name}><h3>{name}</h3><p>{description}</p></section>)}</div>}
    {guide.link&&<Link className="button secondary" href={guide.link[0]}>{guide.link[1]}<ArrowUpRight size={16} aria-hidden="true"/></Link>}
   </section>
   {showAdminLinks&&<section className="panel">
    <h2>Доступні інструменти</h2>
-   <div className="actions">{portalAdminLinks.map(([href,label])=><Link className="button secondary" key={href} href={href}><PanelTop size={17} aria-hidden="true"/>{label}</Link>)}</div>
+   <div className="home-card-grid">{portalAdminLinks.map(([href,label],index)=><CardLink key={href} href={href} title={label} image={['/portal-art/unit-actions/rank.webp','/portal-art/home/reports.webp','/portal-art/weekly.webp','/portal-art/unit-actions/archive.webp'][index]}/>)}</div>
   </section>}
   <Link className="button secondary" href="/"><Home size={16} aria-hidden="true"/>До головної<ArrowUpRight size={16}/></Link>
  </div>;

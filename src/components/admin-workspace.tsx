@@ -1,5 +1,6 @@
 'use client';
 import dynamic from 'next/dynamic';
+import {CardLink} from './card-link';
 import {ReportList} from './report-list';
 import {Loading} from './ui';
 const TaskEditor=dynamic(()=>import('./task-editor').then(m=>m.TaskEditor),{loading:Loading});
@@ -10,4 +11,9 @@ const Personnel=dynamic(()=>import('./personnel').then(m=>m.Personnel),{loading:
 const HistoryImport=dynamic(()=>import('./history-import').then(m=>m.HistoryImport),{loading:Loading});
 const Audit=dynamic(()=>import('./audit').then(m=>m.Audit),{loading:Loading});
 const titles:Record<string,[string,string]>={overview:['Налаштування щотижневого преміювання','Усі підрозділи та звіти за обраний період.'],reports:['Журнал звітів','Докази, рішення та історія кожного подання.'],tasks:['Завдання і коефіцієнти','Керуйте завданнями, балами й часовими варіантами.'],units:['Підрозділи','Автоматичні таблиці виконань без ручних формул.'],personnel:['Особовий склад','Підтверджені профілі, прив’язування та права доступу.'],periods:['Звітні тижні','Відкривайте та закривайте прийом звітів.'],settings:['Ставки й ліміти премій','Підрозділи, звання та внутрішній облік премій.'],import:['Перенесення історії','Імпорт попередніх звітів зі збереженням ставок.'],audit:['Журнал змін','Хто, коли та що змінив у системі.']};
-export function AdminWorkspace({section,unitId}:{section:string;unitId?:string}){const title=titles[section];return <div id="content"><div className="page-heading"><div><h1>{title[0]}</h1><p>{title[1]}</p></div></div>{(section==='overview'||section==='reports')&&<ReportList/>}{section==='tasks'&&<TaskEditor/>}{section==='units'&&<UnitTables unitId={unitId}/>} {section==='periods'&&<Periods/>}{section==='settings'&&<Settings/>}{section==='personnel'&&<Personnel/>}{section==='import'&&<HistoryImport/>}{section==='audit'&&<Audit/>}</div>;}
+const overviewCards=[
+ ['reports','/portal-art/home/reports.webp'],['units','/portal-art/home/service.webp'],
+ ['tasks','/portal-art/home/training.webp'],['periods','/portal-art/calendar.webp'],
+ ['settings','/portal-art/weekly.webp'],['import','/portal-art/unit-actions/archive.webp'],
+] as const;
+export function AdminWorkspace({section,unitId}:{section:string;unitId?:string}){const title=titles[section];return <div id="content"><div className="page-heading"><div><h1>{title[0]}</h1><p>{title[1]}</p></div></div>{section==='overview'&&<nav className="home-card-grid portal-shortcuts" aria-label="Інструменти преміювання">{overviewCards.map(([key,image])=><CardLink key={key} href={'/admin/weekly-bonus/'+key} title={titles[key][0]} description={titles[key][1]} image={image}/>)}</nav>}{(section==='overview'||section==='reports')&&<ReportList/>}{section==='tasks'&&<TaskEditor/>}{section==='units'&&<UnitTables unitId={unitId}/>} {section==='periods'&&<Periods/>}{section==='settings'&&<Settings/>}{section==='personnel'&&<Personnel/>}{section==='import'&&<HistoryImport/>}{section==='audit'&&<Audit/>}</div>;}
