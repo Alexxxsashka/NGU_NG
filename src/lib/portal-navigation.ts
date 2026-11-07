@@ -3,11 +3,11 @@ export type ServiceModule=(typeof serviceModules)[number];
 
 export const portalGroups = [
  {title:'Головне', links:[['/','Головна'],['/cabinet','Особистий кабінет'],['/portal/notifications','Сповіщення']]},
- {title:'Служба', links:[['/portal/personnel','Особовий склад'],['/portal/structure','Підрозділи та структура'],['/portal/personnel-actions','Підвищення й кадровий аудит'],['/portal/promotion-points','Завдання й бали підвищення'],['/portal/calendar','Календар служби'],['/portal/requests','Службові заявки'],['/portal/logistics','Логістика й забезпечення']]},
+ {title:'Служба', links:[['/portal/personnel','Особовий склад'],['/portal/structure','Підрозділи та структура'],['/portal/calendar','Календар служби'],['/portal/requests','Службові заявки'],['/portal/logistics','Логістика й забезпечення']]},
  {title:'Підготовка', links:[['/portal/training','КМБ і навчальний центр'],['/portal/lectures','Лекції та матеріали'],['/portal/exercises','Тренування й атестації']]},
- {title:'Звітність', links:[['/weekly-bonus','Щотижневе преміювання'],['/portal/payments','Премії та виплати'],['/portal/statistics','Статистика та активність']]},
+ {title:'Звітність', links:[['/weekly-bonus','Щотижневе преміювання'],['/portal/payments','Премії та виплати'],['/portal/statistics','Статистика та активність'],['/portal/personnel-actions','Підвищення й кадровий аудит'],['/portal/promotion-points','Завдання й бали підвищення'],['/portal/audit','Журнал аудиту']]},
  {title:'Документи', links:[['/portal/regulations','Статут і нормативи'],['/portal/orders','Накази та розпорядження'],['/portal/announcements','Оголошення']]},
- {title:'Управління', links:[['/portal/command','Панель командування'],['/portal/administration','Адміністрування'],['/portal/audit','Журнал дій']]},
+ {title:'Управління', links:[['/portal/command','Панель командування'],['/portal/administration','Адміністрування']]},
 ] as const;
 
 type Preview = {
