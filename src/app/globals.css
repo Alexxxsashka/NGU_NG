@@ -335,3 +335,22 @@ dialog::backdrop {background:#05080bbc}
 @media (max-width: 760px) {
  .cabinet-overview, .cabinet-security-grid { grid-template-columns: 1fr; }
 }
+
+.report-list-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto; align-items: center; gap: 16px; padding: 16px 20px; }
+.report-row-identity { display: grid; justify-items: start; gap: 4px; overflow-wrap: anywhere; }
+.report-row-identity small, .report-row-totals dt, .report-row-totals small { color: var(--muted); }
+.report-row-totals { display: grid; grid-template-columns: minmax(0,.75fr) minmax(0,1fr) minmax(0,1.4fr); gap: 12px; margin: 0; }
+.report-row-totals dt, .report-row-totals small { font-size: .75rem; }
+.report-row-totals dd { margin: 2px 0 0; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.report-row-totals small { display: block; }
+.report-dialog { width: min(1050px, calc(100% - 24px)); max-height: 90dvh; padding: 0; overflow: hidden; }
+.report-dialog[open] { display: flex; flex-direction: column; }
+.report-dialog .modal-head, .report-dialog-nav { margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.report-dialog .modal-head h2 { margin: 0; overflow-wrap: anywhere; }
+.report-dialog-nav { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.report-dialog-scroll { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+@media (max-width: 860px) { .report-list-row { grid-template-columns: minmax(0,1fr) auto; } .report-row-totals { grid-column: 1 / -1; grid-row: 2; } }
+@media (max-width: 460px) { .report-list-row { grid-template-columns: 1fr; padding: 14px; gap: 10px; } .report-list-row > button { justify-self: start; } }
+
+.report-evidence { margin-block: 12px; }
+.report-evidence summary { width: fit-content; cursor: pointer; color: var(--gold); }
