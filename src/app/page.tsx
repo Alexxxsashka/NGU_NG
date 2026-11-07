@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import {CalendarDays, ClipboardList, ShieldCheck} from 'lucide-react';
+import {ArrowUpRight} from 'lucide-react';
+import {portalGroups} from '@/lib/portal-navigation';
 
 export default function Home(){
  return <div id="content">
@@ -10,18 +11,20 @@ export default function Home(){
    </div>
    <div className="hero-copy">
     <span className="hero-tag">Форт-Занкудо / NG GTA 5 RP</span>
-    <h1>Звітний кабінет<br/>Національної гвардії</h1>
-    <p>Фіксуйте виконані завдання, додавайте докази та переглядайте підтверджені бали за тиждень.</p>
+    <h1>Портал НГУ</h1>
+    <p>Єдина інформаційна система Національної гвардії в NG GTA 5 RP. Особовий склад, підготовка, документи та щотижневе преміювання.</p>
     <div className="actions">
      <Link className="button gold" href="/weekly-bonus">Щотижневе преміювання</Link>
      <Link className="hero-link" href="/weekly-bonus/me">Особистий кабінет</Link>
     </div>
    </div>
   </section>
-  <section className="intro-grid" aria-label="Як працює звітність">
-   <article><ClipboardList/><h2>Тижневий звіт</h2><p>Оберіть виконані завдання, вкажіть кількість і додайте посилання на докази.</p></article>
-   <article><ShieldCheck/><h2>Перевірка доказів</h2><p>Переглядайте статус подань та підтверджені бали в особистому кабінеті.</p></article>
-   <article><CalendarDays/><h2>Завдання підрозділу</h2><p>Звітуйте про загальні й спеціалізовані завдання своєї зміни.</p></article>
+  <section className="portal-index" aria-labelledby="portal-index-title">
+   <h2 id="portal-index-title">Розділи порталу</h2>
+   <div className="portal-index-grid">{portalGroups.map(group=><section className="portal-index-group" key={group.title}>
+    <h3>{group.title}</h3>
+    {group.links.map(([href,label])=><Link key={href} href={href}><span>{label}</span>{href.startsWith('/portal/')&&<small>У розробці</small>}<ArrowUpRight aria-hidden="true" size={15}/></Link>)}
+   </section>)}</div>
   </section>
  </div>;
 }
