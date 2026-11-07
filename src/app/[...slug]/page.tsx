@@ -43,7 +43,7 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
   return <ReportForm key={user.id} userId={user.id} profile={profile}/>;
  }
  if(['login','register','recover','setup'].includes(path))return <AuthScreen returnToReport={(await searchParams).next==='report'} passwordChanged={path==='login'&&(await searchParams).password==='changed'} mode={path as 'login'|'register'|'recover'|'setup'}/>;
- if(path==='my-unit'||slug[0]==='units'&&slug.length===2){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <UnitSpace userId={u.id} unitId={slug[1]}/>;}
+ if(path==='my-unit'||path==='portal/structure'||slug[0]==='units'&&slug.length===2){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <UnitSpace userId={u.id} unitId={slug[0]==='units'?slug[1]:undefined}/>;}
  if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <section id="content"><h1>Мої звіти</h1><details className="account-action profile-action service-reports" open={!!((await searchParams).report||(await searchParams).from)}><IllustratedSummary title="Журнал звітів" image="/portal-art/catalog/report-journal.webp"/><div className="account-action-content"><ReportList personal/></div></details></section>;}
  if(path==='portal/promotion-points'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <PromotionPoints/>;}
  if(path==='cabinet'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword} overview={u.mustChangePassword?null:<ServiceTablet user={u}/>}/>;}
@@ -73,7 +73,7 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
  if(slug[0]==='admin'){
   const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword||u.role!=='admin')redirect('/cabinet');
   if(slug.length===1)redirect('/admin/weekly-bonus');
-  if(slug.length===2&&['personnel','audit'].includes(slug[1]))return <AdminWorkspace section={slug[1]}/>;
+  if(slug.length===2&&['personnel','audit','unit-directory'].includes(slug[1]))return <AdminWorkspace section={slug[1]}/>;
   if(slug[1]!=='weekly-bonus')notFound();
   const section=slug[2]||'overview';
   if(section==='award-orders'&&slug.length===3)return <AwardRegister/>;

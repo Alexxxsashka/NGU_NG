@@ -36,7 +36,7 @@ export async function UnitSpace({userId,unitId}:{userId:string;unitId?:string}){
    <CardLink href="#unit-news" title="Новини" image="/portal-art/unit-actions/news.webp" icon={<Megaphone size={19}/>}/>
    <CardLink href="#unit-roster" title="Особовий склад" image={unitCover(unit.name)||'/portal-art/home/service.webp'} icon={<Users size={19}/>}/>
    {unit.editor&&<>
-    <CardLink href="#unit-management" title="Керування підрозділом" image="/portal-art/home/command.webp" icon={<Shield size={19}/>}/>
+    <CardLink href="#unit-management" title="Редагувати наповнення й керувати складом" image="/portal-art/home/command.webp" icon={<Shield size={19}/>}/>
     <CardLink href="/portal/regulations" title="Додати документ" image="/portal-art/home/documents.webp" icon={<FileText size={19}/>}/>
     <CardLink href="/portal/calendar" title="Додати подію" image="/portal-art/calendar.webp" icon={<CalendarDays size={19}/>}/>
    </>}

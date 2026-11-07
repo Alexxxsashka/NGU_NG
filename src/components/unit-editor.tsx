@@ -25,7 +25,8 @@ export function UnitEditor({unitId,info,news,ranks}:{ranks:{id:number;name:strin
   finally{setBusy(false);}
  }
  return <section className="panel" id="unit-management">
-  <h2>Керування підрозділом</h2>
+  <h2>Керування внутрішньою сторінкою</h2>
+  <p className="muted">Службова інформація, публікації й особовий склад.</p>
   {message&&<Notice>{message}</Notice>}{error&&!selected&&<Notice error>{error}</Notice>}
   <div className="home-card-grid">{actions.map(action=><button key={action.id} type="button" aria-haspopup="dialog"
    className="home-route-card home-action-card" disabled={busy} onClick={()=>{setError('');setMessage('');setSelected(action);}}>

@@ -39,7 +39,6 @@ export const portalPreviews:Record<string,Preview> = {
 
 export const adminPortalRoutes:Readonly<Record<string,string>>={
  personnel:'/admin/personnel',
- structure:'/admin/weekly-bonus/units',
  statistics:'/admin/weekly-bonus',
  audit:'/admin/audit',
 };
@@ -54,6 +53,6 @@ export const portalAdminLinks=[
 export function visiblePortalGroups(isAdmin: boolean, signedIn=false) {
  return portalGroups.map(group=>({
   title:group.title,
-  links:group.links.filter(([href])=>isAdmin||!href.startsWith('/portal/')||(signedIn&&(href==='/portal/payments'||href==='/portal/notifications'||href==='/portal/personnel-actions'||href==='/portal/promotion-points'||serviceModules.some(module=>href==='/portal/'+module)))),
+  links:group.links.filter(([href])=>isAdmin||!href.startsWith('/portal/')||(signedIn&&(href==='/portal/payments'||href==='/portal/notifications'||href==='/portal/personnel-actions'||href==='/portal/promotion-points'||href==='/portal/structure'||serviceModules.some(module=>href==='/portal/'+module)))),
  })).filter(group=>group.links.length>0);
 }

@@ -30,7 +30,6 @@ export function PortalMatrix({signedIn=false,admin=false,hasUnits=false}:{signed
  const tabs=useRef<(HTMLButtonElement|null)[]>([]);
  const groups=visiblePortalGroups(admin,signedIn).map(group=>{
   const links:Array<readonly [string,string]>=group.links.filter(([href])=>href!=='/');
-  if(group.title==='Служба'&&hasUnits)links.unshift(['/my-unit','Мої підрозділи']);
   if(group.title==='Звітність'){
    links.splice(1,0,['/weekly-bonus/report','Подати звіт']);
    if(signedIn)links.splice(2,0,['/weekly-bonus/me','Мої звіти']);
@@ -63,7 +62,7 @@ export function PortalMatrix({signedIn=false,admin=false,hasUnits=false}:{signed
    {active===title&&<div className="home-card-grid">{links.map(([href,label])=>{
     const slug=href.startsWith('/portal/')?href.slice(8):'';
     const preview=slug?portalPreviews[slug]:undefined;
-    const pending=!!preview&&slug!=='payments'&&slug!=='notifications'&&slug!=='personnel-actions'&&!serviceModules.some(module=>module===slug)&&!Object.hasOwn(adminPortalRoutes,slug);
+    const pending=!!preview&&slug!=='payments'&&slug!=='notifications'&&slug!=='personnel-actions'&&slug!=='structure'&&!serviceModules.some(module=>module===slug)&&!Object.hasOwn(adminPortalRoutes,slug);
     return <CardLink key={href} href={href} title={label} description={descriptions[href]||preview?.description}
      image={'/portal-art/'+(art[href]||'home/'+(covers[title]||'cabinet'))+'.webp'} icon={<PortalIcon href={href} size={19}/>} badge={pending?'У розробці':undefined}/>;
    })}</div>}
