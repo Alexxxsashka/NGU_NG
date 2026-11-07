@@ -7,7 +7,7 @@ import { taskReward } from '@/lib/rewards';
 import { currentWeek } from '@/lib/domain';
 import { week,staticId } from '@/lib/validation';
 import { filters,listReports,submitReport } from '@/lib/reports';
-import { saveTask,changePeriod,reviewItems,adjustAward,saveSettings,savePerson,reviewClaim,linkReport,changeRole,issueRecovery } from '@/lib/admin';
+import { saveTask,changePeriod,reviewItems,deleteReportItem,adjustAward,saveSettings,savePerson,reviewClaim,linkReport,changeRole,issueRecovery } from '@/lib/admin';
 import { unitMatrix } from '@/lib/matrix';
 import { bootstrap,recover } from '@/lib/accounts';
 import { register,editAccount,deleteAccount,issueTemporaryPassword,changePassword,lockStaticClaims,reserveStatic } from '@/lib/player-accounts';
@@ -42,7 +42,7 @@ export async function POST(request:Request,ctx:Context){try{
   if(path==='me/claims'){const u=await member(request);const p=z.object({staticId}).parse(input);return json(await transaction(async c=>{await lockStaticClaims(c);if((await c.query("SELECT id FROM profile_claims WHERE user_id=$1 AND status='pending'",[u.id])).rows.length)throw new HttpError('У вас уже є заявка на перевірці.');if((await c.query('SELECT id FROM personnel WHERE user_id=$1',[u.id])).rows.length)throw new HttpError('Ваш профіль уже прив’язаний.');await reserveStatic(c,p.staticId,u.id);return {saved:true};}));}
   const u=await admin(request);
   const actions:Record<string,(input:unknown)=>Promise<unknown>>={
-    'admin/tasks':i=>saveTask(i,u),'admin/periods':i=>changePeriod(i,u),'admin/review':i=>reviewItems(i,u),'admin/award':i=>adjustAward(i,u),
+    'admin/tasks':i=>saveTask(i,u),'admin/periods':i=>changePeriod(i,u),'admin/review':i=>reviewItems(i,u),'admin/reports/delete-item':i=>deleteReportItem(i,u),'admin/award':i=>adjustAward(i,u),
     'admin/settings':i=>saveSettings(i,u),'admin/personnel':i=>savePerson(i,u),'admin/claims':i=>reviewClaim(i,u),'admin/link-report':i=>linkReport(i,u),
     'admin/roles':i=>changeRole(i,u),'admin/accounts/edit':i=>editAccount(i,u),'admin/accounts/delete':i=>deleteAccount(i,u),'admin/accounts/password':i=>issueTemporaryPassword(i,u),'admin/recovery':i=>issueRecovery(i,u),'admin/import':i=>importReports(i,u)
   };

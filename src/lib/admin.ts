@@ -26,17 +26,63 @@ export async function saveTask(input:unknown,u:Viewer){const p=taskSchema.parse(
   await audit(c,u,old?'task.update':'task.create',id,old,rows.rows[0]);return rows.rows[0];
 });revalidateTag('catalog',{expire:0});return result;}
 export async function changePeriod(input:unknown,u:Viewer){const p=z.object({week,open:z.boolean()}).parse(input);return transaction(async c=>{await lockAdmin(c,u);const old=(await c.query('SELECT * FROM reporting_periods WHERE week_start=$1 FOR UPDATE',[p.week])).rows[0];await c.query('INSERT INTO reporting_periods(week_start,open,updated_by) VALUES($1,$2,$3) ON CONFLICT(week_start) DO UPDATE SET open=$2,updated_by=$3,updated_at=now()',[p.week,p.open,u.id]);await audit(c,u,'period.update',p.week,old,p);return p;});}
-export async function reviewItems(input:unknown,u:Viewer){const p=z.object({reportId:z.string().uuid(),itemId:z.string().uuid().optional(),status:itemStatus,reason:z.string().trim().max(2000).default('')}).parse(input);if(['rejected','clarification'].includes(p.status)&&!p.reason)throw new HttpError('Укажіть причину.');
-return transaction(async c=>{await lockAdmin(c,u);const r=(await c.query('SELECT * FROM reports WHERE id=$1 FOR UPDATE',[p.reportId])).rows[0];if(!r)throw new HttpError('Звіт не знайдено.',404);
-  const award=(await c.query('SELECT * FROM weekly_awards WHERE static_id=$1 AND week_start=$2 FOR UPDATE',[r.static_id,r.week_start])).rows[0];
-  const rows=(await c.query('SELECT * FROM report_items WHERE report_id=$1 AND ($2::uuid IS NULL OR id=$2) ORDER BY id FOR UPDATE',[r.id,p.itemId??null])).rows;
-  if(!rows.length)throw new HttpError('Запис не знайдено.',404);
-  const [used]=(await c.query(`SELECT coalesce(sum(i.approved_amount),0)::text AS total FROM report_items i JOIN reports r ON r.id=i.report_id WHERE r.static_id=$1 AND r.week_start=$2 AND i.status='approved' AND NOT(i.id=ANY($3::uuid[]))`,[r.static_id,r.week_start,rows.map(i=>i.id)])).rows;
-  let available=award?.cap===null||!award?null:Decimal.max(0,new Decimal(award.cap).minus(used.total));
-  for(const i of rows){let approved:string|null=null;if(p.status==='approved'&&i.estimated_amount!==null){const value=available===null?new Decimal(i.estimated_amount):Decimal.min(i.estimated_amount,available);approved=value.toFixed(2);if(available!==null)available=available.minus(value);}
-    await c.query('UPDATE report_items SET status=$1,reason=$2,reviewed_by=$3,reviewed_at=now(),approved_amount=$4 WHERE id=$5',[p.status,p.reason,u.id,approved,i.id]);
-    await audit(c,u,'report.review',i.id,{status:i.status,approvedAmount:i.approved_amount},{status:p.status,approvedAmount:approved},p.reason);
-  }return {updated:rows.length};});}
+export async function reviewItems(input:unknown,u:Viewer){
+  const p=z.object({
+    reportId:z.string().uuid(),itemId:z.string().uuid().optional(),status:itemStatus,
+    quantity:z.number().int().min(1).max(10000).optional(),
+    reason:z.string().trim().max(2000).default('')
+  }).parse(input);
+  if(p.quantity!==undefined&&!p.itemId)throw new HttpError('Оберіть окреме завдання.');
+  if(['rejected','clarification'].includes(p.status)&&!p.reason)throw new HttpError('Укажіть причину.');
+  return transaction(async c=>{
+    await lockAdmin(c,u);
+    const r=(await c.query('SELECT * FROM reports WHERE id=$1 FOR UPDATE',[p.reportId])).rows[0];
+    if(!r)throw new HttpError('Звіт не знайдено.',404);
+    const award=(await c.query('SELECT cap FROM weekly_awards WHERE static_id=$1 AND week_start=$2 FOR UPDATE',[r.static_id,r.week_start])).rows[0];
+    const {rows}=await c.query('SELECT * FROM report_items WHERE report_id=$1 AND ($2::uuid IS NULL OR id=$2) ORDER BY id FOR UPDATE',[r.id,p.itemId??null]);
+    if(!rows.length)throw new HttpError('Запис не знайдено.',404);
+    const [used]=(await c.query(`SELECT coalesce(sum(i.approved_amount),0)::text AS total FROM report_items i JOIN reports r ON r.id=i.report_id WHERE r.static_id=$1 AND r.week_start=$2 AND i.status='approved' AND NOT(i.id=ANY($3::uuid[]))`,[r.static_id,r.week_start,rows.map(i=>i.id)])).rows;
+    let available=award?.cap==null?null:Decimal.max(0,new Decimal(award.cap).minus(used.total));
+    for(const item of rows){
+      const quantity=p.quantity??item.quantity;
+      const changed=quantity!==item.quantity;
+      if(changed&&!p.reason)throw new HttpError('Укажіть причину зміни кількості.');
+      const points=changed?quantity*item.points_rate:item.points;
+      const estimated=changed
+        ? item.reward_rate==null||item.rank_multiplier==null
+          ? null
+          : new Decimal(item.reward_rate).mul(item.rank_multiplier).mul(quantity).toFixed(2)
+        : item.estimated_amount;
+      let approved:string|null=null;
+      if(p.status==='approved'&&estimated!==null){
+        const value=available===null?new Decimal(estimated):Decimal.min(estimated,available);
+        approved=value.toFixed(2);
+        if(available!==null)available=available.minus(value);
+      }
+      await c.query(`UPDATE report_items SET status=$1,reason=$2,reviewed_by=$3,reviewed_at=now(),
+        approved_amount=$4,quantity=$5,points=$6,estimated_amount=$7 WHERE id=$8`,
+        [p.status,p.reason,u.id,approved,quantity,points,estimated,item.id]);
+      await audit(c,u,'report.review',item.id,
+        {reportId:r.id,status:item.status,quantity:item.quantity,points:item.points,estimatedAmount:item.estimated_amount,approvedAmount:item.approved_amount},
+        {reportId:r.id,status:p.status,quantity,points,estimatedAmount:estimated,approvedAmount:approved},p.reason);
+    }
+    return {updated:rows.length};
+  });
+}
+
+export async function deleteReportItem(input:unknown,u:Viewer){
+  const p=z.object({reportId:z.string().uuid(),itemId:z.string().uuid(),reason:z.string().trim().min(5).max(2000)}).parse(input);
+  return transaction(async c=>{
+    await lockAdmin(c,u);
+    const {rows:[item]}=await c.query('SELECT * FROM report_items WHERE id=$1 AND report_id=$2 FOR UPDATE',[p.itemId,p.reportId]);
+    if(!item)throw new HttpError('Запис не знайдено.',404);
+    const {rows:evidence}=await c.query('DELETE FROM evidence_links WHERE item_id=$1 RETURNING url,sort_order',[item.id]);
+    await c.query('DELETE FROM report_items WHERE id=$1',[item.id]);
+    await audit(c,u,'report.item.delete',item.id,{...item,evidence},null,p.reason);
+    return {deleted:true};
+  });
+}
+
 export async function adjustAward(input:unknown,u:Viewer){const p=z.object({itemId:z.string().uuid(),estimatedAmount:amount,reason:z.string().trim().min(5).max(2000)}).parse(input);return transaction(async c=>{await lockAdmin(c,u);const i=(await c.query('SELECT * FROM report_items WHERE id=$1 FOR UPDATE',[p.itemId])).rows[0];if(!i)throw new HttpError('Запис не знайдено.',404);if(i.status==='approved')throw new HttpError('Спочатку поверніть запис на перевірку, щоб повторно застосувати ліміт.');await c.query('UPDATE report_items SET estimated_amount=$1 WHERE id=$2',[p.estimatedAmount,i.id]);await audit(c,u,'award.adjust',i.id,{estimatedAmount:i.estimated_amount},{estimatedAmount:p.estimatedAmount},p.reason);return {saved:true};});}
 export async function saveSettings(input:unknown,u:Viewer){const p=z.discriminatedUnion('kind',[
   z.object({kind:z.literal('cap'),value:amount}),
