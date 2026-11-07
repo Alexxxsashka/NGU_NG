@@ -227,3 +227,22 @@ dialog::backdrop {background:#05080bbc}
 .unit-editor-section { border-top: 1px solid var(--line); padding: 12px 0; }
 .unit-editor-section summary { cursor: pointer; color: var(--gold); font-weight: 700; }
 .unit-editor-section form { margin-top: 12px; }
+
+.portal-nav-group > summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; list-style: none; cursor: pointer; }
+.portal-nav-group > summary::-webkit-details-marker { display: none; }
+.portal-nav-group[open] > summary svg { transform: rotate(180deg); }
+.portal-nav-group > summary:hover { color: var(--gold); }
+.portal-guide { margin: 24px 0; }
+.portal-guide > h2 { font-size: clamp(23px,3vw,32px); margin-bottom: 14px; }
+.portal-guide h3 { font-size: 20px; }
+.portal-guide p { color: var(--muted); }
+.portal-guide > .button { margin-top: 14px; }
+.portal-reference { border: 1px solid var(--line); background: var(--surface); }
+.portal-reference details + details { border-top: 1px solid var(--line); }
+.portal-reference summary { padding: 14px 18px; cursor: pointer; font-weight: 700; color: var(--gold); }
+.portal-reference p { padding: 0 18px 16px; margin: 0; max-width: 72ch; }
+.portal-steps { margin: 0; padding: 12px 20px 12px 44px; list-style: decimal-leading-zero; border-left: 3px solid #c4a35f; background: var(--surface); }
+.portal-steps li { padding: 10px 0; }
+.portal-steps li + li { border-top: 1px solid var(--line); }
+.portal-steps li::marker { color: var(--gold); font-weight: 700; }
+.portal-steps p { margin: 4px 0 0; max-width: 72ch; }
