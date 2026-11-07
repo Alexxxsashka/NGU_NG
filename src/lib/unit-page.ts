@@ -10,12 +10,17 @@ import type {Viewer} from './domain';
 
 type Access={id:string;name:string;editor:boolean};
 const accessSql=`
- SELECT unit.id,unit.name,(account.role='admin' OR coalesce(d.value->>'commanderUnitId'=unit.id::text,false)) AS editor
+ SELECT unit.id,unit.name,(account.role='admin' OR global_grant.id IS NOT NULL OR coalesce(d.value->>'commanderUnitId'=unit.id::text,false)) AS editor
  FROM units unit
  JOIN app_user account ON account.id=$1 AND NOT account.must_change_password
+ LEFT JOIN LATERAL (
+  SELECT leader.id FROM personnel leader
+  JOIN settings grant_record ON grant_record.key='service:'||leader.id::text AND grant_record.value->>'leadershipRole'='leadership'
+  WHERE leader.user_id=account.id AND leader.active
+ ) global_grant ON true
  LEFT JOIN personnel p ON p.user_id=account.id AND p.active AND p.unit_id=unit.id
  LEFT JOIN settings d ON d.key='service:'||p.id::text
- WHERE unit.active AND (account.role='admin' OR p.id IS NOT NULL)
+ WHERE unit.active AND (account.role='admin' OR global_grant.id IS NOT NULL OR p.id IS NOT NULL)
  AND ($2::uuid IS NULL OR unit.id=$2)
  ORDER BY unit.sort_order,unit.name
 `;
@@ -48,14 +53,14 @@ const operation=z.discriminatedUnion('kind',[
 async function changeMembership(c:PoolClient,actor:Viewer,unitId:string,id:string,grant:boolean){
  await c.query("SELECT pg_advisory_xact_lock(hashtext('static-account-claims'))");
  const {rows}=await c.query(`
-  SELECT p.id,p.unit_id,p.user_id,u.role,d.value->>'commanderUnitId' AS command_unit
+  SELECT p.id,p.unit_id,p.user_id,u.role,d.value->>'commanderUnitId' AS command_unit,d.value->>'leadershipRole' AS leadership_role
   FROM personnel p JOIN app_user u ON u.id=p.user_id
   LEFT JOIN settings d ON d.key='service:'||p.id::text
   WHERE p.static_id::numeric=$1::text::numeric AND p.active
   FOR UPDATE OF p
  `,[id]);
  const target=rows[0];
- if(rows.length!==1||!target||target.role==='admin'||target.command_unit||target.user_id===actor.id||
+ if(rows.length!==1||!target||target.role==='admin'||target.leadership_role==='leadership'||target.command_unit||target.user_id===actor.id||
     (grant?target.unit_id!==null&&target.unit_id!==unitId:target.unit_id!==unitId)){
   throw new HttpError('Дія доступна для бійця без підрозділу або зі складу вашого підрозділу. Переведення й призначення командирів виконує адміністратор.',409);
  }

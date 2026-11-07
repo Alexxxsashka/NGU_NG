@@ -11,7 +11,7 @@ export async function UnitSpace({userId,unitId}:{userId:string;unitId?:string}){
  if(!unitId){
   if(units.length===1)redirect('/units/'+units[0].id);
   return <section id="content" className="panel">
-   <h1>Мої підрозділи</h1>
+   <h1>{units.length>1?'Підрозділи':'Мої підрозділи'}</h1>
    {units.length?<div className="actions">{units.map(unit=><Link key={unit.id} className="button secondary" href={'/units/'+unit.id}><Shield size={18}/>{unit.name}</Link>)}</div>:<p>Після призначення до підрозділу його сторінка з’явиться в кабінеті.</p>}
   </section>;
  }
