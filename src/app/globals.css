@@ -206,8 +206,6 @@ dialog::backdrop {background:#05080bbc}
 .service-section-head,.service-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 18px; }
 .service-section-head { justify-content: space-between; border-bottom: 1px solid var(--line); }
 .service-reports { scroll-margin-top: 90px; }
-.service-reports > summary { cursor: pointer; color: var(--gold); font-weight: 700; }
-.service-reports[open] > summary { margin-bottom: 14px; }
 
 .unit-card.unit-poster { padding: 0; overflow: hidden; }
 .unit-poster-art { position: relative; aspect-ratio: 16 / 9; background: var(--paper); }
@@ -237,10 +235,6 @@ dialog::backdrop {background:#05080bbc}
 .portal-guide h3 { font-size: 20px; }
 .portal-guide p { color: var(--muted); }
 .portal-guide > .button { margin-top: 14px; }
-.portal-reference { border: 1px solid var(--line); background: var(--surface); }
-.portal-reference details + details { border-top: 1px solid var(--line); }
-.portal-reference summary { padding: 14px 18px; cursor: pointer; font-weight: 700; color: var(--gold); }
-.portal-reference p { padding: 0 18px 16px; margin: 0; max-width: 72ch; }
 .portal-steps { margin: 0; padding: 12px 20px 12px 44px; list-style: decimal-leading-zero; border-left: 3px solid #c4a35f; background: var(--surface); }
 .portal-steps li { padding: 10px 0; }
 .portal-steps li + li { border-top: 1px solid var(--line); }
@@ -265,30 +259,4 @@ dialog::backdrop {background:#05080bbc}
 .account-action[open] > summary > svg { transform: rotate(180deg); }
 .account-action[open] > summary span svg { transform: none; }
 
-details > .illustrated-summary {
- position: relative;
- isolation: isolate;
- display: flex;
- align-items: center;
- justify-content: space-between;
- gap: 1rem;
- min-height: 112px;
- padding: 16px 20px;
- overflow: hidden;
- list-style: none;
-}
-.illustrated-summary::-webkit-details-marker { display: none; }
-.illustrated-summary-art { position: absolute; inset: 0 0 0 auto; width: 75%; max-width: 620px; z-index: -2; }
-.illustrated-summary img { object-fit: cover; object-position: center 44%; }
-.illustrated-summary::before {
- content: "";
- position: absolute;
- inset: 0;
- z-index: -1;
- background: linear-gradient(90deg, #0d131a 4%, #0d131ae0 32%, #0d131a33 78%, #0d131a9c);
-}
-.illustrated-summary:focus-visible { outline-offset: -3px; }
-details[open] > .illustrated-summary { min-height: 0; }
-details[open] > .illustrated-summary-art,
-details[open] > .illustrated-summary::before { display: none; }
-details[open] > .illustrated-summary svg { transform: rotate(180deg); }
+.portal-reference p { margin: 0; max-width: 72ch; }

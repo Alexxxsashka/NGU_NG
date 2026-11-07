@@ -2,8 +2,8 @@
 
 import {useRouter} from 'next/navigation';
 import {useState} from 'react';
-import Image from 'next/image';
-import {ChevronDown, Pencil} from 'lucide-react';
+import {Pencil} from 'lucide-react';
+import {IllustratedSummary} from './illustrated-summary';
 import {api,Field,Notice} from './ui';
 
 type Details={joinedOn:string|null;callsign:string;bio:string};
@@ -21,11 +21,7 @@ export function PersonalServiceForm({details,today}:{details:Details;today:strin
   finally{setBusy(false);}
  }
  return <details className="account-action profile-action">
-  <summary>
-   <Image src="/portal-art/profile.webp" alt="" fill sizes="(max-width: 700px) 100vw, 75vw"/>
-   <span><Pencil size={18} aria-hidden="true"/>Редагувати особисті дані</span>
-   <ChevronDown size={22} aria-hidden="true"/>
-  </summary>
+  <IllustratedSummary title="Редагувати особисті дані" image="/portal-art/profile.webp" icon={<Pencil size={18} aria-hidden="true"/>}/>
   <form className="stack account-action-content" onSubmit={save}>
    <p className="muted">Звання, посаду та підрозділ змінює уповноважений адміністратор у кадровому розділі.</p>
    <div className="form-grid">

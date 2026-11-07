@@ -22,7 +22,7 @@ export function PortalPreview({slug,showAdminLinks=false}:{slug:string;showAdmin
   <section className="portal-guide">
    <h2>{guide.title}</h2>
    {guide.format==='steps'?<ol className="portal-steps">{guide.topics.map(([name,description])=><li key={name}><h3>{name}</h3><p>{description}</p></li>)}</ol>:
-    guide.format==='reference'?<div className="portal-reference">{guide.topics.map(([name,description,artwork])=><details key={name}>{artwork?<IllustratedSummary title={name} artwork={artwork}/>:<summary>{name}</summary>}<p>{description}</p></details>)}</div>:
+    guide.format==='reference'?<div className="portal-reference">{guide.topics.map(([name,description,artwork])=><details key={name} className={artwork?"account-action profile-action":undefined}>{artwork?<IllustratedSummary title={name} image={'/portal-art/catalog/'+artwork+'.webp'}/>:<summary>{name}</summary>}<div className="account-action-content"><p>{description}</p></div></details>)}</div>:
     <div className="portal-feature-grid">{guide.topics.map(([name,description])=><section key={name}><h3>{name}</h3><p>{description}</p></section>)}</div>}
    {guide.link&&<Link className="button secondary" href={guide.link[0]}>{guide.link[1]}<ArrowUpRight size={16} aria-hidden="true"/></Link>}
   </section>
