@@ -361,3 +361,5 @@ dialog::backdrop {background:#05080bbc}
 .notifications-cover { --feature-cover: url('/portal-art/workflows/notifications.webp'); }
 .award-orders-cover { --feature-cover: url('/portal-art/workflows/award-orders.webp'); }
 .notification-read { justify-self: start; }
+
+.personnel-cover { --feature-cover: url("/portal-art/unit-actions/rank.webp"); }

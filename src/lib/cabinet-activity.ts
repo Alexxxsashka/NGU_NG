@@ -28,6 +28,7 @@ export async function loadCabinetActivity(userId:string,today:string){
    ORDER BY r.submitted_at DESC,r.id LIMIT 5`,[userId]),
   query<Change>(`SELECT a.id,a.created_at AS date,
     CASE WHEN a.action='service.training.result' THEN 'Результат КМБ'
+         WHEN a.action='personnel.record' THEN CASE a.after->>'action' WHEN 'promote' THEN 'Підвищення' WHEN 'demote' THEN 'Пониження' WHEN 'admit' THEN 'Прийняття до НГУ' WHEN 'dismiss' THEN 'Звільнення з НГУ' ELSE 'Переведення' END
          WHEN a.action='unit.transfer' THEN 'Переведення до підрозділу'
          WHEN a.action='unit.member.grant' THEN 'Призначення до підрозділу'
          WHEN a.action='unit.member.revoke' THEN 'Виведення зі складу підрозділу'
@@ -36,13 +37,14 @@ export async function loadCabinetActivity(userId:string,today:string){
          ELSE 'Кадрове призначення' END AS label,
     CASE WHEN a.action='service.training.result' THEN concat_ws(' · ',entry.value->>'title',
       CASE WHEN a.after->>'status'='passed' THEN 'Зараховано' ELSE 'Потрібно повторити' END)
+    WHEN a.action='personnel.record' THEN concat_ws(' · ',a.after->>'rankName',a.after->>'unitName')
     ELSE coalesce(unit.name,rank.name,nullif(a.after->>'position','')) END AS detail
    FROM audit_logs a
    LEFT JOIN settings entry ON a.action='service.training.result' AND entry.key='service-entry:'||a.entity_id
    LEFT JOIN units unit ON unit.id::text=a.after->>'unitId'
    LEFT JOIN ranks rank ON rank.id::text=a.after->>'rank'
    WHERE (a.action='service.training.result' AND a.after->>'member'=$1)
-   OR (a.action IN ('personnel.assign','personnel.save','unit.assignment','unit.member.grant','unit.member.revoke','unit.transfer')
+   OR (a.action IN ('personnel.assign','personnel.save','unit.assignment','unit.member.grant','unit.member.revoke','unit.transfer','personnel.record')
     AND EXISTS(SELECT 1 FROM personnel p WHERE p.user_id=$1 AND p.id::text=a.entity_id))
    ORDER BY a.created_at DESC,a.id DESC LIMIT 25`,[userId]),
  ]);

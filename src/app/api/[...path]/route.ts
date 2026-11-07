@@ -8,6 +8,7 @@ import { taskReward } from '@/lib/rewards';
 import { currentWeek } from '@/lib/domain';
 import { week,staticId } from '@/lib/validation';
 import {notifications,markNotifications} from '@/lib/notifications';
+import {changePersonnelWorkflow,personnelWorkflow} from '@/lib/personnel-workflow';
 import {clarifyReport} from '@/lib/report-clarification';
 import { filters,listReports,submitReport } from '@/lib/reports';
 import { saveTask,changePeriod,reviewItems,deleteReportItem,adjustAward,saveSettings,savePerson,reviewClaim,linkReport,changeRole,issueRecovery } from '@/lib/admin';
@@ -31,6 +32,7 @@ export async function GET(request:Request,ctx:Context){try{
   if(path.startsWith('service/'))return json(await serviceWorkspace(await member(request),z.enum(serviceModules).parse(path.slice(8)),z.uuid().nullable().parse(url.searchParams.get('entry'))));
   if(path==='catalog')return json(await getCatalog(week.parse(url.searchParams.get('week')||currentWeek())));
   if(path==='viewer')return json({user:await viewer(request.headers),configured:!!process.env.DATABASE_URL&&!!process.env.AUTH_SECRET&&!!process.env.APP_URL});
+  if(path==='personnel-workflow')return json(await personnelWorkflow(await member(request)));
   if(path==='me/notifications')return json(await notifications((await member(request)).id));
   if(path==='me'){const u=await member(request);return json(await listReports(filters(url),u,true));}
   if(path==='me/claims'){const u=await member(request);return json(await query('SELECT id,static_id,status,reason,created_at FROM profile_claims WHERE user_id=$1 ORDER BY created_at DESC LIMIT 30',[u.id]));}
@@ -53,6 +55,7 @@ export async function GET(request:Request,ctx:Context){try{
 export async function POST(request:Request,ctx:Context){try{
   sameOrigin(request);writable();const path=(await ctx.params).path.join('/');
   const input=await readBody(request,path==='admin/import'?2_500_000:(path==='reports'||path==='me/reports/clarify')?MAX_REPORT_BYTES:100_000);
+  if(path==='personnel-workflow')return json(await changePersonnelWorkflow(input,await member(request)));
   if(path==='service')return json(await changeServiceWorkspace(await member(request),input));
   if(path==='me/notifications')return json(await markNotifications((await member(request)).id,input));
   if(path==='me/reports/clarify')return json(await clarifyReport(input,await member(request)));

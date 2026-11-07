@@ -10,7 +10,7 @@ const covers:Record<string,string>={
  Головне:'cabinet',Служба:'service',Підготовка:'training',Звітність:'reports',Документи:'documents',Управління:'command',
 };
 const art:Record<string,string>={
- '/portal/notifications':'workflows/notifications','/cabinet':'tablet','/my-unit':'home/service','/weekly-bonus':'weekly','/weekly-bonus/report':'home/reports',
+ '/portal/personnel-actions':'unit-actions/rank','/portal/notifications':'workflows/notifications','/cabinet':'tablet','/my-unit':'home/service','/weekly-bonus':'weekly','/weekly-bonus/report':'home/reports',
  '/weekly-bonus/me':'catalog/report-journal','/portal/requests':'home/service','/portal/calendar':'calendar',
  '/portal/training':'training','/portal/lectures':'home/training','/portal/regulations':'home/documents',
  '/portal/orders':'home/documents','/portal/announcements':'home/command','/portal/payments':'weekly',
@@ -62,7 +62,7 @@ export function PortalMatrix({signedIn=false,admin=false,hasUnits=false}:{signed
    {active===title&&<div className="home-card-grid">{links.map(([href,label])=>{
     const slug=href.startsWith('/portal/')?href.slice(8):'';
     const preview=slug?portalPreviews[slug]:undefined;
-    const pending=!!preview&&slug!=='payments'&&slug!=='notifications'&&!serviceModules.some(module=>module===slug)&&!Object.hasOwn(adminPortalRoutes,slug);
+    const pending=!!preview&&slug!=='payments'&&slug!=='notifications'&&slug!=='personnel-actions'&&!serviceModules.some(module=>module===slug)&&!Object.hasOwn(adminPortalRoutes,slug);
     return <CardLink key={href} href={href} title={label} description={descriptions[href]||preview?.description}
      image={'/portal-art/'+(art[href]||'home/'+(covers[title]||'cabinet'))+'.webp'} icon={<PortalIcon href={href} size={19}/>} badge={pending?'У розробці':undefined}/>;
    })}</div>}

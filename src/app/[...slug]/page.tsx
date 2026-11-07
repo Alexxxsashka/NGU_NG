@@ -3,6 +3,7 @@ import {query} from '@/db';
 import {headers} from 'next/headers';
 import {redirect,notFound} from 'next/navigation';
 import {viewer} from '@/lib/auth';
+import {PersonnelWorkflow} from '@/components/personnel-workflow';
 import {AwardRegister} from '@/components/award-register';
 import {NotificationCenter} from '@/components/notification-center';
 import {CardLink} from '@/components/card-link';
@@ -47,6 +48,11 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
  if(slug[0]==='portal'&&slug.length===2&&Object.hasOwn(portalPreviews,slug[1])){
   const section=slug[1];
   const user=await viewer(await headers());
+  if(section==='personnel-actions'){
+   if(!user)redirect('/login');
+   if(user.mustChangePassword)redirect('/cabinet');
+   return <PersonnelWorkflow/>;
+  }
   if(section==='notifications'){
    if(!user)redirect('/login');
    if(user.mustChangePassword)redirect('/cabinet');

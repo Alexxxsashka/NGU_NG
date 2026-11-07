@@ -10,6 +10,13 @@ export async function notifications(userId:string):Promise<Notification[]>{
    '/portal/requests?entry='||(s.value->>'id')||'#service-'||(s.value->>'id') AS href, s.value->>'decidedAt' AS created
   FROM settings s WHERE s.key LIKE 'service-entry:%' AND s.value->>'author'=$1 AND s.value->>'decidedAt' IS NOT NULL
   UNION ALL
+  SELECT 'promotion:'||a.id,'Рішення за звітом на підвищення',
+   '/portal/personnel-actions#promotion-'||a.entity_id,a.created_at::text
+  FROM audit_logs a WHERE a.action='personnel.promotion.decision' AND a.after->>'userId'=$1
+  UNION ALL
+  SELECT 'personnel:'||a.id,'Кадрова зміна у вашій особовій справі','/cabinet#cabinet-history',a.created_at::text
+  FROM audit_logs a WHERE a.action='personnel.record' AND a.after->>'member'=$1
+  UNION ALL
   SELECT 'transfer:'||a.id,'Переведення застосовано',
    '/portal/requests?entry='||(a.after->>'entryId')||'#service-'||(a.after->>'entryId'),a.created_at::text
   FROM audit_logs a WHERE a.action='unit.transfer' AND a.after->>'member'=$1

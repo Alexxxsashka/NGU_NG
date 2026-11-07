@@ -7,11 +7,12 @@ import {loadCabinetActivity} from '@/lib/cabinet-activity';
 import {CardLink} from './card-link';
 
 const shortcuts=[
- ['/my-unit','Мій підрозділ','Склад, новини й службова інформація.','unit',Users],
- ['/portal/requests','Службові заявки','Подання заявок і рішення командування.','requests',ClipboardList],
- ['/portal/training','КМБ','Етапи підготовки та результати.','training',GraduationCap],
- ['/portal/calendar','Календар','Найближчі заходи підрозділу.','calendar',CalendarDays],
- ['/portal/regulations','Документи','Чинні документи й регламенти підрозділу.','documents',FileText],
+ ['/portal/personnel-actions','Звіт на підвищення','Подати докази й переглянути рішення.','unit-actions/rank',ClipboardList],
+ ['/my-unit','Мій підрозділ','Склад, новини й службова інформація.','cabinet/unit',Users],
+ ['/portal/requests','Службові заявки','Подання заявок і рішення командування.','cabinet/requests',ClipboardList],
+ ['/portal/training','КМБ','Етапи підготовки та результати.','cabinet/training',GraduationCap],
+ ['/portal/calendar','Календар','Найближчі заходи підрозділу.','cabinet/calendar',CalendarDays],
+ ['/portal/regulations','Документи','Чинні документи й регламенти підрозділу.','cabinet/documents',FileText],
 ] as const;
 const entryLink=(module:string,id:string)=>'/portal/'+module+'?entry='+encodeURIComponent(id)+'#service-'+id;
 const shortDate=new Intl.DateTimeFormat('uk-UA',{timeZone:'Europe/Kyiv',dateStyle:'medium'});
@@ -51,7 +52,7 @@ export async function CabinetActivity({user,today,joinedOn}:{user:Viewer;today:s
   </div>
   <section className="portal-shortcuts" aria-labelledby="cabinet-shortcuts">
    <h2 id="cabinet-shortcuts">Моя служба</h2>
-   <div className="home-card-grid">{shortcuts.map(([href,title,description,art,Icon])=><CardLink key={href} href={href} title={title} description={description} image={'/portal-art/cabinet/'+art+'.webp'} icon={<Icon size={19} aria-hidden="true"/>}/>)}</div>
+   <div className="home-card-grid">{shortcuts.map(([href,title,description,art,Icon])=><CardLink key={href} href={href} title={title} description={description} image={'/portal-art/'+art+'.webp'} icon={<Icon size={19} aria-hidden="true"/>}/>)}</div>
   </section>
   <section className="panel" aria-labelledby="cabinet-history">
    <h2 id="cabinet-history">Історія служби</h2>

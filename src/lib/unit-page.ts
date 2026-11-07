@@ -25,8 +25,8 @@ const accessSql=`
  ORDER BY unit.sort_order,unit.name
 `;
 
-export function accessibleUnits(userId:string,unitId:string|null=null){
- return query<Access>(accessSql,[userId,unitId]);
+export function accessibleUnits(userId:string,unitId:string|null=null,client?:PoolClient){
+ return client?client.query<Access>(accessSql,[userId,unitId]).then(result=>result.rows):query<Access>(accessSql,[userId,unitId]);
 }
 
 const contentFields=z.object({
