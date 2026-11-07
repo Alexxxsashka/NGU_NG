@@ -2,6 +2,7 @@
 import {useRouter} from 'next/navigation';
 import {useState} from 'react';
 import {Archive,ClipboardList,KeyRound,Megaphone,Shield} from 'lucide-react';
+import {StaticIdField} from './static-id-field';
 import {CardFace} from './card-link';
 import {api,Field,Modal,Notice} from './ui';
 
@@ -46,12 +47,12 @@ export function UnitEditor({unitId,info,news,ranks}:{ranks:{id:number;name:strin
    </form>}
    {selected.id==='access'&&<form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);void save({kind:'member',staticId:data.get('staticId'),grant:data.get('grant')==='yes'},form);}}>
     <p>Вкажіть Static ID бійця з активним кадровим профілем. Переведення з іншого підрозділу виконує адміністратор.</p>
-    <Field label="Static ID"><input name="staticId" inputMode="numeric" pattern="[0-9]{1,30}" required/></Field>
+    <StaticIdField unitId={unitId}/>
     <Field label="Дія"><select name="grant"><option value="yes">Надати доступ</option><option value="no">Відкликати доступ</option></select></Field>
     <button disabled={busy}>Зберегти доступ</button>
    </form>}
    {selected.id==='rank'&&<form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);void save({kind:'assignment',staticId:data.get('staticId'),rank:data.get('rank')?Number(data.get('rank')):null,position:data.get('position')},form);}}>
-    <Field label="Static ID"><input name="staticId" inputMode="numeric" pattern="[0-9]{1,30}" required/></Field>
+    <StaticIdField unitId={unitId}/>
     <Field label="Звання"><select name="rank"><option value="">Без звання</option>{ranks.map(rank=><option key={rank.id} value={rank.id}>{rank.name}</option>)}</select></Field>
     <Field label="Посада"><input name="position" maxLength={100}/></Field>
     <button disabled={busy}>Зберегти призначення</button>

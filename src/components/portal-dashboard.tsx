@@ -31,7 +31,7 @@ export async function PortalDashboard({user}:{user:Viewer}){
    <Image className="home-briefing-emblem" src="/ngu-emblem.svg" alt="" width={68} height={68}/>
    <div><p>Службовий портал НГУ</p><h1>{user.name}</h1><span>{managed.length>1?'Огляд командування':managed.length?'Кабінет командування підрозділу':'Особистий робочий простір'}</span></div>
   </header>
-  <PortalMatrix signedIn admin={user.role==='admin'} hasUnits={units.length>0}/>
+  <PortalMatrix signedIn admin={user.role==='admin'}/>
   <div className="portal-feature-grid">
    <section><h2>Цього тижня</h2>{reports.length?<ul>{reports.map(report=><li key={report.number}>{report.number} · {statusLabels[report.status]||report.status}</li>)}</ul>:<p>Звітів за цей тиждень ще немає.</p>}
     <Link className="button secondary" href="/weekly-bonus">Щотижневе преміювання</Link></section>

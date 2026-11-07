@@ -33,6 +33,7 @@ export async function UnitSpace({userId,unitId}:{userId:string;unitId?:string}){
   <header className="portal-preview-header"><span className="pill prime">Внутрішня сторінка</span><h1>{unit.name}</h1><p>Новини, службова інформація й особовий склад підрозділу.</p>
   </header>
   <nav className="home-card-grid portal-shortcuts" aria-label="Розділи підрозділу">
+   <CardLink href="/portal/promotion-points#promotion-submit" title="Звіт на підвищення" image="/portal-art/unit-actions/rank.webp" icon={<ClipboardList size={19}/>}/>
    <CardLink href="#unit-news" title="Новини" image="/portal-art/unit-actions/news.webp" icon={<Megaphone size={19}/>}/>
    <CardLink href="#unit-roster" title="Особовий склад" image={unitCover(unit.name)||'/portal-art/home/service.webp'} icon={<Users size={19}/>}/>
    {unit.editor&&<>

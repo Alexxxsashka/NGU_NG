@@ -2,6 +2,7 @@
 import {useState} from 'react';
 import {dateLabel} from '@/lib/domain';
 import type {awardOrders} from '@/lib/award-register';
+import {StaticIdField} from './static-id-field';
 import {api,Field,Loading,Notice,useResource} from './ui';
 
 export function AwardRegister(){
@@ -30,7 +31,7 @@ export function AwardRegister(){
     finally{setBusy(false);}
    }}>
     <Field label="Наказ"><select name="week" required>{resource.data.orders.map(order=><option value={order.week} key={order.week}>{order.number}</option>)}</select></Field>
-    <Field label="Static ID"><input name="staticId" pattern="[0-9]{1,30}" inputMode="numeric" required/></Field>
+    <StaticIdField/>
     <Field label="Різниця, $"><input name="delta" type="number" step="0.01" required/></Field>
     <Field label="Підстава"><textarea name="reason" required minLength={5} maxLength={2000}/></Field>
     <button disabled={busy}>Записати коригування</button>

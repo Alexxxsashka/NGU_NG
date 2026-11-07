@@ -24,8 +24,8 @@ const descriptions:Record<string,string>={
  '/weekly-bonus/me':'Переглянути історію, статуси та виплати.',
 };
 
-export function PortalMatrix({signedIn=false,admin=false,hasUnits=false}:{signedIn?:boolean;admin?:boolean;hasUnits?:boolean}){
- const [active,setActive]=useState('Огляд');
+export function PortalMatrix({signedIn=false,admin=false}:{signedIn?:boolean;admin?:boolean}){
+ const [active,setActive]=useState('Головне');
  const id=useId();
  const tabs=useRef<(HTMLButtonElement|null)[]>([]);
  const groups=visiblePortalGroups(admin,signedIn).map(group=>{
@@ -36,10 +36,7 @@ export function PortalMatrix({signedIn=false,admin=false,hasUnits=false}:{signed
   }
   return {...group,links};
  }).filter(group=>group.links.length);
- const quick:Array<readonly [string,string]>=signedIn?
-  [['/cabinet','Особистий кабінет'],['/weekly-bonus/report','Подати звіт'],['/weekly-bonus/me','Мої звіти'],...(hasUnits?[['/my-unit','Мої підрозділи'] as const]:[]),['/portal/requests','Службові заявки'],['/portal/training','КМБ і навчальний центр']]:
-  [['/cabinet','Особистий кабінет'],['/weekly-bonus','Щотижневе преміювання'],['/weekly-bonus/report','Подати звіт']];
- const sections=[{title:'Огляд',links:quick},...groups];
+ const sections=groups;
  function move(event:KeyboardEvent<HTMLButtonElement>,index:number){
   const next=event.key==='ArrowRight'?(index+1)%sections.length:event.key==='ArrowLeft'?(index+sections.length-1)%sections.length:
    event.key==='Home'?0:event.key==='End'?sections.length-1:null;

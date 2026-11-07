@@ -2,11 +2,11 @@ export const serviceModules=['requests','training','calendar','regulations','ann
 export type ServiceModule=(typeof serviceModules)[number];
 
 export const portalGroups = [
- {title:'Головне', links:[['/','Головна'],['/cabinet','Особистий кабінет'],['/portal/notifications','Сповіщення']]},
- {title:'Служба', links:[['/portal/personnel','Особовий склад'],['/portal/structure','Підрозділи та структура'],['/portal/calendar','Календар служби'],['/portal/requests','Службові заявки'],['/portal/logistics','Логістика й забезпечення']]},
- {title:'Підготовка', links:[['/portal/training','КМБ і навчальний центр'],['/portal/lectures','Лекції та матеріали'],['/portal/exercises','Тренування й атестації']]},
- {title:'Звітність', links:[['/weekly-bonus','Щотижневе преміювання'],['/portal/payments','Премії та виплати'],['/portal/statistics','Статистика та активність'],['/portal/personnel-actions','Підвищення й кадровий аудит'],['/portal/promotion-points','Завдання й бали підвищення'],['/portal/audit','Журнал аудиту']]},
- {title:'Документи', links:[['/portal/regulations','Статут і нормативи'],['/portal/orders','Накази та розпорядження'],['/portal/announcements','Оголошення']]},
+ {title:'Головне', links:[['/','Головна'],['/cabinet','Особистий кабінет']]},
+ {title:'Служба', links:[['/portal/logistics','Логістика й забезпечення']]},
+ {title:'Підготовка', links:[['/portal/lectures','Лекції та матеріали'],['/portal/exercises','Тренування й атестації']]},
+ {title:'Звітність', links:[['/weekly-bonus','Щотижневе преміювання'],['/portal/audit','Журнал аудиту']]},
+ {title:'Документи', links:[['/portal/orders','Накази та розпорядження'],['/portal/announcements','Оголошення']]},
  {title:'Управління', links:[['/portal/command','Панель командування'],['/portal/administration','Адміністрування']]},
 ] as const;
 
@@ -53,6 +53,6 @@ export const portalAdminLinks=[
 export function visiblePortalGroups(isAdmin: boolean, signedIn=false) {
  return portalGroups.map(group=>({
   title:group.title,
-  links:group.links.filter(([href])=>isAdmin||!href.startsWith('/portal/')||(signedIn&&(href==='/portal/payments'||href==='/portal/notifications'||href==='/portal/personnel-actions'||href==='/portal/promotion-points'||href==='/portal/structure'||serviceModules.some(module=>href==='/portal/'+module)))),
+  links:group.links.filter(([href])=>isAdmin||!href.startsWith('/portal/')||(signedIn&&serviceModules.some(module=>href==='/portal/'+module))),
  })).filter(group=>group.links.length>0);
 }

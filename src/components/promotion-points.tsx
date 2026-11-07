@@ -4,8 +4,9 @@ import {useState,type FormEvent} from 'react';
 import {promotionLadder,promotionRankName} from '@/lib/promotion-rules';
 import {evidenceLines} from '@/lib/report-limits';
 import type {promotionPoints} from '@/lib/promotion-points';
+import {PromotionReportForm} from './promotion-report-form';
 import {IllustratedSummary} from './illustrated-summary';
-import {api,Field,Loading,Notice,useResource} from './ui';
+import {api,Field,Loading,Modal,Notice,useResource} from './ui';
 
 const status={pending:'На перевірці',approved:'Зараховано',rejected:'Відхилено'};
 export function PromotionPoints(){
@@ -21,6 +22,8 @@ export function PromotionPoints(){
  const links=(fd:FormData)=>evidenceLines(String(fd.get('links')??''));
  const editable=(unitId:string|null)=>data?.units.some(unit=>unit.id===unitId);
  const available=data?.tasks.filter(task=>!task.archived&&(!task.unitId||task.unitId===data.profile?.unit_id))??[];
+ const [selected,setSelected]=useState<string|null>(null);
+ const groups=Object.groupBy(data?.credits??[],entry=>entry.reportId??entry.id);
  return <div id="content">
   <header className="portal-preview-header feature-cover personnel-cover"><h1>Завдання й бали підвищення</h1><p>Підтверджені RP-дії та прогрес до наступного звання.</p></header>
   {(error||resource.error)&&<Notice error>{error||resource.error}</Notice>}{saved&&<Notice>Запис збережено.</Notice>}
@@ -30,22 +33,14 @@ export function PromotionPoints(){
     <h2>Мій прогрес</h2>
     {data.profile?<p>{promotionRankName(data.profile.rank,data.profile.rank_name)} · {data.points} підтверджених балів{data.step?' із '+data.step[2]+' до звання «'+data.step[1]+'»':''}.</p>:<p>Для обліку балів потрібен активний профіль зі званням і підрозділом.</p>}
     {data.step&&<progress aria-label="Прогрес до наступного звання" max={data.step[2]} value={Math.min(data.points,data.step[2])}/>}
-    <p><Link href="/portal/personnel-actions">Перейти до звіту на підвищення</Link></p>
+    <p><Link href="/portal/personnel-actions">Запит на підвищення та кадровий аудит</Link></p>
     <p>Бали зараховуються за фактично виконані RP-дії з відповідними відіграваннями. Повторно зараховувати ту саму дію заборонено.</p>
     <p>Для підвищення також потрібні нормативи, атестації, перевірки та рішення командування.</p>
     <details><summary>Шкала підвищень</summary><ul>{promotionLadder.map(([from,to,points])=><li key={from}>{from} → {to} · {points} балів</li>)}</ul></details>
    </section>
-   {data.profile&&<details className="account-action profile-action">
-    <IllustratedSummary title="Подати виконане завдання" image="/portal-art/cabinet/training.webp"/>
-    <form className="stack account-action-content" onSubmit={e=>void save(e,f=>({kind:'submit',taskId:f.get('taskId'),quantity:Number(f.get('quantity')),links:links(f)}))}>
-     <Field label="Завдання"><select name="taskId" required defaultValue=""><option value="">Оберіть завдання</option>
-      <optgroup label="Спільні">{available.filter(task=>!task.unitId).map(task=><option key={task.id} value={task.id}>{task.name} · {task.points} б.</option>)}</optgroup>
-      <optgroup label="Мій підрозділ">{available.filter(task=>task.unitId).map(task=><option key={task.id} value={task.id}>{task.name} · {task.points} б.</option>)}</optgroup>
-     </select></Field>
-     <Field label="Кількість виконань"><input name="quantity" type="number" min={1} max={100} step={1} defaultValue={1} required/></Field>
-     <Field label="Докази"><textarea name="links" rows={3} required placeholder="Одне HTTPS-посилання на рядок"/></Field>
-     <button disabled={busy}>Надіслати на перевірку</button>
-    </form>
+   {data.profile&&<details id="promotion-submit" className="account-action profile-action cabinet-target" open>
+    <IllustratedSummary title="Подати звіт із завданнями" image="/portal-art/cabinet/training.webp"/>
+    <PromotionReportForm tasks={available} onSaved={resource.refresh}/>
    </details>}
    {data.units.length>0&&<section className="panel"><h2>Завдання підрозділів і заохочення</h2>
     <details><summary>Додати завдання підрозділу</summary><form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'task',unitId:f.get('unitId'),name:f.get('name'),points:Number(f.get('points'))}))}>
@@ -73,7 +68,14 @@ export function PromotionPoints(){
    </section>}
    <section className="panel"><h2>Журнал виконань</h2>
     {!data.credits.length&&<p>Виконань поки немає.</p>}
-    {data.credits.map(entry=><details className="audit-row" key={entry.id}>
+    {Object.entries(groups).map(([id,entries])=>{
+     const items=entries??[];
+     const approved=items.reduce((sum,item)=>sum+(item.status==='approved'?item.rate*item.quantity:0),0);
+     return <article className="report-card report-list-row" key={id}>
+      <div className="report-row-identity"><strong>{items[0]?.name}</strong><small>{items[0]?.createdAt?new Date(items[0].createdAt).toLocaleDateString('uk-UA'):''}</small></div>
+      <dl className="report-row-totals"><div><dt>Завдань</dt><dd>{items.length}</dd></div><div><dt>Балів у звіті</dt><dd>{items.reduce((sum,item)=>sum+item.rate*item.quantity,0)}</dd></div><div><dt>Зараховано</dt><dd>{approved}</dd></div></dl>
+      <button type="button" className="secondary" aria-haspopup="dialog" onClick={()=>setSelected(id)}>Відкрити звіт</button>
+      {selected===id&&<Modal title={'Звіт на підвищення · '+items[0]?.name} className="report-dialog" onClose={()=>setSelected(null)}><div className="report-dialog-scroll" tabIndex={0} role="region" aria-label="Завдання звіту"><div className="report-body">{items.map(entry=><details className="audit-row" key={entry.id}>
      <summary><strong>{entry.title} · {entry.rate*entry.quantity} б.</strong> · {entry.name} · {status[entry.status]}</summary>
      <p>{entry.quantity} × {entry.rate} б. · {new Date(entry.createdAt).toLocaleDateString('uk-UA')}</p>
      <ul>{entry.links.map((url,i)=><li key={url}><a href={url} target="_blank" rel="noopener noreferrer">Доказ {i+1}</a></li>)}</ul>
@@ -84,7 +86,8 @@ export function PromotionPoints(){
       <Field label="Підстава рішення"><textarea name="reason" required minLength={5} maxLength={2000}/></Field>
       <button disabled={busy}>Зберегти рішення</button>
      </form>}
-    </details>)}
+    </details>)}</div></div></Modal>}</article>;
+    })}
    </section>
   </>}
  </div>;
