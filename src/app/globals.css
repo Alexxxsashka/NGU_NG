@@ -158,3 +158,34 @@ dialog::backdrop {background:#05080bbc}
 .portal-feature-grid h2 { font-size: 23px; }
 .portal-feature-grid p { margin-bottom: 0; }
 .portal-workspace table td { padding-block: 24px; color: var(--muted); }
+
+.portal-nav-group a { justify-content: flex-start; }
+.portal-nav-group a > svg { color: #c4a35f; }
+.portal-nav-label { flex: 1; }
+.portal-index-group h3,.portal-feature-grid h2 { display: flex; align-items: center; gap: 10px; }
+.portal-index-group h3 svg,.portal-feature-grid h2 svg { color: #c4a35f; }
+.portal-preview-header {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(90deg, #141c24 28%, #141c24db 68%, #141c24), url('/ngu-formation.png') center 54% / cover;
+}
+.portal-preview-insignia {
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 120px;
+  position: absolute;
+  right: 5%;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #ffbf1866;
+  border: 1px solid #c4a35f66;
+  z-index: -1;
+}
+.portal-preview-header h1,.portal-preview-header p { max-width: 76%; }
+@media(max-width: 600px) {
+  .portal-preview-insignia { width: 72px; height: 72px; right: 10px; }
+  .portal-preview-insignia svg { width: 42px; }
+  .portal-preview-header h1,.portal-preview-header p { max-width: 90%; }
+}

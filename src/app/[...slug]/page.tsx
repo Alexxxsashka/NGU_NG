@@ -6,7 +6,7 @@ import {ReportForm} from '@/components/report-form';
 import {AuthScreen} from '@/components/auth-screen';
 import {AdminWorkspace} from '@/components/admin-workspace';
 import {PortalPreview} from '@/components/portal-preview';
-import {portalPreviews} from '@/lib/portal-navigation';
+import {adminPortalRoutes,portalPreviews} from '@/lib/portal-navigation';
 import {Personal} from '@/components/personal';
 export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string}>}){
  const {slug}=await params;const path=slug.join('/');
@@ -21,7 +21,17 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
  if(path==='weekly-bonus/report')return <ReportForm/>;
  if(['login','register','recover','setup'].includes(path))return <AuthScreen passwordChanged={path==='login'&&(await searchParams).password==='changed'} mode={path as 'login'|'register'|'recover'|'setup'}/>;
  if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword}/>;}
- if(slug[0]==='portal'&&slug.length===2&&Object.hasOwn(portalPreviews,slug[1]))return <PortalPreview slug={slug[1]}/>;
+ if(slug[0]==='portal'&&slug.length===2&&Object.hasOwn(portalPreviews,slug[1])){
+  const section=slug[1];
+  if(Object.hasOwn(adminPortalRoutes,section)||section==='administration'){
+   const user=await viewer(await headers());
+   if(user?.role==='admin'&&!user.mustChangePassword){
+    if(Object.hasOwn(adminPortalRoutes,section))redirect(adminPortalRoutes[section]);
+    return <PortalPreview slug={section} showAdminLinks/>;
+   }
+  }
+  return <PortalPreview slug={section}/>;
+ }
  if(slug[0]==='admin'){
   const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword||u.role!=='admin')redirect('/weekly-bonus/me');
   if(slug.length===1)redirect('/admin/weekly-bonus');

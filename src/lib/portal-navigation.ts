@@ -33,3 +33,17 @@ export const portalPreviews:Record<string,Preview> = {
  administration:{description:'Керування доступом і довідниками порталу.',action:'Призначити повноваження',panels:[['Доступ','Ролі, делегування та область повноважень.'],['Довідники','Звання, посади й підрозділи.']],columns:['Користувач','Роль','Область доступу','Строк']},
  audit:{description:'Історія кадрових, службових і фінансових рішень.',action:'Експортувати журнал',panels:[['Події','Автор, об’єкт, час і підстава зміни.'],['Історія','Попереднє й нове значення та окремі записи виправлень.']],columns:['Час','Автор','Дія','Об’єкт']},
 };
+
+export const adminPortalRoutes:Readonly<Record<string,string>>={
+ personnel:'/admin/personnel',
+ structure:'/admin/weekly-bonus/units',
+ statistics:'/admin/weekly-bonus',
+ audit:'/admin/audit',
+};
+
+export const portalAdminLinks=[
+ ['/admin/personnel','Особовий склад'],
+ ['/admin/weekly-bonus','Огляд преміювання'],
+ ['/admin/weekly-bonus/settings','Налаштування преміювання'],
+ ['/admin/audit','Журнал змін'],
+] as const;
