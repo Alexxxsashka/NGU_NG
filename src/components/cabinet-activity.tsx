@@ -2,6 +2,7 @@ import Link from 'next/link';
 import {ArrowUpRight,Bell,CalendarDays,ClipboardList,FileText,GraduationCap,Users} from 'lucide-react';
 import type {Viewer} from '@/lib/domain';
 import {dateLabel} from '@/lib/domain';
+import {notifications} from '@/lib/notifications';
 import {loadCabinetActivity} from '@/lib/cabinet-activity';
 import {CardLink} from './card-link';
 
@@ -16,7 +17,7 @@ const entryLink=(module:string,id:string)=>'/portal/'+module+'?entry='+encodeURI
 const shortDate=new Intl.DateTimeFormat('uk-UA',{timeZone:'Europe/Kyiv',dateStyle:'medium'});
 
 export async function CabinetActivity({user,today,joinedOn}:{user:Viewer;today:string;joinedOn?:string|null}){
- const {requests,learning,event,reports,history}=await loadCabinetActivity(user.id,today);
+ const [{requests,learning,event,reports,history},feed]=await Promise.all([loadCabinetActivity(user.id,today),notifications(user.id)]);
  const timeline=[...history.map(item=>({...item,date:new Date(item.date).toISOString()})),
   ...(joinedOn?[{id:'joined',date:joinedOn+'T12:00:00.000Z',label:'Дата вступу до НГУ',detail:null}]:[]),
  ].sort((a,b)=>b.date.localeCompare(a.date));
@@ -32,6 +33,7 @@ export async function CabinetActivity({user,today,joinedOn}:{user:Viewer;today:s
   <div className="cabinet-overview">
    <section className="panel" aria-labelledby="cabinet-attention">
     <h2 id="cabinet-attention"><Bell size={19} aria-hidden="true"/> Потребує уваги</h2>
+    <p><Link href="/portal/notifications">Сповіщення · {feed.filter(item=>!item.read).length} непрочитаних</Link></p>
     {attention.length?<ul className="cabinet-items">{attention.map(item=><li key={item.key}>
      <Link href={item.href}>{item.title}<ArrowUpRight size={15} aria-hidden="true"/></Link>
      {item.detail&&<p>{item.detail}</p>}

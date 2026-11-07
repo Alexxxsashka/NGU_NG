@@ -7,12 +7,15 @@ import { getCatalog } from '@/lib/catalog';
 import { taskReward } from '@/lib/rewards';
 import { currentWeek } from '@/lib/domain';
 import { week,staticId } from '@/lib/validation';
+import {notifications,markNotifications} from '@/lib/notifications';
+import {clarifyReport} from '@/lib/report-clarification';
 import { filters,listReports,submitReport } from '@/lib/reports';
 import { saveTask,changePeriod,reviewItems,deleteReportItem,adjustAward,saveSettings,savePerson,reviewClaim,linkReport,changeRole,issueRecovery } from '@/lib/admin';
 import {changeServiceWorkspace,serviceWorkspace} from '@/lib/service-workspace';
 import {serviceModules} from '@/lib/portal-navigation';
 import {finalizeAwards,recalculateAwardWeek} from '@/lib/finalize-awards';
-import {awardOrderDocx} from '@/lib/award-order-docx';
+import {awardOrders,awardPreview,correctAwardOrder} from '@/lib/award-register';
+import {awardOrderDocx,type AwardOrder} from '@/lib/award-order-docx';
 import { updateUnitPage } from '@/lib/unit-page';
 import { assignService,savePersonalServiceDetails } from '@/lib/service-assignment';
 import { unitMatrix } from '@/lib/matrix';
@@ -28,9 +31,17 @@ export async function GET(request:Request,ctx:Context){try{
   if(path.startsWith('service/'))return json(await serviceWorkspace(await member(request),z.enum(serviceModules).parse(path.slice(8)),z.uuid().nullable().parse(url.searchParams.get('entry'))));
   if(path==='catalog')return json(await getCatalog(week.parse(url.searchParams.get('week')||currentWeek())));
   if(path==='viewer')return json({user:await viewer(request.headers),configured:!!process.env.DATABASE_URL&&!!process.env.AUTH_SECRET&&!!process.env.APP_URL});
+  if(path==='me/notifications')return json(await notifications((await member(request)).id));
   if(path==='me'){const u=await member(request);return json(await listReports(filters(url),u,true));}
   if(path==='me/claims'){const u=await member(request);return json(await query('SELECT id,static_id,status,reason,created_at FROM profile_claims WHERE user_id=$1 ORDER BY created_at DESC LIMIT 30',[u.id]));}
   const u=await admin(request);
+  if(path==='admin/award-preview')return json(await awardPreview(week.parse(url.searchParams.get('week'))));
+  if(path==='admin/award-orders')return json(await awardOrders());
+  if(path==='admin/award-orders/docx'){
+   const [order]=await query<{value:AwardOrder}>('SELECT value FROM settings WHERE key=$1',['award-order:'+week.parse(url.searchParams.get('week'))]);
+   if(!order)throw new HttpError('Наказ не знайдено.',404);
+   return orderResponse(order.value);
+  }
   if(path==='admin/reports')return json(await listReports(filters(url),u));
   if(path==='admin/matrix'){const f=filters(url);if(!f.unit)throw new HttpError('Оберіть підрозділ.');return json(await unitMatrix(f));}
   if(path==='admin/catalog'){const [tasks,units,ranks,settings]=await Promise.all([query('SELECT * FROM tasks ORDER BY sort_order,name'),query('SELECT * FROM units ORDER BY sort_order,name'),query('SELECT * FROM ranks ORDER BY id'),query('SELECT * FROM settings')]);const pointValue=settings.find(s=>s.key==='pointValue')?.value??null;return json({tasks:tasks.map(t=>({...t,reward:taskReward(t.points,pointValue)})),units,ranks,settings});}
@@ -41,8 +52,10 @@ export async function GET(request:Request,ctx:Context){try{
 }catch(e){return failure(e);}}
 export async function POST(request:Request,ctx:Context){try{
   sameOrigin(request);writable();const path=(await ctx.params).path.join('/');
-  const input=await readBody(request,path==='admin/import'?2_500_000:path==='reports'?MAX_REPORT_BYTES:100_000);
+  const input=await readBody(request,path==='admin/import'?2_500_000:(path==='reports'||path==='me/reports/clarify')?MAX_REPORT_BYTES:100_000);
   if(path==='service')return json(await changeServiceWorkspace(await member(request),input));
+  if(path==='me/notifications')return json(await markNotifications((await member(request)).id,input));
+  if(path==='me/reports/clarify')return json(await clarifyReport(input,await member(request)));
   if(path==='reports')return json(await submitReport(request,input));
   if(path==='register')return json(await register(request,input));
   if(path==='me/service-details')return json(await savePersonalServiceDetails(input,await member(request)));
@@ -52,11 +65,11 @@ export async function POST(request:Request,ctx:Context){try{
   if(path==='me/claims'){const u=await member(request);const p=z.object({staticId}).parse(input);return json(await transaction(async c=>{await lockStaticClaims(c);if((await c.query("SELECT id FROM profile_claims WHERE user_id=$1 AND status='pending'",[u.id])).rows.length)throw new HttpError('У вас уже є заявка на перевірці.');if((await c.query('SELECT id FROM personnel WHERE user_id=$1',[u.id])).rows.length)throw new HttpError('Ваш профіль уже прив’язаний.');await reserveStatic(c,p.staticId,u.id);return {saved:true};}));}
   if(path.startsWith('units/')&&path.split('/').length===2)return json(await updateUnitPage(path.split('/')[1],input,await member(request)));
   const u=await admin(request);
+  if(path==='admin/award-orders/correction')return json(await correctAwardOrder(input,u));
   if(path==='admin/periods/recalculate')return json(await recalculateAwardWeek(input,u));
   if(path==='admin/periods/pay'){
     const order=await finalizeAwards(input,u);
-    const document=await awardOrderDocx(order);
-    return new Response(new Uint8Array(document),{headers:{'Cache-Control':'private, no-store','Content-Type':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','Content-Disposition':'attachment; filename="ngu-awards-'+order.week+'.docx"'}});
+    return orderResponse(order);
   }
   const actions:Record<string,(input:unknown)=>Promise<unknown>>={
     'admin/tasks':i=>saveTask(i,u),'admin/periods':i=>changePeriod(i,u),'admin/review':i=>reviewItems(i,u),'admin/reports/delete-item':i=>deleteReportItem(i,u),'admin/award':i=>adjustAward(i,u),
@@ -66,3 +79,8 @@ export async function POST(request:Request,ctx:Context){try{
   if(!actions[path])throw new HttpError('Операцію не знайдено.',404);
   return json(await actions[path](input));
 }catch(e){return failure(e);}}
+
+async function orderResponse(order:AwardOrder){
+ const document=await awardOrderDocx(order);
+ return new Response(new Uint8Array(document),{headers:{'Cache-Control':'private, no-store','Content-Type':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','Content-Disposition':'attachment; filename="ngu-awards-'+order.week+'.docx"'}});
+}

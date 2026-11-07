@@ -54,6 +54,6 @@ export const portalAdminLinks=[
 export function visiblePortalGroups(isAdmin: boolean, signedIn=false) {
  return portalGroups.map(group=>({
   title:group.title,
-  links:group.links.filter(([href])=>isAdmin||!href.startsWith('/portal/')||(signedIn&&(href==='/portal/payments'||serviceModules.some(module=>href==='/portal/'+module)))),
+  links:group.links.filter(([href])=>isAdmin||!href.startsWith('/portal/')||(signedIn&&(href==='/portal/payments'||href==='/portal/notifications'||serviceModules.some(module=>href==='/portal/'+module)))),
  })).filter(group=>group.links.length>0);
 }

@@ -354,3 +354,10 @@ dialog::backdrop {background:#05080bbc}
 
 .report-evidence { margin-block: 12px; }
 .report-evidence summary { width: fit-content; cursor: pointer; color: var(--gold); }
+
+.feature-cover {
+ background: linear-gradient(90deg,#0b1118 8%,#0b1118e0 50%,#0b11184d), var(--feature-cover) center / cover;
+}
+.notifications-cover { --feature-cover: url('/portal-art/workflows/notifications.webp'); }
+.award-orders-cover { --feature-cover: url('/portal-art/workflows/award-orders.webp'); }
+.notification-read { justify-self: start; }

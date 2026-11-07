@@ -3,6 +3,8 @@ import {query} from '@/db';
 import {headers} from 'next/headers';
 import {redirect,notFound} from 'next/navigation';
 import {viewer} from '@/lib/auth';
+import {AwardRegister} from '@/components/award-register';
+import {NotificationCenter} from '@/components/notification-center';
 import {CardLink} from '@/components/card-link';
 import {IllustratedSummary} from '@/components/illustrated-summary';
 import {ReportList} from '@/components/report-list';
@@ -15,7 +17,7 @@ import {Personal} from '@/components/personal';
 import {UnitSpace} from '@/components/unit-space';
 import {ServiceWorkspace} from '@/components/service-workspace';
 import {ServiceTablet} from '@/components/service-tablet';
-export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string;next?:string;entry?:string;report?:string}>}){
+export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string;next?:string;entry?:string;report?:string;from?:string}>}){
  const {slug}=await params;const path=slug.join('/');
  if(path==='weekly-bonus')return <div id="content"><section className="panel portal-preview-header weekly-bonus-banner">
   <h1>Щотижневе преміювання</h1>
@@ -40,11 +42,16 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
  }
  if(['login','register','recover','setup'].includes(path))return <AuthScreen returnToReport={(await searchParams).next==='report'} passwordChanged={path==='login'&&(await searchParams).password==='changed'} mode={path as 'login'|'register'|'recover'|'setup'}/>;
  if(path==='my-unit'||slug[0]==='units'&&slug.length===2){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <UnitSpace userId={u.id} unitId={slug[1]}/>;}
- if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <section id="content"><h1>Мої звіти</h1><details className="account-action profile-action service-reports" open={!!(await searchParams).report}><IllustratedSummary title="Журнал звітів" image="/portal-art/catalog/report-journal.webp"/><div className="account-action-content"><ReportList personal/></div></details></section>;}
+ if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <section id="content"><h1>Мої звіти</h1><details className="account-action profile-action service-reports" open={!!((await searchParams).report||(await searchParams).from)}><IllustratedSummary title="Журнал звітів" image="/portal-art/catalog/report-journal.webp"/><div className="account-action-content"><ReportList personal/></div></details></section>;}
  if(path==='cabinet'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword} overview={u.mustChangePassword?null:<ServiceTablet user={u}/>}/>;}
  if(slug[0]==='portal'&&slug.length===2&&Object.hasOwn(portalPreviews,slug[1])){
   const section=slug[1];
   const user=await viewer(await headers());
+  if(section==='notifications'){
+   if(!user)redirect('/login');
+   if(user.mustChangePassword)redirect('/cabinet');
+   return <NotificationCenter/>;
+  }
   if(section==='payments'&&user&&!user.mustChangePassword)redirect('/weekly-bonus/me');
   if(serviceModules.includes(section as ServiceModule)){
    if(!user)redirect('/login');
@@ -61,6 +68,7 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
   if(slug.length===2&&['personnel','audit'].includes(slug[1]))return <AdminWorkspace section={slug[1]}/>;
   if(slug[1]!=='weekly-bonus')notFound();
   const section=slug[2]||'overview';
+  if(section==='award-orders'&&slug.length===3)return <AwardRegister/>;
   if(!['overview','reports','units','tasks','periods','settings','import'].includes(section)||slug.length>(section==='units'?4:3))notFound();
   return <AdminWorkspace section={section} unitId={section==='units'?slug[3]:undefined}/>;
  }

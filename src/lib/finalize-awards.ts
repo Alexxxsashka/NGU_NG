@@ -3,6 +3,7 @@ import Decimal from 'decimal.js';
 import {z} from 'zod';
 import {transaction} from '@/db';
 import {audit,lockAdmin} from './admin';
+import {awardPreview,type AwardChange} from './award-register';
 import {recalculateAwards} from './recalculate-awards';
 import {HttpError} from './security';
 import {week} from './validation';
@@ -15,9 +16,14 @@ export async function recalculateAwardWeek(input:unknown,actor:Viewer){
   await lockAdmin(c,actor);
   if((await c.query('SELECT 1 FROM settings WHERE key=$1',['award-order:'+p.week])).rowCount)
    throw new HttpError('Виплату за цей тиждень уже зафіксовано.',409);
+  const before=new Map((await awardPreview(p.week,c)).map(row=>[row.static_id,row.approved]));
   const recalculated=await recalculateAwards(c,p.week);
-  await audit(c,actor,'award.recalculate',p.week,null,{recalculated});
-  return {recalculated};
+  const changes:AwardChange[]=(await awardPreview(p.week,c)).flatMap(row=>{
+   const previous=before.get(row.static_id)??null;
+   return previous===row.approved?[]:[{staticId:row.static_id,before:previous,after:row.approved}];
+  });
+  await audit(c,actor,'award.recalculate',p.week,null,{recalculated,changes});
+  return {recalculated,changes};
  });
 }
 

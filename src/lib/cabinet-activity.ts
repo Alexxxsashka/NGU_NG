@@ -28,6 +28,7 @@ export async function loadCabinetActivity(userId:string,today:string){
    ORDER BY r.submitted_at DESC,r.id LIMIT 5`,[userId]),
   query<Change>(`SELECT a.id,a.created_at AS date,
     CASE WHEN a.action='service.training.result' THEN 'Результат КМБ'
+         WHEN a.action='unit.transfer' THEN 'Переведення до підрозділу'
          WHEN a.action='unit.member.grant' THEN 'Призначення до підрозділу'
          WHEN a.action='unit.member.revoke' THEN 'Виведення зі складу підрозділу'
          WHEN coalesce(a.before#>>'{profile,unit_id}',a.before->>'unit_id') IS DISTINCT FROM a.after->>'unitId' THEN 'Зміна підрозділу'
@@ -41,7 +42,7 @@ export async function loadCabinetActivity(userId:string,today:string){
    LEFT JOIN units unit ON unit.id::text=a.after->>'unitId'
    LEFT JOIN ranks rank ON rank.id::text=a.after->>'rank'
    WHERE (a.action='service.training.result' AND a.after->>'member'=$1)
-   OR (a.action IN ('personnel.assign','personnel.save','unit.assignment','unit.member.grant','unit.member.revoke')
+   OR (a.action IN ('personnel.assign','personnel.save','unit.assignment','unit.member.grant','unit.member.revoke','unit.transfer')
     AND EXISTS(SELECT 1 FROM personnel p WHERE p.user_id=$1 AND p.id::text=a.entity_id))
    ORDER BY a.created_at DESC,a.id DESC LIMIT 25`,[userId]),
  ]);

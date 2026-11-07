@@ -34,10 +34,11 @@ async function ensureUnpaid(c:PoolClient,reportId:string){
 }
 export async function reviewItems(input:unknown,u:Viewer){
   const p=z.object({
-    reportId:z.string().uuid(),itemId:z.string().uuid().optional(),status:itemStatus,
+    reportId:z.string().uuid(),itemId:z.string().uuid().optional(),itemIds:z.array(z.uuid()).min(1).max(50).optional(),status:itemStatus,
     quantity:z.number().int().min(1).max(10000).optional(),
     reason:z.string().trim().max(2000).default('')
   }).parse(input);
+  if(p.itemId&&p.itemIds)throw new HttpError('Оберіть один спосіб вибору завдань.');
   if(p.quantity!==undefined&&!p.itemId)throw new HttpError('Оберіть окреме завдання.');
   if(['rejected','clarification'].includes(p.status)&&!p.reason)throw new HttpError('Укажіть причину.');
   return transaction(async c=>{
@@ -46,8 +47,9 @@ export async function reviewItems(input:unknown,u:Viewer){
     if(!r)throw new HttpError('Звіт не знайдено.',404);
     await ensureUnpaid(c,r.id);
     const award=(await c.query('SELECT cap FROM weekly_awards WHERE static_id=$1 AND week_start=$2 FOR UPDATE',[r.static_id,r.week_start])).rows[0];
-    const {rows}=await c.query('SELECT * FROM report_items WHERE report_id=$1 AND ($2::uuid IS NULL OR id=$2) ORDER BY id FOR UPDATE',[r.id,p.itemId??null]);
-    if(!rows.length)throw new HttpError('Запис не знайдено.',404);
+    const selected=p.itemIds?[...new Set(p.itemIds)]:p.itemId?[p.itemId]:null;
+    const {rows}=await c.query('SELECT * FROM report_items WHERE report_id=$1 AND ($2::uuid[] IS NULL OR id=ANY($2)) ORDER BY id FOR UPDATE',[r.id,selected]);
+    if(!rows.length||(selected&&rows.length!==selected.length))throw new HttpError('Запис не знайдено.',404);
     const [used]=(await c.query(`SELECT coalesce(sum(i.approved_amount),0)::text AS total FROM report_items i JOIN reports r ON r.id=i.report_id WHERE r.static_id=$1 AND r.week_start=$2 AND i.status='approved' AND NOT(i.id=ANY($3::uuid[]))`,[r.static_id,r.week_start,rows.map(i=>i.id)])).rows;
     let available=award?.cap==null?null:Decimal.max(0,new Decimal(award.cap).minus(used.total));
     for(const item of rows){

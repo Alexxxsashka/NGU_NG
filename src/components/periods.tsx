@@ -1,4 +1,6 @@
 'use client';
+import Link from 'next/link';
+import type {AwardChange,AwardPreviewRow} from '@/lib/award-register';
 import {useState} from 'react';
 import {currentWeek,monday,dateLabel,shiftDate} from '@/lib/domain';
 import {api,useResource,Field,Notice,Refresh} from './ui';
@@ -8,6 +10,8 @@ type Period={week_start:string;open:boolean;paid:boolean;updated_at:string};
 export function Periods(){
  const resource=useResource<Period[]>('admin/periods');
  const [week,setWeek]=useState(currentWeek),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
+ const preview=useResource<AwardPreviewRow[]>('admin/award-preview?week='+week);
+ const [changes,setChanges]=useState<AwardChange[]>([]);
  const period=resource.data?.find(p=>p.week_start===week);
  const open=period?.open??false;
  const disabled=busy||resource.loading||!!resource.error;
@@ -23,7 +27,8 @@ export function Periods(){
  async function recalculate(){
   setBusy(true);setError('');setMessage('');
   try{
-   const {recalculated}=await api<{recalculated:number}>('admin/periods/recalculate',{week});
+   const {recalculated,changes}=await api<{recalculated:number;changes:AwardChange[]}>('admin/periods/recalculate',{week});
+   setChanges(changes);await preview.refresh();
    setMessage(recalculated?'Перераховано позицій: '+recalculated+'.':'Усі невиплачені позиції вже відповідають чинним ставкам і лімітам.');
   }catch(e){setError((e as Error).message);}
   finally{setBusy(false);}
@@ -41,14 +46,15 @@ export function Periods(){
    setTimeout(()=>URL.revokeObjectURL(url),1000);
    setMessage('Наказ Word сформовано.');
   }catch(e){setError((e as Error).message);}
-  finally{await resource.refresh();setBusy(false);}
+  finally{await Promise.all([resource.refresh(),preview.refresh()]);setBusy(false);}
  }
 
  return <>
   <section className="panel narrow">
    <h2>Прийом звітів і виплата</h2>
+   <p><Link href="/admin/weekly-bonus/award-orders">Реєстр наказів Word</Link></p>
    <Field label="Початок звітного тижня"><input type="date" value={week} disabled={busy} onChange={e=>{
-    if(e.target.value){setWeek(monday(e.target.value));setError('');setMessage('');}
+    if(e.target.value){setWeek(monday(e.target.value));setChanges([]);setError('');setMessage('');}
    }}/></Field>
    <p>{dateLabel(week)} — {dateLabel(shiftDate(week,6))}</p>
    <p><span className={'pill '+(open||period?.paid?'approved':'pending')}>{status(period)}</span></p>
@@ -61,10 +67,20 @@ export function Periods(){
    {message&&<Notice>{message}</Notice>}
    {(error||resource.error)&&<Notice error>{error||resource.error}</Notice>}
   </section>
+  {!period?.paid&&<section className="panel"><h2>Попередній перегляд виплати</h2>
+   {preview.error&&<Notice error>{preview.error}</Notice>}
+   {preview.loading&&<p>Завантажуємо нарахування…</p>}
+   {preview.data?.length===0&&<p>Схвалених невиплачених позицій за цей тиждень немає.</p>}
+   {preview.data?.length?<div className="table-wrap"><table><thead><tr><th>Боєць</th><th>Розраховано</th><th>Ліміт</th><th>Коригувань</th><th>До виплати</th><th>Після перерахунку</th></tr></thead><tbody>
+    {preview.data.map(row=>{const change=changes.find(item=>item.staticId===row.static_id);
+     return <tr key={row.static_id}><td>{row.name}<small>ID {row.static_id}</small></td><td>{row.estimate??'—'}</td><td>{row.cap??'Без ліміту'}</td><td>{row.manual}</td><td>{row.approved??'—'}</td><td>{change?(change.before??'—')+' → '+(change.after??'—'):'—'}</td></tr>;
+    })}
+   </tbody></table></div>:null}
+  </section>}
   <Refresh loading={resource.loading} onClick={resource.refresh} at={resource.updatedAt}/>
   <div className="table-wrap"><table><thead><tr><th>Тиждень</th><th>Стан</th><th>Остання зміна</th></tr></thead><tbody>
    {resource.data?.map(p=><tr key={p.week_start}>
-    <td><button type="button" className="text-button" disabled={busy} onClick={()=>{setWeek(p.week_start);setError('');setMessage('');}}>{dateLabel(p.week_start)}</button></td>
+    <td><button type="button" className="text-button" disabled={busy} onClick={()=>{setWeek(p.week_start);setChanges([]);setError('');setMessage('');}}>{dateLabel(p.week_start)}</button></td>
     <td><span className={'pill '+(p.open||p.paid?'approved':'pending')}>{status(p)}</span></td><td>{new Date(p.updated_at).toLocaleString('uk-UA')}</td>
    </tr>)}
   </tbody></table></div>
