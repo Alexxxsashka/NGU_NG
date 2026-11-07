@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_REPORT_BYTES } from '@/lib/report-limits';
 import { query,transaction } from '@/db';
 import { viewer } from '@/lib/auth';
 import { admin,member,failure,sameOrigin,writable,readBody,HttpError } from '@/lib/security';
@@ -35,7 +36,7 @@ export async function GET(request:Request,ctx:Context){try{
 }catch(e){return failure(e);}}
 export async function POST(request:Request,ctx:Context){try{
   sameOrigin(request);writable();const path=(await ctx.params).path.join('/');
-  const input=await readBody(request,path==='admin/import'?2_500_000:100_000);
+  const input=await readBody(request,path==='admin/import'?2_500_000:path==='reports'?MAX_REPORT_BYTES:100_000);
   if(path==='reports')return json(await submitReport(request,input));
   if(path==='register')return json(await register(request,input));
   if(path==='me/password'){const u=await viewer(request.headers);if(!u)throw new HttpError('Увійдіть у свій обліковий запис.',401);return json(await changePassword(request,input,u));}

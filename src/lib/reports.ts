@@ -36,7 +36,7 @@ export async function submitReport(request:Request,input:unknown){
       const estimated=reward!==null&&rank.multiplier!==null?new Decimal(reward).mul(rank.multiplier).mul(e.quantity).toFixed(2):null;
       await c.query(`INSERT INTO report_items(id,report_id,task_id,task_name,quantity,points_rate,points,reward_rate,rank_multiplier,estimated_amount,time_category,starts_at,ends_at)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,[itemId,id,t.id,t.name,e.quantity,t.points,points,reward,rank.multiplier,estimated,t.time_category,t.starts_at,t.ends_at]);
-      for(const [i,url] of e.evidenceUrls.entries())await c.query('INSERT INTO evidence_links(item_id,url,sort_order) VALUES($1,$2,$3)',[itemId,url,i]);
+      await c.query('INSERT INTO evidence_links(item_id,url,sort_order) SELECT $1,url,(ordinal-1)::int FROM unnest($2::text[]) WITH ORDINALITY AS evidence(url,ordinal)',[itemId,e.evidenceUrls]);
     }
     return {reportId:id,number,week:p.week,points:total,quantity:p.entries.reduce((n,e)=>n+e.quantity,0)};
   });
