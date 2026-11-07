@@ -50,9 +50,20 @@ export const portalAdminLinks=[
  ['/admin/audit','Журнал змін'],
 ] as const;
 
-export function visiblePortalGroups(isAdmin: boolean, signedIn=false) {
+const adminGroupLinks:Readonly<Record<string,readonly (readonly [string,string])[]>>={
+ Головне:[['/portal/notifications','Сповіщення']],
+ Служба:[['/portal/structure','Внутрішні сторінки підрозділів'],['/portal/calendar','Календар служби'],['/portal/requests','Службові заявки']],
+ Підготовка:[['/portal/training','КМБ і навчальний центр']],
+ Звітність:[['/portal/personnel-actions','Кадровий аудит і рішення щодо підвищень'],['/portal/promotion-points','Завдання та перевірка балів підвищення']],
+ Документи:[['/portal/regulations','Статут і нормативи']],
+};
+
+export function visiblePortalGroups(isAdmin:boolean,signedIn=false){
  return portalGroups.map(group=>({
   title:group.title,
-  links:group.links.filter(([href])=>isAdmin||!href.startsWith('/portal/')||(signedIn&&serviceModules.some(module=>href==='/portal/'+module))),
+  links:[
+   ...group.links.filter(([href])=>isAdmin||!href.startsWith('/portal/')||(signedIn&&serviceModules.some(module=>href==='/portal/'+module))),
+   ...(isAdmin?adminGroupLinks[group.title]??[]:[]),
+  ],
  })).filter(group=>group.links.length>0);
 }
