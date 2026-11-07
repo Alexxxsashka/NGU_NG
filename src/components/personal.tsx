@@ -38,19 +38,19 @@ function PasswordForm({required}:{required:boolean}){
    <button disabled={busy}>{busy?'Зберігаємо…':'Змінити пароль і ввійти знову'}</button>
   </form>;
 }
-export function Personal({mustChangePassword}:{mustChangePassword:boolean}){
+export function Personal({mustChangePassword,overview}:{mustChangePassword:boolean;overview:ReactNode}){
  return <div id="content">{mustChangePassword?
   <section className="panel narrow">
    <h1>Зміна пароля</h1>
    <Notice>Ви увійшли з тимчасовим паролем. Установіть новий пароль, щоб відкрити кабінет.</Notice>
    <PasswordForm required/>
   </section>:
-  <><PersonalReports/><AccountAction title="Змінити пароль" image="/account-password.png"><PasswordForm required={false}/></AccountAction></>
+  <>{overview}<PersonalReports/><AccountAction title="Змінити пароль" image="/account-password.png"><PasswordForm required={false}/></AccountAction></>
  }</div>;
 }
 function PersonalReports(){const resource=useResource<ReportsData>('me'),claims=useResource<{id:string;static_id:string;status:string;reason:string}[]>('me/claims');const [error,setError]=useState(''),[busy,setBusy]=useState(false);
 async function claim(e:React.FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);setError('');try{await api('me/claims',{staticId:new FormData(e.currentTarget).get('staticId')});await claims.refresh();}catch(err){setError((err as Error).message);}finally{setBusy(false);}}
-return <div><div className="page-heading"><div><h1>Особистий кабінет</h1><p>Ваші звіти, виконання й підтверджені бали.</p></div></div>{resource.error?<Notice error>{resource.error}</Notice>:resource.loading?<Loading/>:resource.data?.profile?<><Notice>Профіль: {resource.data.profile.lastName} {resource.data.profile.firstName} · ID {resource.data.profile.staticId}</Notice><ReportList personal/></>:<>
+return <div>{resource.error?<Notice error>{resource.error}</Notice>:resource.loading?<Loading/>:resource.data?.profile?<details className="panel service-reports" id="service-reports" open><summary>Журнал звітів</summary><ReportList personal/></details>:<>
  <AccountAction title="Підтвердити Static ID" image="/account-static.png">
   <p>Адміністратор зв’яже обліковий запис із вашим кадровим профілем. До підтвердження історія недоступна.</p>
   {claims.error?<Notice error>{claims.error}</Notice>:claims.loading&&!claims.data?<Loading/>:

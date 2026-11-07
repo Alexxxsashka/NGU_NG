@@ -189,3 +189,22 @@ dialog::backdrop {background:#05080bbc}
   .portal-preview-insignia svg { width: 42px; }
   .portal-preview-header h1,.portal-preview-header p { max-width: 90%; }
 }
+
+.service-tablet { margin-bottom: 26px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.service-identity { display: flex; gap: clamp(12px,3vw,24px); align-items: center; min-height: 166px; padding: clamp(18px,4vw,38px); border-bottom: 2px solid #c4a35f; background: linear-gradient(90deg,#0b1118 24%,#0b1118e8 61%,#0b111885),url('/ngu-formation.png') center 54% / cover; }
+.service-identity img { width: clamp(44px,9vw,76px); height: auto; flex: none; }
+.service-identity > div { min-width: 0; }
+.service-kicker { color: #c4a35f; font-size: 12px; }
+.service-identity h1 { margin-block: 4px 8px; font-size: clamp(28px,5vw,54px); line-height: 1.08; overflow-wrap: anywhere; }
+.service-status { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; color: var(--muted); }
+.service-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,150px),1fr)); gap: 1px; background: var(--line); }
+.service-grid > div { display: grid; align-content: start; gap: 4px; padding: 16px 18px; background: var(--surface); }
+.service-grid svg { color: #c4a35f; }
+.service-grid dt,.service-section-head span { color: var(--muted); font-size: 12px; }
+.service-grid dd { font-size: clamp(17px,2vw,24px); font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.service-facts,.service-totals .service-grid { border-bottom: 1px solid var(--line); }
+.service-section-head,.service-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 18px; }
+.service-section-head { justify-content: space-between; border-bottom: 1px solid var(--line); }
+.service-reports { scroll-margin-top: 90px; }
+.service-reports > summary { cursor: pointer; color: var(--gold); font-weight: 700; }
+.service-reports[open] > summary { margin-bottom: 14px; }

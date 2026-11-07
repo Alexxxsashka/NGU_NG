@@ -8,6 +8,7 @@ import {AdminWorkspace} from '@/components/admin-workspace';
 import {PortalPreview} from '@/components/portal-preview';
 import {adminPortalRoutes,portalPreviews} from '@/lib/portal-navigation';
 import {Personal} from '@/components/personal';
+import {ServiceTablet} from '@/components/service-tablet';
 export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string}>}){
  const {slug}=await params;const path=slug.join('/');
  if(path==='weekly-bonus')return <section id="content" className="panel narrow">
@@ -20,7 +21,7 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
  </section>;
  if(path==='weekly-bonus/report')return <ReportForm/>;
  if(['login','register','recover','setup'].includes(path))return <AuthScreen passwordChanged={path==='login'&&(await searchParams).password==='changed'} mode={path as 'login'|'register'|'recover'|'setup'}/>;
- if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword}/>;}
+ if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword} overview={u.mustChangePassword?null:<ServiceTablet user={u}/>}/>;}
  if(slug[0]==='portal'&&slug.length===2&&Object.hasOwn(portalPreviews,slug[1])){
   const section=slug[1];
   const user=await viewer(await headers());
