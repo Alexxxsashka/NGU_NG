@@ -12,7 +12,7 @@ export function PortalPreview({slug,showAdminLinks=false}:{slug:string;showAdmin
  if(!page||!title||!guide)return null;
  return <div id="content" className="portal-preview">
   <nav aria-label="Шлях до сторінки" className="portal-crumb"><Link href="/">Портал НГУ</Link><span>/</span><span>{group?.title}</span></nav>
-  <header className="portal-preview-header">
+  <header className="portal-preview-header" data-portal-art={slug}>
    <div className="portal-preview-insignia"><PortalIcon href={'/portal/'+slug} size={72}/></div>
    <span className="pill prime"><HardHat size={15}/>{showAdminLinks?'Доступно частково':'У розробці'}</span>
    <h1>{title}</h1>

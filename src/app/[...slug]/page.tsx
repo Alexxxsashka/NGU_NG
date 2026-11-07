@@ -12,7 +12,7 @@ import {UnitSpace} from '@/components/unit-space';
 import {ServiceTablet} from '@/components/service-tablet';
 export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string}>}){
  const {slug}=await params;const path=slug.join('/');
- if(path==='weekly-bonus')return <section id="content" className="panel narrow">
+ if(path==='weekly-bonus')return <section id="content" className="panel portal-preview-header weekly-bonus-banner">
   <h1>Щотижневе преміювання</h1>
   <p>Подавайте звіти за виконані завдання та переглядайте підтверджені результати.</p>
   <div className="actions">

@@ -168,7 +168,7 @@ dialog::backdrop {background:#05080bbc}
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  background: linear-gradient(90deg, #141c24 28%, #141c24db 68%, #141c24), url('/ngu-formation.png') center 54% / cover;
+  background: linear-gradient(115deg,#141c24 35%,#1c2831);
 }
 .portal-preview-insignia {
   display: grid;
@@ -191,7 +191,7 @@ dialog::backdrop {background:#05080bbc}
 }
 
 .service-tablet { margin-bottom: 26px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
-.service-identity { display: flex; gap: clamp(12px,3vw,24px); align-items: center; min-height: 166px; padding: clamp(18px,4vw,38px); border-bottom: 2px solid #c4a35f; background: linear-gradient(90deg,#0b1118 24%,#0b1118e8 61%,#0b111885),url('/ngu-formation.png') center 54% / cover; }
+.service-identity { display: flex; gap: clamp(12px,3vw,24px); align-items: center; min-height: 166px; padding: clamp(18px,4vw,38px); border-bottom: 2px solid #c4a35f; background: linear-gradient(90deg,#0b1118 24%,#0b1118e8 61%,#0b111885),url('/portal-art/tablet.webp') right 57% / cover; }
 .service-identity img { width: clamp(44px,9vw,76px); height: auto; flex: none; }
 .service-identity > div { min-width: 0; }
 .service-kicker { color: #c4a35f; font-size: 12px; }
@@ -246,3 +246,21 @@ dialog::backdrop {background:#05080bbc}
 .portal-steps li + li { border-top: 1px solid var(--line); }
 .portal-steps li::marker { color: var(--gold); font-weight: 700; }
 .portal-steps p { margin: 4px 0 0; max-width: 72ch; }
+
+.portal-preview-header[data-portal-art="training"],
+.portal-preview-header[data-portal-art="calendar"],
+.weekly-bonus-banner {
+  min-height: 184px;
+  background: linear-gradient(90deg,#0b1118 12%,#0b1118d9 50%,#0b111850), var(--portal-banner) right center / cover;
+}
+.portal-preview-header[data-portal-art="training"] { --portal-banner: url('/portal-art/training.webp'); }
+.portal-preview-header[data-portal-art="calendar"] { --portal-banner: url('/portal-art/calendar.webp'); }
+.weekly-bonus-banner { --portal-banner: url('/portal-art/weekly.webp'); }
+.weekly-bonus-banner h1 { margin-top: 0; }
+.profile-action > summary { align-items: center; }
+.profile-action > summary > span { display: flex; align-items: center; gap: 10px; }
+.profile-action > summary img { object-position: right center; }
+.account-action[open] > summary { min-height: 0; background: var(--surface); }
+.account-action[open] > summary img,.account-action[open] > summary::before { display: none; }
+.account-action[open] > summary > svg { transform: rotate(180deg); }
+.account-action[open] > summary span svg { transform: none; }

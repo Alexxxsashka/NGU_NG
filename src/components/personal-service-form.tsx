@@ -2,7 +2,8 @@
 
 import {useRouter} from 'next/navigation';
 import {useState} from 'react';
-import {Pencil} from 'lucide-react';
+import Image from 'next/image';
+import {ChevronDown, Pencil} from 'lucide-react';
 import {api,Field,Notice} from './ui';
 
 type Details={joinedOn:string|null;callsign:string;bio:string};
@@ -19,9 +20,13 @@ export function PersonalServiceForm({details,today}:{details:Details;today:strin
   }catch(error){setError((error as Error).message);}
   finally{setBusy(false);}
  }
- return <details className="panel service-reports">
-  <summary><Pencil size={16} aria-hidden="true"/> Редагувати особисті дані</summary>
-  <form className="stack" onSubmit={save}>
+ return <details className="account-action profile-action">
+  <summary>
+   <Image src="/portal-art/profile.webp" alt="" fill sizes="(max-width: 700px) 100vw, 75vw"/>
+   <span><Pencil size={18} aria-hidden="true"/>Редагувати особисті дані</span>
+   <ChevronDown size={22} aria-hidden="true"/>
+  </summary>
+  <form className="stack account-action-content" onSubmit={save}>
    <p className="muted">Звання, посаду та підрозділ змінює уповноважений адміністратор у кадровому розділі.</p>
    <div className="form-grid">
     <Field label="Дата вступу до НГУ"><input type="date" name="joinedOn" defaultValue={details.joinedOn??''} max={today}/></Field>
