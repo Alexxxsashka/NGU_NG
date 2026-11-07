@@ -17,7 +17,7 @@ export async function lockStaticClaims(c: PoolClient) {
   await c.query("SELECT pg_advisory_xact_lock(hashtext('static-account-claims'))");
 }
 
-export async function reserveStatic(c: PoolClient, id: string, userId: string) {
+export async function reserveStatic(c: PoolClient, id: string, userId: string, createClaim = true) {
   const taken = await c.query(`
     SELECT 1 FROM app_user WHERE username=$3 AND id<>$2
     UNION ALL
@@ -26,6 +26,7 @@ export async function reserveStatic(c: PoolClient, id: string, userId: string) {
     SELECT 1 FROM profile_claims WHERE static_id::numeric=$1::text::numeric AND status='pending' AND user_id<>$2
   `, [id, userId, staticAccountKey(id)]);
   if (taken.rowCount) throw new HttpError('Цей Static ID уже зареєстровано або він очікує підтвердження.', 409);
+  if (!createClaim) return;
   const roster = await c.query('SELECT static_id FROM personnel WHERE static_id::numeric=$1::text::numeric ORDER BY (static_id=$1) DESC, static_id LIMIT 1', [id]);
   const claimId = roster.rows[0]?.static_id ?? id.replace(/^0+(?=\d)/, '');
   await c.query('INSERT INTO profile_claims(user_id,static_id) VALUES($1,$2)', [userId, claimId]);
@@ -40,7 +41,11 @@ export async function register(request: Request, input: unknown) {
     await lockStaticClaims(c);
     await c.query('INSERT INTO app_user(id,name,email,username,display_username) VALUES($1,$2,$3,$4,$4)',
       [id, p.firstName + " " + p.lastName, id + '@accounts.invalid', staticAccountKey(p.staticId)]);
-    await reserveStatic(c, p.staticId, id);
+    await reserveStatic(c, p.staticId, id, false);
+    const profile=await c.query(`INSERT INTO personnel(static_id,first_name,last_name,user_id)
+      SELECT $1,$2,$3,$4 WHERE NOT EXISTS(SELECT 1 FROM personnel WHERE static_id::numeric=$1::text::numeric)`,
+      [staticAccountKey(p.staticId).slice(7),p.firstName,p.lastName,id]);
+    if(!profile.rowCount)await reserveStatic(c,p.staticId,id);
     await c.query("INSERT INTO account(id,account_id,provider_id,user_id,password) VALUES($1,$2,'credential',$2,$3)", [randomUUID(), id, digest]);
     return { created: true };
   });
