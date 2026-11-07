@@ -1,16 +1,20 @@
 import Link from 'next/link';
+import {query} from '@/db';
 import {headers} from 'next/headers';
 import {redirect,notFound} from 'next/navigation';
 import {viewer} from '@/lib/auth';
+import {IllustratedSummary} from '@/components/illustrated-summary';
+import {ReportList} from '@/components/report-list';
 import {ReportForm} from '@/components/report-form';
 import {AuthScreen} from '@/components/auth-screen';
 import {AdminWorkspace} from '@/components/admin-workspace';
 import {PortalPreview} from '@/components/portal-preview';
-import {adminPortalRoutes,portalPreviews} from '@/lib/portal-navigation';
+import {adminPortalRoutes,portalPreviews,serviceModules,type ServiceModule} from '@/lib/portal-navigation';
 import {Personal} from '@/components/personal';
 import {UnitSpace} from '@/components/unit-space';
+import {ServiceWorkspace} from '@/components/service-workspace';
 import {ServiceTablet} from '@/components/service-tablet';
-export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string}>}){
+export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string;next?:string}>}){
  const {slug}=await params;const path=slug.join('/');
  if(path==='weekly-bonus')return <section id="content" className="panel portal-preview-header weekly-bonus-banner">
   <h1>Щотижневе преміювання</h1>
@@ -20,19 +24,38 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
    <Link className="button secondary" href="/weekly-bonus/me">Мої звіти</Link>
   </div>
  </section>;
- if(path==='weekly-bonus/report')return <ReportForm/>;
- if(['login','register','recover','setup'].includes(path))return <AuthScreen passwordChanged={path==='login'&&(await searchParams).password==='changed'} mode={path as 'login'|'register'|'recover'|'setup'}/>;
- if(path==='my-unit'||slug[0]==='units'&&slug.length===2){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/weekly-bonus/me');return <UnitSpace userId={u.id} unitId={slug[1]}/>;}
- if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword} overview={u.mustChangePassword?null:<ServiceTablet user={u}/>}/>;}
+ if(path==='weekly-bonus/report'){
+  const user=await viewer(await headers());
+  if(user?.mustChangePassword)redirect('/cabinet');
+  if(!user)return <section id="content" className="panel narrow">
+   <h1>Подати звіт на премію</h1>
+   <p className="notice error" role="alert">Щоб подати звіт, увійдіть або створіть акаунт.</p>
+   <div className="actions"><Link className="button" href="/register?next=report">Створити акаунт</Link><Link className="button secondary" href="/login?next=report">Увійти</Link></div>
+  </section>;
+  const [profile]=await query<{static_id:string|null;first_name:string|null;last_name:string|null;rank:number|null;unit_id:string|null}>(`SELECT coalesce(p.static_id,substring(u.username from '^static_([0-9]+)$'),
+   (SELECT static_id FROM profile_claims WHERE user_id=u.id AND status='pending' ORDER BY created_at DESC LIMIT 1)) AS static_id,
+   p.first_name,p.last_name,p.rank,(SELECT id FROM units WHERE id=p.unit_id AND active) AS unit_id FROM app_user u LEFT JOIN personnel p ON p.user_id=u.id AND p.active WHERE u.id=$1`,[user.id]);
+  return <ReportForm key={user.id} userId={user.id} profile={profile}/>;
+ }
+ if(['login','register','recover','setup'].includes(path))return <AuthScreen returnToReport={(await searchParams).next==='report'} passwordChanged={path==='login'&&(await searchParams).password==='changed'} mode={path as 'login'|'register'|'recover'|'setup'}/>;
+ if(path==='my-unit'||slug[0]==='units'&&slug.length===2){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <UnitSpace userId={u.id} unitId={slug[1]}/>;}
+ if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <section id="content"><h1>Мої звіти</h1><details className="account-action profile-action service-reports"><IllustratedSummary title="Журнал звітів" image="/portal-art/catalog/report-journal.webp"/><div className="account-action-content"><ReportList personal/></div></details></section>;}
+ if(path==='cabinet'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword} overview={u.mustChangePassword?null:<ServiceTablet user={u}/>}/>;}
  if(slug[0]==='portal'&&slug.length===2&&Object.hasOwn(portalPreviews,slug[1])){
   const section=slug[1];
   const user=await viewer(await headers());
+  if(section==='payments'&&user&&!user.mustChangePassword)redirect('/weekly-bonus/me');
+  if(serviceModules.includes(section as ServiceModule)){
+   if(!user)redirect('/login');
+   if(user.mustChangePassword)redirect('/cabinet');
+   return <ServiceWorkspace key={section} module={section as ServiceModule}/>;
+  }
   if(!user||user.role!=='admin'||user.mustChangePassword)notFound();
   if(Object.hasOwn(adminPortalRoutes,section))redirect(adminPortalRoutes[section]);
   return <PortalPreview slug={section} showAdminLinks={section==='administration'}/>;
  }
  if(slug[0]==='admin'){
-  const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword||u.role!=='admin')redirect('/weekly-bonus/me');
+  const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword||u.role!=='admin')redirect('/cabinet');
   if(slug.length===1)redirect('/admin/weekly-bonus');
   if(slug.length===2&&['personnel','audit'].includes(slug[1]))return <AdminWorkspace section={slug[1]}/>;
   if(slug[1]!=='weekly-bonus')notFound();

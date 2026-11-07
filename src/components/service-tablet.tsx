@@ -25,7 +25,7 @@ type ServiceCard={
  pending_items:string;
 };
 
-export async function ServiceTablet({user}:{user:Viewer}){
+export async function ServiceTablet({user,editable=true}:{user:Viewer;editable?:boolean}){
  const [card]=await query<ServiceCard>(`
   SELECT p.static_id,CASE WHEN u.active THEN u.id END AS unit_id,p.first_name,p.last_name,p.active,p.rank,u.name AS unit_name,k.name AS rank_name,
          details.value->>'leadershipRole' AS leadership_role,details.value->>'joinedOn' AS joined_on,details.value->>'callsign' AS callsign,details.value->>'bio' AS bio,details.value->>'position' AS position,
@@ -40,7 +40,7 @@ export async function ServiceTablet({user}:{user:Viewer}){
     coalesce(sum(i.points) FILTER (WHERE i.status='approved'),0)::text AS approved_points,
     count(*) FILTER (WHERE i.status IN ('pending','clarification'))::text AS pending_items
    FROM reports r JOIN report_items i ON i.report_id=r.id
-   WHERE r.personnel_id=p.id AND p.active
+   WHERE (r.personnel_id=p.id OR r.author_id=p.user_id) AND p.active
   ) totals
   WHERE p.user_id=$1
  `,[user.id]);
@@ -85,6 +85,6 @@ export async function ServiceTablet({user}:{user:Viewer}){
    <Link className="button secondary" href={card.leadership_role==='leadership'?'/my-unit':'/units/'+card.unit_id}><Users size={17} aria-hidden="true"/> {card.leadership_role==='leadership'?'Усі підрозділи':'Мій підрозділ'}</Link>
   </div>}
  </section>
- {card?.active&&<PersonalServiceForm today={today} details={{joinedOn:card.joined_on,callsign:card.callsign??'',bio:card.bio??''}}/>}
+ {editable&&card?.active&&<PersonalServiceForm today={today} details={{joinedOn:card.joined_on,callsign:card.callsign??'',bio:card.bio??''}}/>}
  </>;
 }

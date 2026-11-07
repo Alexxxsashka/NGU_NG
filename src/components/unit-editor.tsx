@@ -5,7 +5,7 @@ import {api,Field,Notice} from './ui';
 
 const infoFields=[['overview','Про підрозділ'],['schedule','Розклад і заходи'],['rules','Правила та матеріали'],['contacts','Контакти командування']] as const;
 type Info=Record<(typeof infoFields)[number][0],string>;
-export function UnitEditor({unitId,info,news}:{unitId:string;info:Info;news:{id:string;title:string}[]}){
+export function UnitEditor({unitId,info,news,ranks}:{ranks:{id:number;name:string}[];unitId:string;info:Info;news:{id:string;title:string}[]}){
  const router=useRouter();
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
  async function save(body:unknown,form?:HTMLFormElement){
@@ -18,14 +18,14 @@ export function UnitEditor({unitId,info,news}:{unitId:string;info:Info;news:{id:
   <h2>Керування підрозділом</h2>
   {error&&<Notice error>{error}</Notice>}{message&&<Notice>{message}</Notice>}
   <details className="unit-editor-section">
-   <summary>Редагувати службову інформацію</summary>
+   <summary>Додати або змінити інформацію</summary>
    <form className="stack" onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);void save({kind:'content',content:Object.fromEntries(data)});}}>
     {infoFields.map(([name,label])=><Field key={name} label={label}><textarea name={name} rows={3} maxLength={name==='contacts'?2000:name==='schedule'?3000:4000} defaultValue={info[name]}/></Field>)}
     <button disabled={busy}>Зберегти інформацію</button>
    </form>
   </details>
   <details className="unit-editor-section">
-   <summary>Опублікувати новину або оголошення</summary>
+   <summary>Додати новину або оголошення</summary>
    <form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;void save({kind:'publish',...Object.fromEntries(new FormData(form))},form);}}>
     <Field label="Тип"><select name="type"><option value="news">Новина</option><option value="announcement">Оголошення</option></select></Field>
     <Field label="Заголовок"><input name="title" required maxLength={100}/></Field>
@@ -40,6 +40,15 @@ export function UnitEditor({unitId,info,news}:{unitId:string;info:Info;news:{id:
     <Field label="Static ID"><input name="staticId" inputMode="numeric" pattern="[0-9]{1,30}" required/></Field>
     <Field label="Дія"><select name="grant"><option value="yes">Надати доступ</option><option value="no">Відкликати доступ</option></select></Field>
     <button disabled={busy}>Зберегти доступ</button>
+   </form>
+  </details>
+  <details className="unit-editor-section">
+   <summary>Змінити звання й посаду бійця</summary>
+   <form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);void save({kind:'assignment',staticId:data.get('staticId'),rank:data.get('rank')?Number(data.get('rank')):null,position:data.get('position')},form);}}>
+    <Field label="Static ID"><input name="staticId" inputMode="numeric" pattern="[0-9]{1,30}" required/></Field>
+    <Field label="Звання"><select name="rank"><option value="">Без звання</option>{ranks.map(rank=><option key={rank.id} value={rank.id}>{rank.name}</option>)}</select></Field>
+    <Field label="Посада"><input name="position" maxLength={100}/></Field>
+    <button disabled={busy}>Зберегти призначення</button>
    </form>
   </details>
   <details className="unit-editor-section">

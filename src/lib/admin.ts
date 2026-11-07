@@ -26,6 +26,29 @@ export async function saveTask(input:unknown,u:Viewer){const p=taskSchema.parse(
   await audit(c,u,old?'task.update':'task.create',id,old,rows.rows[0]);return rows.rows[0];
 });revalidateTag('catalog',{expire:0});return result;}
 export async function changePeriod(input:unknown,u:Viewer){const p=z.object({week,open:z.boolean()}).parse(input);return transaction(async c=>{await lockAdmin(c,u);const old=(await c.query('SELECT * FROM reporting_periods WHERE week_start=$1 FOR UPDATE',[p.week])).rows[0];await c.query('INSERT INTO reporting_periods(week_start,open,updated_by) VALUES($1,$2,$3) ON CONFLICT(week_start) DO UPDATE SET open=$2,updated_by=$3,updated_at=now()',[p.week,p.open,u.id]);await audit(c,u,'period.update',p.week,old,p);return p;});}
+async function ensureUnpaid(c:PoolClient,reportId:string){
+  if((await c.query('SELECT 1 FROM settings WHERE key=$1',['report-paid:'+reportId])).rowCount)
+    throw new HttpError('Виплату вже зафіксовано. Звіт закрито для редагування.',409);
+}
+export async function markReportPaid(input:unknown,u:Viewer){
+  const p=z.object({reportId:z.uuid(),reason:z.string().trim().min(5).max(2000)}).parse(input);
+  return transaction(async c=>{
+    await lockAdmin(c,u);
+    const {rows:[report]}=await c.query('SELECT id FROM reports WHERE id=$1 FOR UPDATE',[p.reportId]);
+    if(!report)throw new HttpError('Звіт не знайдено.',404);
+    const key='report-paid:'+p.reportId;
+    const {rows:[existing]}=await c.query('SELECT value FROM settings WHERE key=$1',[key]);
+    if(existing)return existing.value;
+    const {rows:[totals]}=await c.query(`SELECT count(*) FILTER(WHERE status IN ('pending','clarification') OR (status='approved' AND approved_amount IS NULL))::int AS pending,
+      coalesce(sum(approved_amount) FILTER(WHERE status='approved'),0)::text AS amount
+      FROM report_items WHERE report_id=$1`,[p.reportId]);
+    if(totals.pending||!new Decimal(totals.amount).gt(0))throw new HttpError('Спочатку завершіть перевірку та погодьте суму.',409);
+    const value={amount:totals.amount,paidAt:new Date().toISOString()};
+    await c.query('INSERT INTO settings(key,value) VALUES($1,$2)',[key,JSON.stringify(value)]);
+    await audit(c,u,'report.payment',p.reportId,null,value,p.reason);
+    return value;
+  });
+}
 export async function reviewItems(input:unknown,u:Viewer){
   const p=z.object({
     reportId:z.string().uuid(),itemId:z.string().uuid().optional(),status:itemStatus,
@@ -38,6 +61,7 @@ export async function reviewItems(input:unknown,u:Viewer){
     await lockAdmin(c,u);
     const r=(await c.query('SELECT * FROM reports WHERE id=$1 FOR UPDATE',[p.reportId])).rows[0];
     if(!r)throw new HttpError('Звіт не знайдено.',404);
+    await ensureUnpaid(c,r.id);
     const award=(await c.query('SELECT cap FROM weekly_awards WHERE static_id=$1 AND week_start=$2 FOR UPDATE',[r.static_id,r.week_start])).rows[0];
     const {rows}=await c.query('SELECT * FROM report_items WHERE report_id=$1 AND ($2::uuid IS NULL OR id=$2) ORDER BY id FOR UPDATE',[r.id,p.itemId??null]);
     if(!rows.length)throw new HttpError('Запис не знайдено.',404);
@@ -74,6 +98,7 @@ export async function deleteReportItem(input:unknown,u:Viewer){
   const p=z.object({reportId:z.string().uuid(),itemId:z.string().uuid(),reason:z.string().trim().min(5).max(2000)}).parse(input);
   return transaction(async c=>{
     await lockAdmin(c,u);
+    await ensureUnpaid(c,p.reportId);
     const {rows:[item]}=await c.query('SELECT * FROM report_items WHERE id=$1 AND report_id=$2 FOR UPDATE',[p.itemId,p.reportId]);
     if(!item)throw new HttpError('Запис не знайдено.',404);
     const {rows:evidence}=await c.query('DELETE FROM evidence_links WHERE item_id=$1 RETURNING url,sort_order',[item.id]);

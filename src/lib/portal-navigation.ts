@@ -1,5 +1,8 @@
+export const serviceModules=['requests','training','calendar','regulations','announcements','orders','lectures'] as const;
+export type ServiceModule=(typeof serviceModules)[number];
+
 export const portalGroups = [
- {title:'Головне', links:[['/','Головна'],['/weekly-bonus/me','Особистий кабінет'],['/portal/notifications','Сповіщення']]},
+ {title:'Головне', links:[['/','Головна'],['/cabinet','Особистий кабінет'],['/portal/notifications','Сповіщення']]},
  {title:'Служба', links:[['/portal/personnel','Особовий склад'],['/portal/structure','Підрозділи та структура'],['/portal/personnel-actions','Кадрові дії'],['/portal/calendar','Календар служби'],['/portal/requests','Службові заявки'],['/portal/logistics','Логістика й забезпечення']]},
  {title:'Підготовка', links:[['/portal/training','КМБ і навчальний центр'],['/portal/lectures','Лекції та матеріали'],['/portal/exercises','Тренування й атестації']]},
  {title:'Звітність', links:[['/weekly-bonus','Щотижневе преміювання'],['/portal/payments','Премії та виплати'],['/portal/statistics','Статистика та активність']]},
@@ -48,9 +51,9 @@ export const portalAdminLinks=[
  ['/admin/audit','Журнал змін'],
 ] as const;
 
-export function visiblePortalGroups(isAdmin: boolean) {
+export function visiblePortalGroups(isAdmin: boolean, signedIn=false) {
  return portalGroups.map(group=>({
   title:group.title,
-  links:group.links.filter(([href])=>isAdmin||!href.startsWith('/portal/')),
+  links:group.links.filter(([href])=>isAdmin||!href.startsWith('/portal/')||(signedIn&&(href==='/portal/payments'||serviceModules.some(module=>href==='/portal/'+module)))),
  })).filter(group=>group.links.length>0);
 }

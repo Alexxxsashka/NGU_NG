@@ -15,7 +15,7 @@ export async function bootstrap(request:Request,input:unknown){
   await transaction(async c=>{await c.query("SELECT pg_advisory_xact_lock(hashtext('admin-access'))");if((await c.query("SELECT id FROM app_user WHERE role='admin'")).rows.length)throw new HttpError('Адміністратора вже створено.',409);
     const id=randomUUID();const email=id+'@accounts.invalid';await lockStaticClaims(c);
     await c.query("INSERT INTO app_user(id,name,email,email_verified,username,display_username,role) VALUES($1,'Адміністратор',$2,true,$3,$3,'admin')",[id,email,staticAccountKey(p.staticId)]);
-    await reserveStatic(c,p.staticId,id);
+    await reserveStatic(c,p.staticId,id,false);
     await c.query("INSERT INTO account(id,account_id,provider_id,user_id,password) VALUES($1,$2,'credential',$2,$3)",[randomUUID(),id,passwordHash]);
     await c.query("INSERT INTO recovery_tokens(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval '1 year')",[id,hash(token)]);
     await c.query("INSERT INTO audit_logs(actor_id,action,entity_id) VALUES($1,'admin.bootstrap',$1)",[id]);

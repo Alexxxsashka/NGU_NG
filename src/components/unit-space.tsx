@@ -17,11 +17,11 @@ export async function UnitSpace({userId,unitId}:{userId:string;unitId?:string}){
  }
  const unit=units[0];
  if(!unit)notFound();
- const [content,roster]=await Promise.all([loadUnitContent(unit.id),query<{static_id:string;first_name:string;last_name:string;rank_name:string|null;position:string|null}>(`
+ const [content,roster,ranks]=await Promise.all([loadUnitContent(unit.id),query<{static_id:string;first_name:string;last_name:string;rank_name:string|null;position:string|null}>(`
   SELECT p.static_id,p.first_name,p.last_name,k.name AS rank_name,d.value->>'position' AS position
   FROM personnel p LEFT JOIN ranks k ON k.id=p.rank LEFT JOIN settings d ON d.key='service:'||p.id::text
   WHERE p.unit_id=$1 AND p.active ORDER BY p.rank DESC NULLS LAST,p.last_name,p.first_name
- `,[unit.id])]);
+ `,[unit.id]),unit.editor?query<{id:number;name:string}>('SELECT id,name FROM ranks ORDER BY id'):[]]);
  const sections=[
   ['Про підрозділ',content.overview,Shield],
   ['Розклад і заходи',content.schedule,CalendarDays],
@@ -30,7 +30,7 @@ export async function UnitSpace({userId,unitId}:{userId:string;unitId?:string}){
  ] as const;
  return <div id="content">
   <header className="portal-preview-header"><span className="pill prime">Внутрішня сторінка</span><h1>{unit.name}</h1><p>Новини, службова інформація й особовий склад підрозділу.</p>
-   <div className="actions"><a className="button secondary" href="#unit-news"><Megaphone size={17}/>Новини</a><a className="button secondary" href="#unit-roster"><Users size={17}/>Склад</a>{unit.editor&&<a className="button" href="#unit-management">Керування</a>}</div>
+   <div className="actions"><a className="button secondary" href="#unit-news"><Megaphone size={17}/>Новини</a><a className="button secondary" href="#unit-roster"><Users size={17}/>Склад</a>{unit.editor&&<><a className="button" href="#unit-management">Керування</a><Link className="button secondary" href="/portal/regulations">Додати документ</Link><Link className="button secondary" href="/portal/calendar">Додати подію</Link></>}</div>
   </header>
   <div className="portal-feature-grid">{sections.map(([title,body,Icon])=><section key={title}><h2><Icon size={18}/>{title}</h2><p className="unit-copy">{body||'Інформацію ще не додано.'}</p></section>)}</div>
   <section className="panel" id="unit-news"><h2>Новини й оголошення</h2>
@@ -45,6 +45,6 @@ export async function UnitSpace({userId,unitId}:{userId:string;unitId?:string}){
     <tbody>{roster.length?roster.map(person=><tr key={person.static_id}><td>{person.first_name} {person.last_name}</td><td>{person.static_id}</td><td>{person.rank_name??'Не призначено'}</td><td>{person.position||'Не призначено'}</td></tr>):<tr><td colSpan={4}>Склад ще не призначено.</td></tr>}</tbody>
    </table></div>
   </section>
-  {unit.editor&&<UnitEditor unitId={unit.id} info={content} news={content.news.map(({id,title})=>({id,title}))}/>}
+  {unit.editor&&<UnitEditor ranks={ranks} unitId={unit.id} info={content} news={content.news.map(({id,title})=>({id,title}))}/>}
  </div>;
 }

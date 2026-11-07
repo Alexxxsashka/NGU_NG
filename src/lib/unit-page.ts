@@ -10,7 +10,7 @@ import type {Viewer} from './domain';
 
 type Access={id:string;name:string;editor:boolean};
 const accessSql=`
- SELECT unit.id,unit.name,(account.role='admin' OR global_grant.id IS NOT NULL OR coalesce(d.value->>'commanderUnitId'=unit.id::text,false)) AS editor
+ SELECT unit.id,unit.name,(account.role='admin' OR global_grant.id IS NOT NULL OR coalesce(d.value->>'commanderUnitId'=unit.id::text AND d.value->>'leadershipRole' IN ('commander','deputy'),false)) AS editor
  FROM units unit
  JOIN app_user account ON account.id=$1 AND NOT account.must_change_password
  LEFT JOIN LATERAL (
@@ -47,6 +47,7 @@ const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('content'),content:contentFields}),
  z.object({kind:z.literal('publish'),type:z.enum(['news','announcement']),title:z.string().trim().min(1).max(100),body:z.string().trim().min(1).max(3000)}),
  z.object({kind:z.literal('remove-news'),id:z.string().uuid()}),
+ z.object({kind:z.literal('assignment'),staticId:canonicalStaticId,rank:z.number().int().positive().max(2147483647).nullable(),position:z.string().trim().max(100)}),
  z.object({kind:z.literal('member'),staticId:canonicalStaticId,grant:z.boolean()}),
 ]);
 
@@ -81,6 +82,20 @@ export async function updateUnitPage(unitId:string,input:unknown,actor:Viewer){
   if(!access?.editor)throw new HttpError('Редагувати може лише командування цього підрозділу.',403);
   if(action.kind==='member'){
    await changeMembership(c,actor,id,action.staticId,action.grant);
+   return {saved:true};
+  }
+  if(action.kind==='assignment'){
+   const {rows:[target]}=await c.query(`SELECT p.id,p.rank,d.value AS details FROM personnel p
+    LEFT JOIN app_user u ON u.id=p.user_id LEFT JOIN settings d ON d.key='service:'||p.id::text
+    WHERE p.unit_id=$1 AND p.active AND p.static_id::numeric=$2::text::numeric
+    AND p.user_id IS DISTINCT FROM $3 AND coalesce(u.role,'member')<>'admin'
+    AND coalesce(d.value->>'leadershipRole','member')='member' FOR UPDATE OF p`,[id,action.staticId,actor.id]);
+   if(!target)throw new HttpError('Редагувати можна лише бійця цього підрозділу без командної ролі.',403);
+   if(action.rank!==null&&!(await c.query('SELECT 1 FROM ranks WHERE id=$1',[action.rank])).rowCount)throw new HttpError('Звання не знайдено.');
+   const details={...target.details,position:action.position};
+   await c.query('UPDATE personnel SET rank=$1 WHERE id=$2',[action.rank,target.id]);
+   await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=excluded.value',['service:'+target.id,JSON.stringify(details)]);
+   await audit(c,actor,'unit.assignment',target.id,{rank:target.rank,position:target.details?.position},{rank:action.rank,position:action.position});
    return {saved:true};
   }
   const key='unit-page:'+id;

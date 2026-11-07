@@ -8,7 +8,9 @@ import { taskReward } from '@/lib/rewards';
 import { currentWeek } from '@/lib/domain';
 import { week,staticId } from '@/lib/validation';
 import { filters,listReports,submitReport } from '@/lib/reports';
-import { saveTask,changePeriod,reviewItems,deleteReportItem,adjustAward,saveSettings,savePerson,reviewClaim,linkReport,changeRole,issueRecovery } from '@/lib/admin';
+import { saveTask,changePeriod,markReportPaid,reviewItems,deleteReportItem,adjustAward,saveSettings,savePerson,reviewClaim,linkReport,changeRole,issueRecovery } from '@/lib/admin';
+import {changeServiceWorkspace,serviceWorkspace} from '@/lib/service-workspace';
+import {serviceModules} from '@/lib/portal-navigation';
 import { updateUnitPage } from '@/lib/unit-page';
 import { assignService,savePersonalServiceDetails } from '@/lib/service-assignment';
 import { unitMatrix } from '@/lib/matrix';
@@ -21,6 +23,7 @@ type Context={params:Promise<{path:string[]}>};
 const json=(data:unknown)=>Response.json(data,{headers:{'Cache-Control':'private, no-store'}});
 export async function GET(request:Request,ctx:Context){try{
   const path=(await ctx.params).path.join('/'),url=new URL(request.url);
+  if(path.startsWith('service/'))return json(await serviceWorkspace(await member(request),z.enum(serviceModules).parse(path.slice(8))));
   if(path==='catalog')return json(await getCatalog(week.parse(url.searchParams.get('week')||currentWeek())));
   if(path==='viewer')return json({user:await viewer(request.headers),configured:!!process.env.DATABASE_URL&&!!process.env.AUTH_SECRET&&!!process.env.APP_URL});
   if(path==='me'){const u=await member(request);return json(await listReports(filters(url),u,true));}
@@ -37,6 +40,7 @@ export async function GET(request:Request,ctx:Context){try{
 export async function POST(request:Request,ctx:Context){try{
   sameOrigin(request);writable();const path=(await ctx.params).path.join('/');
   const input=await readBody(request,path==='admin/import'?2_500_000:path==='reports'?MAX_REPORT_BYTES:100_000);
+  if(path==='service')return json(await changeServiceWorkspace(await member(request),input));
   if(path==='reports')return json(await submitReport(request,input));
   if(path==='register')return json(await register(request,input));
   if(path==='me/service-details')return json(await savePersonalServiceDetails(input,await member(request)));
@@ -47,7 +51,7 @@ export async function POST(request:Request,ctx:Context){try{
   if(path.startsWith('units/')&&path.split('/').length===2)return json(await updateUnitPage(path.split('/')[1],input,await member(request)));
   const u=await admin(request);
   const actions:Record<string,(input:unknown)=>Promise<unknown>>={
-    'admin/tasks':i=>saveTask(i,u),'admin/periods':i=>changePeriod(i,u),'admin/review':i=>reviewItems(i,u),'admin/reports/delete-item':i=>deleteReportItem(i,u),'admin/award':i=>adjustAward(i,u),
+    'admin/tasks':i=>saveTask(i,u),'admin/periods':i=>changePeriod(i,u),'admin/review':i=>reviewItems(i,u),'admin/reports/pay':i=>markReportPaid(i,u),'admin/reports/delete-item':i=>deleteReportItem(i,u),'admin/award':i=>adjustAward(i,u),
     'admin/settings':i=>saveSettings(i,u),'admin/personnel':i=>savePerson(i,u),'admin/personnel/assign':i=>assignService(i,u),'admin/claims':i=>reviewClaim(i,u),'admin/link-report':i=>linkReport(i,u),
     'admin/roles':i=>changeRole(i,u),'admin/accounts/edit':i=>editAccount(i,u),'admin/accounts/delete':i=>deleteAccount(i,u),'admin/accounts/password':i=>issueTemporaryPassword(i,u),'admin/recovery':i=>issueRecovery(i,u),'admin/import':i=>importReports(i,u)
   };
