@@ -5,12 +5,14 @@ import { username } from 'better-auth/plugins';
 import { db, query } from '@/db';
 import * as schema from '@/db/schema';
 import type { Viewer } from './domain';
+import { trustedOrigins } from './origins';
 let instance:ReturnType<typeof createAuth> | undefined;
 function createAuth(){
   if(process.env.VERCEL_ENV==='preview'&&process.env.ALLOW_PREVIEW_WRITES!=='true')throw new Error('Preview authorization requires an isolated database.');
   if(!process.env.AUTH_SECRET || !process.env.APP_URL) throw new Error('Авторизацію ще не налаштовано.');
   return betterAuth({
     appName:'НГУ — звітність',baseURL:process.env.APP_URL,secret:process.env.AUTH_SECRET,
+    trustedOrigins:trustedOrigins(process.env.APP_URL),
     database:drizzleAdapter(db(),{provider:'pg',schema,transaction:true}),
     emailAndPassword:{enabled:true,disableSignUp:true,minPasswordLength:12,maxPasswordLength:128,requireEmailVerification:false},
     user:{additionalFields:{role:{type:'string',defaultValue:'member',input:false}}},

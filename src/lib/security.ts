@@ -3,6 +3,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { ZodError } from 'zod';
 import { query } from '@/db';
 import { viewer } from './auth';
+import { trustedOrigins } from './origins';
 export class HttpError extends Error { constructor(message:string,public status=400){super(message);} }
 export const hash=(s:string)=>createHash('sha256').update(s).digest('hex');
 export function sameSecret(a:string,b:string){const x=Buffer.from(a),y=Buffer.from(b);return x.length===y.length && timingSafeEqual(x,y);}
@@ -10,7 +11,7 @@ export function writable(){if(process.env.VERCEL_ENV==='preview' && process.env.
 export function sameOrigin(request:Request){
   const allowed=process.env.APP_URL;
   if(!allowed)throw new HttpError('Адресу сайту ще не налаштовано.',503);
-  if(request.headers.get('origin')!==new URL(allowed).origin)throw new HttpError('Недозволене джерело запиту.',403);
+  if(!trustedOrigins(allowed).includes(request.headers.get('origin') ?? ''))throw new HttpError('Недозволене джерело запиту.',403);
 }
 export async function readBody(request:Request,max=100_000):Promise<unknown>{
   if(!request.headers.get('content-type')?.includes('application/json'))throw new HttpError('Потрібний JSON-запит.',415);
