@@ -3,6 +3,7 @@ import { query,transaction } from '@/db';
 import { viewer } from '@/lib/auth';
 import { admin,member,failure,sameOrigin,writable,readBody,HttpError } from '@/lib/security';
 import { getCatalog } from '@/lib/catalog';
+import { taskReward } from '@/lib/rewards';
 import { currentWeek } from '@/lib/domain';
 import { week,staticId } from '@/lib/validation';
 import { filters,listReports,submitReport } from '@/lib/reports';
@@ -23,7 +24,7 @@ export async function GET(request:Request,ctx:Context){try{
   const u=await admin(request);
   if(path==='admin/reports')return json(await listReports(filters(url),u));
   if(path==='admin/matrix'){const f=filters(url);if(!f.unit)throw new HttpError('Оберіть підрозділ.');return json(await unitMatrix(f));}
-  if(path==='admin/catalog'){const [tasks,units,ranks,settings]=await Promise.all([query('SELECT * FROM tasks ORDER BY sort_order,name'),query('SELECT * FROM units ORDER BY sort_order,name'),query('SELECT * FROM ranks ORDER BY id'),query('SELECT * FROM settings')]);return json({tasks,units,ranks,settings});}
+  if(path==='admin/catalog'){const [tasks,units,ranks,settings]=await Promise.all([query('SELECT * FROM tasks ORDER BY sort_order,name'),query('SELECT * FROM units ORDER BY sort_order,name'),query('SELECT * FROM ranks ORDER BY id'),query('SELECT * FROM settings')]);const pointValue=settings.find(s=>s.key==='pointValue')?.value??null;return json({tasks:tasks.map(t=>({...t,reward:taskReward(t.points,pointValue)})),units,ranks,settings});}
   if(path==='admin/periods')return json(await query('SELECT * FROM reporting_periods ORDER BY week_start DESC LIMIT 104'));
   if(path==='admin/personnel'){const [people,claims,users]=await Promise.all([query('SELECT p.*,u.name unit_name FROM personnel p LEFT JOIN units u ON u.id=p.unit_id ORDER BY p.rank DESC,p.last_name LIMIT 1000'),query('SELECT c.*,u.username,u.email FROM profile_claims c JOIN app_user u ON u.id=c.user_id ORDER BY c.created_at DESC LIMIT 100'),query('SELECT id,name,email,username,role FROM app_user ORDER BY name LIMIT 1000')]);return json({people,claims,users});}
   if(path==='admin/audit'){const page=Math.max(1,Math.min(10000,Math.floor(Number(url.searchParams.get('page')))||1));return json(await query('SELECT a.*,u.username actor FROM audit_logs a LEFT JOIN app_user u ON u.id=a.actor_id ORDER BY created_at DESC LIMIT 50 OFFSET $1',[(page-1)*50]));}

@@ -1,6 +1,7 @@
 import 'server-only';
 import { randomUUID } from 'node:crypto';
 import Decimal from 'decimal.js';
+import {taskReward} from './rewards';
 import { query,transaction } from '@/db';
 import { viewer } from './auth';
 import { hash,HttpError,throttle } from './security';
@@ -28,11 +29,13 @@ export async function submitReport(request:Request,input:unknown){
     const id=randomUUID(),number='НГУ-'+id.slice(0,8).toUpperCase();
     await c.query(`INSERT INTO reports(id,number,author_id,personnel_id,static_id,first_name,last_name,rank,unit_id,unit_name,week_start,idempotency_key,payload_hash,context_hash)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,[id,number,u?.id??null,profile?.id??null,p.staticId,p.firstName,p.lastName,p.rank,p.unitId,unit.name,p.week,p.idempotencyKey,digest,context]);
+    const pointValue=(await c.query("SELECT value FROM settings WHERE key='pointValue' FOR SHARE")).rows[0]?.value??null;
     let total=0;
     for(const {e,t} of prepared){const itemId=randomUUID();const points=t.points*e.quantity;total+=points;
-      const estimated=t.reward!==null&&rank.multiplier!==null?new Decimal(t.reward).mul(rank.multiplier).mul(e.quantity).toFixed(2):null;
+      const reward=taskReward(t.points,pointValue);
+      const estimated=reward!==null&&rank.multiplier!==null?new Decimal(reward).mul(rank.multiplier).mul(e.quantity).toFixed(2):null;
       await c.query(`INSERT INTO report_items(id,report_id,task_id,task_name,quantity,points_rate,points,reward_rate,rank_multiplier,estimated_amount,time_category,starts_at,ends_at)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,[itemId,id,t.id,t.name,e.quantity,t.points,points,t.reward,rank.multiplier,estimated,t.time_category,t.starts_at,t.ends_at]);
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,[itemId,id,t.id,t.name,e.quantity,t.points,points,reward,rank.multiplier,estimated,t.time_category,t.starts_at,t.ends_at]);
       for(const [i,url] of e.evidenceUrls.entries())await c.query('INSERT INTO evidence_links(item_id,url,sort_order) VALUES($1,$2,$3)',[itemId,url,i]);
     }
     return {reportId:id,number,week:p.week,points:total,quantity:p.entries.reduce((n,e)=>n+e.quantity,0)};
