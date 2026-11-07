@@ -6,11 +6,11 @@ import { APIError } from 'better-auth/api';
 import { db, query } from '@/db';
 import * as schema from '@/db/schema';
 import type { Viewer } from './domain';
-let instance:ReturnType<typeof betterAuth> | undefined;
-export function getAuth(){
+let instance:ReturnType<typeof createAuth> | undefined;
+function createAuth(){
   if(process.env.VERCEL_ENV==='preview'&&process.env.ALLOW_PREVIEW_WRITES!=='true')throw new Error('Preview authorization requires an isolated database.');
   if(!process.env.AUTH_SECRET || !process.env.APP_URL) throw new Error('Авторизацію ще не налаштовано.');
-  return instance ??= betterAuth({
+  return betterAuth({
     appName:'НГУ — звітність',baseURL:process.env.APP_URL,secret:process.env.AUTH_SECRET,
     database:drizzleAdapter(db(),{provider:'pg',schema,transaction:true}),
     emailAndPassword:{enabled:true,minPasswordLength:12,maxPasswordLength:128,requireEmailVerification:false},
@@ -25,6 +25,7 @@ export function getAuth(){
     plugins:[username({minUsernameLength:3,maxUsernameLength:40})]
   });
 }
+export function getAuth(){return instance ??= createAuth();}
 export async function viewer(headers:Headers):Promise<Viewer|null>{
   if(!process.env.DATABASE_URL || !process.env.AUTH_SECRET || !process.env.APP_URL)return null;
   const session=await getAuth().api.getSession({headers});
