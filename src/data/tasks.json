@@ -1,0 +1,1032 @@
+[
+  {
+    "seedKey": "catalog-001",
+    "unit": "НЦП",
+    "name": "Проведення лекції",
+    "points": 9,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "3f8634e5-da93-531a-9d65-f9262653afbb"
+  },
+  {
+    "seedKey": "catalog-002",
+    "unit": "НЦП",
+    "name": "Нічне проведення лекції",
+    "points": 11,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "3f8634e5-da93-531a-9d65-f9262653afbb"
+  },
+  {
+    "seedKey": "catalog-003",
+    "unit": "НЦП",
+    "name": "Проведення тренування на ФЗ",
+    "points": 10,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "d3f241be-1cff-5f16-a6f5-d49707660e25"
+  },
+  {
+    "seedKey": "catalog-004",
+    "unit": "НЦП",
+    "name": "Нічне проведення тренування на ФЗ",
+    "points": 12,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "d3f241be-1cff-5f16-a6f5-d49707660e25"
+  },
+  {
+    "seedKey": "catalog-005",
+    "unit": "НЦП",
+    "name": "Проведення тренування поза ФЗ",
+    "points": 11,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "68ac45f1-0e91-5652-ab92-9b1bfa7787e1"
+  },
+  {
+    "seedKey": "catalog-006",
+    "unit": "НЦП",
+    "name": "Нічне проведення тренування поза ФЗ",
+    "points": 14,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "68ac45f1-0e91-5652-ab92-9b1bfa7787e1"
+  },
+  {
+    "seedKey": "catalog-007",
+    "unit": "НЦП",
+    "name": "Проведення загальновійськового тренування",
+    "points": 14,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "cc41263d-7987-5072-8920-0d2b8e28d667"
+  },
+  {
+    "seedKey": "catalog-008",
+    "unit": "НЦП",
+    "name": "Нічне проведення загальновійськового тренування",
+    "points": 17,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "cc41263d-7987-5072-8920-0d2b8e28d667"
+  },
+  {
+    "seedKey": "catalog-009",
+    "unit": "НЦП",
+    "name": "Участь у наборі",
+    "points": 7,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-010",
+    "unit": "НЦП",
+    "name": "Прийняття присяги",
+    "points": 9,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-011",
+    "unit": "НЦП",
+    "name": "Ознайомлення з ФЗ",
+    "points": 6,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "0054ab5f-d95c-579f-8856-bf1bc582a031"
+  },
+  {
+    "seedKey": "catalog-012",
+    "unit": "НЦП",
+    "name": "Нічне ознайомлення з ФЗ",
+    "points": 8,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "0054ab5f-d95c-579f-8856-bf1bc582a031"
+  },
+  {
+    "seedKey": "catalog-013",
+    "unit": "НЦП",
+    "name": "Прийняття УКМБ",
+    "points": 11,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-014",
+    "unit": "НЦП",
+    "name": "Супровід КМБ",
+    "points": 12,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "34949d9b-fff9-5753-8e2f-c5df05e79b35"
+  },
+  {
+    "seedKey": "catalog-015",
+    "unit": "НЦП",
+    "name": "Нічний супровід КМБ",
+    "points": 15,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "34949d9b-fff9-5753-8e2f-c5df05e79b35"
+  },
+  {
+    "seedKey": "catalog-016",
+    "unit": "НЦП",
+    "name": "Оформлення курсанта",
+    "points": 5,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-017",
+    "unit": "ВСП",
+    "name": "Патруль (1 год)",
+    "points": 6,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "af7fe528-da1c-55b2-8eb9-6bbfa888786e"
+  },
+  {
+    "seedKey": "catalog-018",
+    "unit": "ВСП",
+    "name": "Нічний патруль (1 год)",
+    "points": 8,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "af7fe528-da1c-55b2-8eb9-6bbfa888786e"
+  },
+  {
+    "seedKey": "catalog-019",
+    "unit": "ВСП",
+    "name": "Виявлення порушення",
+    "points": 6,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "c39d13ea-7a0f-5d3b-bf69-119b68e955fb"
+  },
+  {
+    "seedKey": "catalog-020",
+    "unit": "ВСП",
+    "name": "Нічне виявлення порушення",
+    "points": 8,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "c39d13ea-7a0f-5d3b-bf69-119b68e955fb"
+  },
+  {
+    "seedKey": "catalog-021",
+    "unit": "ВСП",
+    "name": "Оформлення затримання громадянина",
+    "points": 10,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "98ea2536-2581-5113-8e70-70977898aebe"
+  },
+  {
+    "seedKey": "catalog-022",
+    "unit": "ВСП",
+    "name": "Нічне оформлення затримання громадянина",
+    "points": 12,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "98ea2536-2581-5113-8e70-70977898aebe"
+  },
+  {
+    "seedKey": "catalog-023",
+    "unit": "ВСП",
+    "name": "Оформлення затримання військовослужбовця",
+    "points": 12,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "eb384fcf-0de6-5c20-bcfc-488c6cd41cb0"
+  },
+  {
+    "seedKey": "catalog-024",
+    "unit": "ВСП",
+    "name": "Нічне оформлення затримання військовослужбовця",
+    "points": 15,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "eb384fcf-0de6-5c20-bcfc-488c6cd41cb0"
+  },
+  {
+    "seedKey": "catalog-025",
+    "unit": "ВСП",
+    "name": "Видача дисциплінарного покарання",
+    "points": 9,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-026",
+    "unit": "ВСП",
+    "name": "Перевірка караулу КПП (Якщо там є караульні від 2 осіб)",
+    "points": 3,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-027",
+    "unit": "ВСП",
+    "name": "Нічна перевірка караулу КПП (від 2 осіб)",
+    "points": 4,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-028",
+    "unit": "ВСП",
+    "name": "Зупинка транспорту для перевірки",
+    "points": 3,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "d5c95af1-0d08-50e1-bd8e-975b137f398d"
+  },
+  {
+    "seedKey": "catalog-029",
+    "unit": "ВСП",
+    "name": "Нічна зупинка транспорту для перевірки",
+    "points": 4,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "d5c95af1-0d08-50e1-bd8e-975b137f398d"
+  },
+  {
+    "seedKey": "catalog-030",
+    "unit": "ВСП",
+    "name": "Лекція із законодавства",
+    "points": 9,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-031",
+    "unit": "ВСП",
+    "name": "Допомога іншим держ. службам",
+    "points": 10,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "7c6c3624-7809-526b-a34a-81ef88f57e26"
+  },
+  {
+    "seedKey": "catalog-032",
+    "unit": "ВСП",
+    "name": "Нічна допомога іншим держ. службам",
+    "points": 12,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "7c6c3624-7809-526b-a34a-81ef88f57e26"
+  },
+  {
+    "seedKey": "catalog-033",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Бойове тренування поза ФЗ",
+    "points": 10,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "a6788c52-6455-5706-a16e-25cd3a81e18f"
+  },
+  {
+    "seedKey": "catalog-034",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Нічне бойове тренування поза ФЗ",
+    "points": 12,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "a6788c52-6455-5706-a16e-25cd3a81e18f"
+  },
+  {
+    "seedKey": "catalog-035",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Успішна оборона Форт-Занкудо",
+    "points": 18,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-036",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Успішний взятий хамер",
+    "points": 10,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-037",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Супровід вищих посадових осіб",
+    "points": 12,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "3d58f3ee-cda2-52bd-b46b-b17d399d2d33"
+  },
+  {
+    "seedKey": "catalog-038",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Нічний супровід вищих посадових осіб",
+    "points": 15,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "3d58f3ee-cda2-52bd-b46b-b17d399d2d33"
+  },
+  {
+    "seedKey": "catalog-039",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Охорона наказового об'єкта поза ФЗ (1 год)",
+    "points": 5,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "d8dd6fb3-c922-5399-8f47-f0b4007997c1"
+  },
+  {
+    "seedKey": "catalog-040",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Нічна охорона наказового об'єкта поза ФЗ (1 год)",
+    "points": 7,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "d8dd6fb3-c922-5399-8f47-f0b4007997c1"
+  },
+  {
+    "seedKey": "catalog-041",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Участь у затриманні озброєного злочинця",
+    "points": 9,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-042",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Участь у відбитті нападу на державну структуру",
+    "points": 12,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "a0d4e101-266f-5a87-a419-cf4af7b2e08d"
+  },
+  {
+    "seedKey": "catalog-043",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Нічна участь у відбитті нападу на державну структуру",
+    "points": 15,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "a0d4e101-266f-5a87-a419-cf4af7b2e08d"
+  },
+  {
+    "seedKey": "catalog-044",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Спільне патрулювання з НПУ / СБУ",
+    "points": 11,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "a1ba064c-5da8-5b9d-9944-44447a21d5b0"
+  },
+  {
+    "seedKey": "catalog-045",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Нічне спільне патрулювання з НПУ / СБУ",
+    "points": 14,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "a1ba064c-5da8-5b9d-9944-44447a21d5b0"
+  },
+  {
+    "seedKey": "catalog-046",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Участь в обороні поставки при нападі",
+    "points": 8,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-047",
+    "unit": "ССО \"Nord Division\"",
+    "name": "Допомога іншим службам",
+    "points": 11,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-048",
+    "unit": "ЗЛП",
+    "name": "Організація поставки",
+    "points": 16,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "df97c061-47e2-501f-ae0b-e3f578a5193d"
+  },
+  {
+    "seedKey": "catalog-049",
+    "unit": "ЗЛП",
+    "name": "Нічна організація поставки (з 21:00 до 23:00)",
+    "points": 20,
+    "timeCategory": "night",
+    "startsAt": "21:00",
+    "endsAt": "23:00",
+    "variantGroupId": "df97c061-47e2-501f-ae0b-e3f578a5193d"
+  },
+  {
+    "seedKey": "catalog-050",
+    "unit": "ЗЛП",
+    "name": "Організація конвою",
+    "points": 6,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "fdb023a4-c2f7-59fb-950e-87893331471a"
+  },
+  {
+    "seedKey": "catalog-051",
+    "unit": "ЗЛП",
+    "name": "Нічна організація конвою",
+    "points": 8,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "fdb023a4-c2f7-59fb-950e-87893331471a"
+  },
+  {
+    "seedKey": "catalog-052",
+    "unit": "ЗЛП",
+    "name": "Керування бараком на поставкі",
+    "points": 9,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "48a7e8fc-744d-586f-a5eb-c9f2870b7288"
+  },
+  {
+    "seedKey": "catalog-053",
+    "unit": "ЗЛП",
+    "name": "Нічне керування бараком на поставкі (з 21:00 до 23:00)",
+    "points": 11,
+    "timeCategory": "night",
+    "startsAt": "21:00",
+    "endsAt": "23:00",
+    "variantGroupId": "48a7e8fc-744d-586f-a5eb-c9f2870b7288"
+  },
+  {
+    "seedKey": "catalog-054",
+    "unit": "ЗЛП",
+    "name": "Участь в тренуванні з колони",
+    "points": 9,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-055",
+    "unit": "ЗЛП",
+    "name": "Нічна участь у тренуванні з колони",
+    "points": 11,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-056",
+    "unit": "ЗЛП",
+    "name": "Організація в тренуванні з колони",
+    "points": 13,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-057",
+    "unit": "ЗЛП",
+    "name": "Нічна організація тренування з колони",
+    "points": 16,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-058",
+    "unit": "ЗЛП",
+    "name": "Розвантаження ящиків поставки (1 Успішна поставка)",
+    "points": 11,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "6d444192-28b9-5708-a118-fc22176f2331"
+  },
+  {
+    "seedKey": "catalog-059",
+    "unit": "ЗЛП",
+    "name": "Нічне розвантаження ящиків поставки (1 успішна поставка)",
+    "points": 14,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "6d444192-28b9-5708-a118-fc22176f2331"
+  },
+  {
+    "seedKey": "catalog-060",
+    "unit": "ОАЗ",
+    "name": "Повітряний патруль (1 год)",
+    "points": 7,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "b2de6e0a-4137-5cde-b669-089a2c7f492a"
+  },
+  {
+    "seedKey": "catalog-061",
+    "unit": "ОАЗ",
+    "name": "Нічний повітряний патруль (1 год) (З 22:00 до 8:00)",
+    "points": 9,
+    "timeCategory": "night",
+    "startsAt": "22:00",
+    "endsAt": "08:00",
+    "variantGroupId": "b2de6e0a-4137-5cde-b669-089a2c7f492a"
+  },
+  {
+    "seedKey": "catalog-062",
+    "unit": "ОАЗ",
+    "name": "Тренувальний виліт",
+    "points": 9,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "79ce8e62-2358-5c9b-b80d-157e6669a230"
+  },
+  {
+    "seedKey": "catalog-063",
+    "unit": "ОАЗ",
+    "name": "Нічний тренувальний виліт",
+    "points": 11,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "79ce8e62-2358-5c9b-b80d-157e6669a230"
+  },
+  {
+    "seedKey": "catalog-064",
+    "unit": "ОАЗ",
+    "name": "Повітряне десантування",
+    "points": 10,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "cb9b2440-6b53-50dc-a0a5-2d207b450cdd"
+  },
+  {
+    "seedKey": "catalog-065",
+    "unit": "ОАЗ",
+    "name": "Нічне повітряне десантування",
+    "points": 12,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "cb9b2440-6b53-50dc-a0a5-2d207b450cdd"
+  },
+  {
+    "seedKey": "catalog-066",
+    "unit": "ОАЗ",
+    "name": "Повітряна розвідка",
+    "points": 12,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "8bc0add7-2ccf-5e6f-9922-1a092d7f3b7c"
+  },
+  {
+    "seedKey": "catalog-067",
+    "unit": "ОАЗ",
+    "name": "Нічна повітряна розвідка",
+    "points": 15,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "8bc0add7-2ccf-5e6f-9922-1a092d7f3b7c"
+  },
+  {
+    "seedKey": "catalog-068",
+    "unit": "ОАЗ",
+    "name": "Евакуаційний виліт",
+    "points": 13,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "b7a12bd4-9163-50fd-b382-088964a13ba2"
+  },
+  {
+    "seedKey": "catalog-069",
+    "unit": "ОАЗ",
+    "name": "Нічний евакуаційний виліт",
+    "points": 16,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "b7a12bd4-9163-50fd-b382-088964a13ba2"
+  },
+  {
+    "seedKey": "catalog-070",
+    "unit": "ОАЗ",
+    "name": "Повітряний супровід",
+    "points": 11,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "9f1aac4b-9bd7-52e2-b8cd-f09afb747e3e"
+  },
+  {
+    "seedKey": "catalog-071",
+    "unit": "ОАЗ",
+    "name": "Нічний повітряний супровід",
+    "points": 14,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "9f1aac4b-9bd7-52e2-b8cd-f09afb747e3e"
+  },
+  {
+    "seedKey": "catalog-072",
+    "unit": "ОАЗ",
+    "name": "Транспортування вантажу",
+    "points": 11,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "3d5751ab-1fbe-5e4c-aad2-eea667e0a6ed"
+  },
+  {
+    "seedKey": "catalog-073",
+    "unit": "ОАЗ",
+    "name": "Нічне транспортування вантажу",
+    "points": 14,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "3d5751ab-1fbe-5e4c-aad2-eea667e0a6ed"
+  },
+  {
+    "seedKey": "catalog-074",
+    "unit": "ОАЗ",
+    "name": "Огляд повітряного судна",
+    "points": 4,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-075",
+    "unit": "ОАЗ",
+    "name": "Лекція авіабезпеки",
+    "points": 9,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-076",
+    "unit": "ОАЗ",
+    "name": "Спільна операція",
+    "points": 15,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-077",
+    "unit": "ОАЗ",
+    "name": "Посадкове тренування",
+    "points": 7,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "b4198ec2-c043-53b4-bf04-4f8b103752f3"
+  },
+  {
+    "seedKey": "catalog-078",
+    "unit": "ОАЗ",
+    "name": "Нічне посадкове тренування",
+    "points": 9,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "b4198ec2-c043-53b4-bf04-4f8b103752f3"
+  },
+  {
+    "seedKey": "catalog-079",
+    "unit": "Старший склад",
+    "name": "Прийняття бійця",
+    "points": 4,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-080",
+    "unit": "Старший склад",
+    "name": "Підвищення бійця",
+    "points": 4,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-081",
+    "unit": "Старший склад",
+    "name": "Проведення шикування / збору від 10 бійців",
+    "points": 9,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "10db46c1-433c-547a-8dd8-b47e63b852b4"
+  },
+  {
+    "seedKey": "catalog-082",
+    "unit": "Старший склад",
+    "name": "Нічне проведення шикування / збору від 10 бійців",
+    "points": 12,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "10db46c1-433c-547a-8dd8-b47e63b852b4"
+  },
+  {
+    "seedKey": "catalog-083",
+    "unit": "Старший склад",
+    "name": "Організація вечірнього шикування",
+    "points": 12,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-084",
+    "unit": "Старший склад",
+    "name": "Організація МП",
+    "points": 14,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "63232298-c61e-58b2-8c1d-54ccea2bfb06"
+  },
+  {
+    "seedKey": "catalog-085",
+    "unit": "Старший склад",
+    "name": "Нічна організація МП",
+    "points": 17,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "63232298-c61e-58b2-8c1d-54ccea2bfb06"
+  },
+  {
+    "seedKey": "catalog-086",
+    "unit": "Старший склад",
+    "name": "Організація ГМП",
+    "points": 18,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-087",
+    "unit": "Старший склад",
+    "name": "Організація поставки",
+    "points": 16,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "83e388c1-44d7-5ed1-a0f7-e9567f37b2e4"
+  },
+  {
+    "seedKey": "catalog-088",
+    "unit": "Старший склад",
+    "name": "Нічна організація поставки",
+    "points": 20,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "83e388c1-44d7-5ed1-a0f7-e9567f37b2e4"
+  },
+  {
+    "seedKey": "catalog-089",
+    "unit": "Старший склад",
+    "name": "Організація захисту ФЗ",
+    "points": 17,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "2bf17921-735b-5827-a5d4-f845e10489fe"
+  },
+  {
+    "seedKey": "catalog-090",
+    "unit": "Старший склад",
+    "name": "Нічна організація захисту ФЗ",
+    "points": 21,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "2bf17921-735b-5827-a5d4-f845e10489fe"
+  },
+  {
+    "seedKey": "catalog-091",
+    "unit": "Старший склад",
+    "name": "Організація набору",
+    "points": 12,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-092",
+    "unit": "Загальні завдання",
+    "name": "Караул на посту (1 година)",
+    "points": 6,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "6f44d59e-8cf7-5ba3-9d84-3954f96f8d16"
+  },
+  {
+    "seedKey": "catalog-093",
+    "unit": "Загальні завдання",
+    "name": "Нічний караул на посту (1 година) (З 22:00 до 8:00)",
+    "points": 8,
+    "timeCategory": "night",
+    "startsAt": "22:00",
+    "endsAt": "08:00",
+    "variantGroupId": "6f44d59e-8cf7-5ba3-9d84-3954f96f8d16"
+  },
+  {
+    "seedKey": "catalog-094",
+    "unit": "Загальні завдання",
+    "name": "Участь у постачанні матеріалів (1 замовлення)",
+    "points": 7,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "6be6b60d-874e-5574-bbef-f8b7f971166c"
+  },
+  {
+    "seedKey": "catalog-095",
+    "unit": "Загальні завдання",
+    "name": "Нічна участь у постачанні матеріалів (1 замовлення)",
+    "points": 9,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "6be6b60d-874e-5574-bbef-f8b7f971166c"
+  },
+  {
+    "seedKey": "catalog-096",
+    "unit": "Загальні завдання",
+    "name": "Участь в обороні Форта-Занкудо (1 напад)",
+    "points": 12,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "fbc36e6b-2ed7-5ef5-8952-fafb10ede0c6"
+  },
+  {
+    "seedKey": "catalog-097",
+    "unit": "Загальні завдання",
+    "name": "Нічна участь в обороні Форта-Занкудо (1 напад)",
+    "points": 15,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "fbc36e6b-2ed7-5ef5-8952-fafb10ede0c6"
+  },
+  {
+    "seedKey": "catalog-098",
+    "unit": "Загальні завдання",
+    "name": "Участь у війні за хамери (1 раз)",
+    "points": 8,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-099",
+    "unit": "Загальні завдання",
+    "name": "Участь у МП від НГУ",
+    "points": 9,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-100",
+    "unit": "Загальні завдання",
+    "name": "Участь у МП від інших організацій",
+    "points": 10,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-101",
+    "unit": "Загальні завдання",
+    "name": "Участь у ГМП",
+    "points": 10,
+    "timeCategory": "any",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": null
+  },
+  {
+    "seedKey": "catalog-102",
+    "unit": "Загальні завдання",
+    "name": "Наземне патрулювання (1 година)",
+    "points": 6,
+    "timeCategory": "day",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "6bdc675c-58da-5d6f-b7d5-b3ebf5b0c57d"
+  },
+  {
+    "seedKey": "catalog-103",
+    "unit": "Загальні завдання",
+    "name": "Нічне наземне патрулювання (1 година)",
+    "points": 8,
+    "timeCategory": "night",
+    "startsAt": null,
+    "endsAt": null,
+    "variantGroupId": "6bdc675c-58da-5d6f-b7d5-b3ebf5b0c57d"
+  }
+]

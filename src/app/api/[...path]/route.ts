@@ -1,0 +1,47 @@
+import { z } from 'zod';
+import { query,transaction } from '@/db';
+import { viewer } from '@/lib/auth';
+import { admin,member,failure,sameOrigin,writable,readBody,HttpError } from '@/lib/security';
+import { getCatalog } from '@/lib/catalog';
+import { currentWeek } from '@/lib/domain';
+import { week,staticId } from '@/lib/validation';
+import { filters,listReports,submitReport } from '@/lib/reports';
+import { saveTask,changePeriod,reviewItems,adjustAward,saveSettings,savePerson,reviewClaim,linkReport,changeRole,issueRecovery } from '@/lib/admin';
+import { unitMatrix } from '@/lib/matrix';
+import { bootstrap,recover } from '@/lib/accounts';
+import { importReports } from '@/lib/importer';
+export const runtime='nodejs';
+export const dynamic='force-dynamic';
+type Context={params:Promise<{path:string[]}>};
+const json=(data:unknown)=>Response.json(data,{headers:{'Cache-Control':'private, no-store'}});
+export async function GET(request:Request,ctx:Context){try{
+  const path=(await ctx.params).path.join('/'),url=new URL(request.url);
+  if(path==='catalog')return json(await getCatalog(week.parse(url.searchParams.get('week')||currentWeek())));
+  if(path==='viewer')return json({user:await viewer(request.headers),configured:!!process.env.DATABASE_URL&&!!process.env.AUTH_SECRET&&!!process.env.APP_URL});
+  if(path==='me'){const u=await member(request);return json(await listReports(filters(url),u,true));}
+  if(path==='me/claims'){const u=await member(request);return json(await query('SELECT id,static_id,status,reason,created_at FROM profile_claims WHERE user_id=$1 ORDER BY created_at DESC LIMIT 30',[u.id]));}
+  const u=await admin(request);
+  if(path==='admin/reports')return json(await listReports(filters(url),u));
+  if(path==='admin/matrix'){const f=filters(url);if(!f.unit)throw new HttpError('Оберіть підрозділ.');return json(await unitMatrix(f));}
+  if(path==='admin/catalog'){const [tasks,units,ranks,settings]=await Promise.all([query('SELECT * FROM tasks ORDER BY sort_order,name'),query('SELECT * FROM units ORDER BY sort_order,name'),query('SELECT * FROM ranks ORDER BY id'),query('SELECT * FROM settings')]);return json({tasks,units,ranks,settings});}
+  if(path==='admin/periods')return json(await query('SELECT * FROM reporting_periods ORDER BY week_start DESC LIMIT 104'));
+  if(path==='admin/personnel'){const [people,claims,users]=await Promise.all([query('SELECT p.*,u.name unit_name FROM personnel p LEFT JOIN units u ON u.id=p.unit_id ORDER BY p.rank DESC,p.last_name LIMIT 1000'),query('SELECT c.*,u.username,u.email FROM profile_claims c JOIN app_user u ON u.id=c.user_id ORDER BY c.created_at DESC LIMIT 100'),query('SELECT id,name,email,username,role FROM app_user ORDER BY name LIMIT 1000')]);return json({people,claims,users});}
+  if(path==='admin/audit'){const page=Math.max(1,Math.min(10000,Math.floor(Number(url.searchParams.get('page')))||1));return json(await query('SELECT a.*,u.username actor FROM audit_logs a LEFT JOIN app_user u ON u.id=a.actor_id ORDER BY created_at DESC LIMIT 50 OFFSET $1',[(page-1)*50]));}
+  throw new HttpError('Сторінку не знайдено.',404);
+}catch(e){return failure(e);}}
+export async function POST(request:Request,ctx:Context){try{
+  sameOrigin(request);writable();const path=(await ctx.params).path.join('/');
+  const input=await readBody(request,path==='admin/import'?2_500_000:100_000);
+  if(path==='reports')return json(await submitReport(request,input));
+  if(path==='bootstrap')return json(await bootstrap(request,input));
+  if(path==='recover')return json(await recover(request,input));
+  if(path==='me/claims'){const u=await member(request);const p=z.object({staticId}).parse(input);return json(await transaction(async c=>{await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[u.id]);if((await c.query("SELECT id FROM profile_claims WHERE user_id=$1 AND status='pending'",[u.id])).rows.length)throw new HttpError('У вас уже є заявка на перевірці.');if((await c.query('SELECT id FROM personnel WHERE user_id=$1',[u.id])).rows.length)throw new HttpError('Ваш профіль уже прив’язаний.');await c.query('INSERT INTO profile_claims(user_id,static_id) VALUES($1,$2)',[u.id,p.staticId]);return {saved:true};}));}
+  const u=await admin(request);
+  const actions:Record<string,(input:unknown)=>Promise<unknown>>={
+    'admin/tasks':i=>saveTask(i,u),'admin/periods':i=>changePeriod(i,u),'admin/review':i=>reviewItems(i,u),'admin/award':i=>adjustAward(i,u),
+    'admin/settings':i=>saveSettings(i,u),'admin/personnel':i=>savePerson(i,u),'admin/claims':i=>reviewClaim(i,u),'admin/link-report':i=>linkReport(i,u),
+    'admin/roles':i=>changeRole(i,u),'admin/recovery':i=>issueRecovery(i,u),'admin/import':i=>importReports(i,u)
+  };
+  if(!actions[path])throw new HttpError('Операцію не знайдено.',404);
+  return json(await actions[path](input));
+}catch(e){return failure(e);}}
