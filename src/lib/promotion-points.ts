@@ -1,0 +1,108 @@
+import 'server-only';
+import {randomUUID} from 'node:crypto';
+import type {PoolClient} from 'pg';
+import {z} from 'zod';
+import {query,transaction} from '@/db';
+import {audit} from './admin';
+import {HttpError} from './security';
+import {evidence} from './validation';
+import {accessibleUnits} from './unit-page';
+import {commonPromotionTasks,promotionRankName,promotionStep} from './promotion-rules';
+import type {Viewer} from './domain';
+
+type Task={id:string;name:string;points:number;unitId:string|null;archived?:boolean};
+type Credit={id:string;userId:string;name:string;unitId:string;rank:number;cycle:string;taskId:string;title:string;rate:number;quantity:number;links:string[];status:'pending'|'approved'|'rejected';reason?:string;createdAt:string};
+const common:Task[]=commonPromotionTasks.map(([id,name,points])=>({id,name,points,unitId:null}));
+const operation=z.discriminatedUnion('kind',[
+ z.object({kind:z.literal('task'),id:z.uuid().optional(),unitId:z.uuid(),name:z.string().trim().min(3).max(120),points:z.number().int().min(1).max(1000)}),
+ z.object({kind:z.literal('archive'),id:z.uuid()}),
+ z.object({kind:z.literal('submit'),taskId:z.string().min(1).max(50),quantity:z.number().int().min(1).max(100),links:z.array(evidence).min(1).max(20)}),
+ z.object({kind:z.literal('review'),id:z.uuid(),approve:z.boolean(),quantity:z.number().int().min(1).max(100).optional(),reason:z.string().trim().min(5).max(2000)}),
+ z.object({kind:z.literal('bonus'),userId:z.string().min(1).max(100),points:z.number().int().min(1).max(1000),reason:z.string().trim().min(5).max(2000),links:z.array(evidence).min(1).max(20)}),
+]);
+type Profile={id:string;unit_id:string;rank:number;rank_name:string;name:string;cycle:string};
+const profileSql=`SELECT p.id,p.unit_id,p.rank,k.name AS rank_name,p.first_name||' '||p.last_name AS name,
+ coalesce((SELECT a.id::text FROM audit_logs a WHERE a.entity_id=p.id::text AND (
+  (a.action='personnel.record' AND a.after->>'action' IN ('promote','demote','admit')) OR
+  (a.action='unit.assignment' AND a.before->>'rank' IS DISTINCT FROM a.after->>'rank') OR
+  (a.action='personnel.assign' AND a.before#>>'{profile,rank}' IS DISTINCT FROM a.after->>'rank') OR
+  (a.action='personnel.save' AND a.before->>'rank' IS DISTINCT FROM a.after->>'rank')
+ ) ORDER BY a.created_at DESC,a.id DESC LIMIT 1),'initial') AS cycle
+ FROM personnel p JOIN ranks k ON k.id=p.rank JOIN units u ON u.id=p.unit_id AND u.active
+ WHERE p.user_id=$1 AND p.active`;
+
+export async function promotionProgress(userId:string,c?:PoolClient){
+ const [profile]=c?(await c.query<Profile>(profileSql,[userId])).rows:await query<Profile>(profileSql,[userId]);
+ if(!profile)return {profile:null,points:0,step:undefined};
+ const sql=`SELECT coalesce(sum((value->>'rate')::int*(value->>'quantity')::int),0)::float8 AS points FROM settings
+  WHERE key LIKE 'promotion-credit:%' AND value->>'userId'=$1 AND value->>'rank'=$2 AND value->>'cycle'=$3 AND value->>'status'='approved'`;
+ const args=[userId,String(profile.rank),profile.cycle];
+ const [total]=c?(await c.query<{points:number}>(sql,args)).rows:await query<{points:number}>(sql,args);
+ return {profile,points:total.points,step:promotionStep(promotionRankName(profile.rank,profile.rank_name))};
+}
+
+export async function promotionPoints(actor:Viewer){
+ const units=(await accessibleUnits(actor.id)).filter(unit=>unit.editor);
+ const progress=await promotionProgress(actor.id);
+ const ids=units.map(unit=>unit.id);
+ const [tasks,credits,people]=await Promise.all([
+  query<{value:Task}>(`SELECT value FROM settings WHERE key LIKE 'promotion-task:%'
+   AND (value->>'unitId'=$1 OR value->>'unitId'=ANY($2::text[])) ORDER BY value->>'name'`,[progress.profile?.unit_id??null,ids]),
+  query<{value:Credit}>(`SELECT value FROM settings WHERE key LIKE 'promotion-credit:%'
+   AND (value->>'userId'=$1 OR value->>'unitId'=ANY($2::text[])) ORDER BY value->>'createdAt' DESC LIMIT 200`,[actor.id,ids]),
+  ids.length?query<{id:string;name:string;unit_id:string}>(`SELECT p.user_id AS id,p.first_name||' '||p.last_name AS name,p.unit_id
+   FROM personnel p WHERE p.active AND p.rank IS NOT NULL AND p.user_id IS NOT NULL AND p.unit_id=ANY($1::uuid[]) AND p.user_id<>$2 ORDER BY p.last_name`,[ids,actor.id]):[],
+ ]);
+ return {...progress,units,tasks:[...common,...tasks.map(row=>row.value)],credits:credits.map(row=>row.value),people,actorId:actor.id};
+}
+
+export async function changePromotionPoints(input:unknown,actor:Viewer){
+ const action=operation.parse(input);
+ return transaction(async c=>{
+  await c.query("SELECT pg_advisory_xact_lock(hashtext('admin-access'))");
+  const units=(await accessibleUnits(actor.id,null,c)).filter(unit=>unit.editor);
+  const editable=(unit:string|null)=>units.some(item=>item.id===unit);
+  const write=async(key:string,value:unknown)=>{await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=excluded.value',[key,JSON.stringify(value)]);};
+  if(action.kind==='task'||action.kind==='archive'){
+   const id=action.id??randomUUID(),key='promotion-task:'+id;
+   const {rows:[old]}=await c.query<{value:Task}>('SELECT value FROM settings WHERE key=$1 FOR UPDATE',[key]);
+   const unit=action.kind==='task'?action.unitId:old?.value.unitId??null;
+   if(!editable(unit)||(action.id&&(!old||old.value.unitId!==unit)))throw new HttpError('Завдання поза межами вашого підрозділу.',403);
+   const next=action.kind==='task'?{id,unitId:unit,name:action.name,points:action.points}:{...old!.value,archived:true};
+   await write(key,next);
+   await audit(c,actor,'promotion.task',id,old?.value??null,next);
+   return {saved:true};
+  }
+  if(action.kind==='review'){
+   const key='promotion-credit:'+action.id;
+   const {rows:[row]}=await c.query<{value:Credit}>('SELECT value FROM settings WHERE key=$1 FOR UPDATE',[key]);
+   const old=row?.value;
+   if(!old||old.status!=='pending'||old.userId===actor.id||!editable(old.unitId))throw new HttpError('Запис недоступний для перевірки.',403);
+   const {profile}=await promotionProgress(old.userId,c);
+   if(action.approve&&(!profile||profile.rank!==old.rank||profile.cycle!==old.cycle||profile.unit_id!==old.unitId))
+    throw new HttpError('Службове призначення змінилося після подання.',409);
+   const next={...old,quantity:action.approve?action.quantity??old.quantity:old.quantity,status:action.approve?'approved':'rejected',reason:action.reason};
+   await write(key,next);
+   await audit(c,actor,'promotion.credit.review',old.id,old,next,action.reason);
+   return {saved:true};
+  }
+  const userId=action.kind==='bonus'?action.userId:actor.id;
+  const {profile}=await promotionProgress(userId,c);
+  if(!profile||(action.kind==='bonus'&&(!editable(profile.unit_id)||userId===actor.id)))
+   throw new HttpError('Потрібен активний профіль із підрозділом і званням.',403);
+  const task=action.kind==='submit'?(common.find(item=>item.id===action.taskId)??(await c.query<{value:Task}>('SELECT value FROM settings WHERE key=$1',['promotion-task:'+action.taskId])).rows[0]?.value):undefined;
+  if(action.kind==='submit'&&(!task||task.archived||(task.unitId&&task.unitId!==profile.unit_id)))throw new HttpError('Це завдання недоступне.',409);
+  const links=[...new Set(action.links)];
+  if((await c.query(`SELECT 1 FROM settings WHERE key LIKE 'promotion-credit:%' AND value->>'userId'=$1
+   AND value->>'status'<>'rejected' AND (value->'links') ?| $2::text[] LIMIT 1`,[userId,links])).rowCount)
+   throw new HttpError('Ці докази вже використано в іншому записі. Додайте докази саме цієї RP-дії.',409);
+  const id=randomUUID();
+  const entry:Credit={id,userId,name:profile.name,unitId:profile.unit_id,rank:profile.rank,cycle:profile.cycle,
+   taskId:task?.id??'bonus',title:task?.name??'Позачергове заохочення',rate:action.kind==='bonus'?action.points:task!.points,
+   quantity:action.kind==='bonus'?1:action.quantity,links,status:action.kind==='bonus'?'approved':'pending',
+   reason:action.kind==='bonus'?action.reason:undefined,createdAt:new Date().toISOString()};
+  await write('promotion-credit:'+id,entry);
+  await audit(c,actor,'promotion.credit',id,null,entry,entry.reason);
+  return {saved:true};
+ });
+}

@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import {promotionRankName} from '@/lib/promotion-rules';
 import {useState,type FormEvent} from 'react';
 import type {personnelWorkflow} from '@/lib/personnel-workflow';
 import {evidenceLines} from '@/lib/report-limits';
@@ -30,7 +32,7 @@ export function PersonnelWorkflow(){
  const person=data?.people.find(person=>person.id===target);
  const needsRank=kind!=='dismiss'&&kind!=='transfer';
  const needsUnit=kind==='admit'||kind==='transfer';
- const rankName=(id:number|null)=>data?.ranks.find(rank=>rank.id===id)?.name??(id??'Не призначено');
+ const rankName=(id:number|null)=>id==null?'Не призначено':promotionRankName(id,data?.ranks.find(rank=>rank.id===id)?.name??String(id));
  const availablePeople=data?.people.filter(person=>kind==='admit'?(!person.active||!person.unit_id):person.active&&!!person.unit_id)??[];
  const filtered=availablePeople.filter(person=>(person.name+' '+person.static_id).toLocaleLowerCase('uk').includes(search.trim().toLocaleLowerCase('uk')));
  const proof=(fd:FormData)=>({reason:fd.get('reason'),links:evidenceLines(String(fd.get('links')||''))});
@@ -44,9 +46,10 @@ export function PersonnelWorkflow(){
      <IllustratedSummary title="Подати звіт на підвищення" image="/portal-art/unit-actions/rank.webp"/>
      <div className="account-action-content">
       {data.me?.active&&data.me.rank&&data.me.unit_id?<form className="stack" onSubmit={e=>void save(e,fd=>({kind:'submit',rank:Number(fd.get('rank')),...proof(fd)}))}>
-       <p>Поточне звання: {rankName(data.me.rank)}</p>
-       <Field label="Запитуване звання"><select name="rank" required defaultValue=""><option value="">Оберіть вище звання</option>{data.ranks.filter(rank=>rank.id>data.me.rank!).map(rank=><option key={rank.id} value={rank.id}>{rank.name}</option>)}</select></Field>
-       <Proof/><button disabled={busy}>Надіслати звіт</button>
+       <p>Поточне звання: {rankName(data.me.rank)}. Підтверджені бали: {data.progress.points}{data.progress.step?' / '+data.progress.step[2]:''}.</p>
+       <Link href="/portal/promotion-points">Завдання й бали підвищення</Link>
+       <Field label="Запитуване звання"><select name="rank" required defaultValue=""><option value="">Оберіть вище звання</option>{data.ranks.filter(rank=>rankName(rank.id).toLocaleLowerCase('uk')===data.progress.step?.[1].toLocaleLowerCase('uk')).map(rank=><option key={rank.id} value={rank.id}>{rankName(rank.id)}</option>)}</select></Field>
+       <Proof/><button disabled={busy||!data.progress.step||data.progress.points<data.progress.step[2]}>Надіслати звіт</button>
       </form>:<p>Для подання потрібні активний кадровий профіль, підрозділ і звання.</p>}
      </div>
     </details>
@@ -54,15 +57,16 @@ export function PersonnelWorkflow(){
      <IllustratedSummary title="Додати кадровий запис" image="/portal-art/unit-actions/info.webp"/>
      <form className="stack account-action-content" onSubmit={e=>{
       if(confirm('Застосувати кадрову зміну та записати її в журнал?'))void save(e,fd=>({kind:'record',action:kind,userId:target,
-       rank:needsRank?Number(fd.get('rank')):undefined,unitId:needsUnit?fd.get('unitId'):undefined,...proof(fd)}));
+       rank:needsRank?Number(fd.get('rank')):undefined,unitId:needsUnit?fd.get('unitId'):undefined,qualified:fd.has('qualified'),...proof(fd)}));
       else e.preventDefault();
      }}>
       <Field label="Кадрова дія"><select value={kind} onChange={e=>{setKind(e.target.value as typeof kind);setTarget('');}}>{Object.entries(actionLabels).filter(([id])=>id!=='transfer'||data.canTransfer).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></Field>
       <Field label="Пошук за ім’ям або Static ID"><input type="search" value={search} onChange={e=>{setSearch(e.target.value);setTarget('');}}/></Field>
       <Field label="Боєць"><select value={target} required onChange={e=>setTarget(e.target.value)}><option value="">Оберіть зареєстрованого бійця</option>{filtered.map(person=><option key={person.id} value={person.id}>{person.name} · {person.static_id}</option>)}</select></Field>
       {person&&<p>Поточні дані: {rankName(person.rank)} · {data.units.find(unit=>unit.id===person.unit_id)?.name??'Без підрозділу'}</p>}
-      {needsRank&&<Field label="Нове звання"><select key={kind+target} name="rank" required defaultValue=""><option value="">Оберіть звання</option>{data.ranks.filter(rank=>kind==='admit'||(kind==='promote'?rank.id>(person?.rank??0):rank.id<(person?.rank??0))).map(rank=><option key={rank.id} value={rank.id}>{rank.name}</option>)}</select></Field>}
+      {needsRank&&<Field label="Нове звання"><select key={kind+target} name="rank" required defaultValue=""><option value="">Оберіть звання</option>{data.ranks.filter(rank=>kind==='admit'||(kind==='promote'?rank.id>(person?.rank??0):rank.id<(person?.rank??0))).map(rank=><option key={rank.id} value={rank.id}>{rankName(rank.id)}</option>)}</select></Field>}
       {needsUnit&&<Field label="Новий підрозділ"><select name="unitId" required defaultValue=""><option value="">Оберіть підрозділ</option>{data.units.filter(unit=>kind==='admit'||unit.id!==person?.unit_id).map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>}
+      {kind==='promote'&&<label className="checkbox"><input type="checkbox" name="qualified" required/>Нормативи, атестації та перевірки пройдено</label>}
       <Proof/><button disabled={busy||!target}>Застосувати й записати</button>
      </form>
     </details>}
@@ -75,9 +79,10 @@ export function PersonnelWorkflow(){
      <ul>{report.links.map((link,index)=><li key={index}><a href={link} target="_blank" rel="noopener noreferrer">Доказ {index+1}</a></li>)}</ul>
      {report.decision&&<p>Рішення: {report.decision}</p>}
      {report.status==='pending'&&report.userId!==data.actorId&&data.units.some(unit=>unit.id===report.unitId)&&
-      <form className="stack narrow" onSubmit={e=>void save(e,fd=>({kind:'decide',id:report.id,approve:fd.get('decision')==='approve',reason:fd.get('reason')}))}>
+      <form className="stack narrow" onSubmit={e=>void save(e,fd=>({kind:'decide',id:report.id,approve:fd.get('decision')==='approve',qualified:fd.has('qualified'),reason:fd.get('reason')}))}>
        <Field label="Рішення"><select name="decision"><option value="approve">Погодити й застосувати звання</option><option value="reject">Відхилити</option></select></Field>
        <Field label="Підстава рішення"><textarea name="reason" required minLength={5} maxLength={3000}/></Field>
+       <label className="checkbox"><input type="checkbox" name="qualified"/>Для схвалення підтверджую нормативи, атестації та перевірки</label>
        <button disabled={busy}>Зберегти рішення</button>
       </form>}
     </details>)}

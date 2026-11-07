@@ -3,6 +3,7 @@ import {query} from '@/db';
 import {headers} from 'next/headers';
 import {redirect,notFound} from 'next/navigation';
 import {viewer} from '@/lib/auth';
+import {PromotionPoints} from '@/components/promotion-points';
 import {PersonnelWorkflow} from '@/components/personnel-workflow';
 import {AwardRegister} from '@/components/award-register';
 import {NotificationCenter} from '@/components/notification-center';
@@ -44,6 +45,7 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
  if(['login','register','recover','setup'].includes(path))return <AuthScreen returnToReport={(await searchParams).next==='report'} passwordChanged={path==='login'&&(await searchParams).password==='changed'} mode={path as 'login'|'register'|'recover'|'setup'}/>;
  if(path==='my-unit'||slug[0]==='units'&&slug.length===2){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <UnitSpace userId={u.id} unitId={slug[1]}/>;}
  if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <section id="content"><h1>Мої звіти</h1><details className="account-action profile-action service-reports" open={!!((await searchParams).report||(await searchParams).from)}><IllustratedSummary title="Журнал звітів" image="/portal-art/catalog/report-journal.webp"/><div className="account-action-content"><ReportList personal/></div></details></section>;}
+ if(path==='portal/promotion-points'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <PromotionPoints/>;}
  if(path==='cabinet'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword} overview={u.mustChangePassword?null:<ServiceTablet user={u}/>}/>;}
  if(slug[0]==='portal'&&slug.length===2&&Object.hasOwn(portalPreviews,slug[1])){
   const section=slug[1];

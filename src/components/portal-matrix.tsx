@@ -10,12 +10,13 @@ const covers:Record<string,string>={
  Головне:'cabinet',Служба:'service',Підготовка:'training',Звітність:'reports',Документи:'documents',Управління:'command',
 };
 const art:Record<string,string>={
- '/portal/personnel-actions':'unit-actions/rank','/portal/notifications':'workflows/notifications','/cabinet':'tablet','/my-unit':'home/service','/weekly-bonus':'weekly','/weekly-bonus/report':'home/reports',
+ '/portal/promotion-points':'cabinet/training','/portal/personnel-actions':'unit-actions/rank','/portal/notifications':'workflows/notifications','/cabinet':'tablet','/my-unit':'home/service','/weekly-bonus':'weekly','/weekly-bonus/report':'home/reports',
  '/weekly-bonus/me':'catalog/report-journal','/portal/requests':'home/service','/portal/calendar':'calendar',
  '/portal/training':'training','/portal/lectures':'home/training','/portal/regulations':'home/documents',
  '/portal/orders':'home/documents','/portal/announcements':'home/command','/portal/payments':'weekly',
 };
 const descriptions:Record<string,string>={
+ '/portal/promotion-points':'Виконані завдання й прогрес до наступного звання.',
  '/cabinet':'Службова картка, звання та особисті дані.',
  '/my-unit':'Склад, новини й робоча інформація підрозділу.',
  '/weekly-bonus':'Звіти, перевірка та підсумки звітного тижня.',

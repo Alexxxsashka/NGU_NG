@@ -5,6 +5,8 @@ import {query,transaction} from '@/db';
 import {audit} from './admin';
 import {HttpError} from './security';
 import {evidence} from './validation';
+import {promotionProgress} from './promotion-points';
+import {promotionRankName} from './promotion-rules';
 import {accessibleUnits} from './unit-page';
 import type {Viewer} from './domain';
 
@@ -13,8 +15,8 @@ const proof={reason:z.string().trim().min(5).max(3000),links:z.array(evidence).m
 const rank=z.number().int().positive().max(2147483647);
 const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('submit'),rank,...proof}),
- z.object({kind:z.literal('record'),action:z.enum(actions),userId:z.string().min(1).max(100),rank:rank.optional(),unitId:z.uuid().optional(),...proof}),
- z.object({kind:z.literal('decide'),id:z.uuid(),approve:z.boolean(),reason:proof.reason}),
+ z.object({kind:z.literal('record'),action:z.enum(actions),userId:z.string().min(1).max(100),rank:rank.optional(),unitId:z.uuid().optional(),qualified:z.boolean().optional(),...proof}),
+ z.object({kind:z.literal('decide'),id:z.uuid(),approve:z.boolean(),qualified:z.boolean().optional(),reason:proof.reason}),
 ]);
 type Promotion={id:string;userId:string;name:string;staticId:string;unitId:string;fromRank:number;rank:number;reason:string;links:string[];status:string;decision?:string;createdAt:string};
 
@@ -35,7 +37,8 @@ export async function personnelWorkflow(actor:Viewer){
     AND (after->>'fromUnit'=ANY($1::text[]) OR after->>'unitId'=ANY($1::text[])) ORDER BY created_at DESC,id DESC LIMIT 100`,[units.map(unit=>unit.id)]):[],
   query("SELECT 1 FROM personnel p JOIN settings s ON s.key='service:'||p.id::text WHERE p.user_id=$1 AND p.active AND s.value->>'leadershipRole'='leadership'",[actor.id]),
  ]);
- return {units,canTransfer:actor.role==='admin'||leadership.length>0,me:me[0],ranks,promotions:promotions.map(row=>row.value),people,history,actorId:actor.id};
+ const progress=await promotionProgress(actor.id);
+ return {units,progress:{points:progress.points,step:progress.step},canTransfer:actor.role==='admin'||leadership.length>0,me:me[0],ranks,promotions:promotions.map(row=>row.value),people,history,actorId:actor.id};
 }
 
 export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
@@ -56,6 +59,10 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
     throw new HttpError('Потрібен активний профіль із підрозділом і чинне вище звання.',409);
    if((await c.query("SELECT 1 FROM settings WHERE key LIKE 'promotion-report:%' AND value->>'userId'=$1 AND value->>'status'='pending'",[actor.id])).rowCount)
     throw new HttpError('Ваш попередній звіт ще на розгляді.',409);
+   const progress=await promotionProgress(actor.id,c);
+   const {rows:[destinationRank]}=await c.query<{name:string}>('SELECT name FROM ranks WHERE id=$1',[action.rank]);
+   if(!progress.step||promotionRankName(action.rank,destinationRank.name).toLocaleLowerCase('uk')!==progress.step[1].toLocaleLowerCase('uk')||progress.points<progress.step[2])
+    throw new HttpError('Потрібні підтверджені бали й наступне звання за шкалою підвищень.',409);
    const entry:Promotion={id:randomUUID(),userId:actor.id,name:author.name,staticId:author.static_id,unitId:author.unit_id,
     fromRank:author.rank,rank:action.rank,reason:action.reason,links:action.links,status:'pending',createdAt:new Date().toISOString()};
    await c.query('INSERT INTO settings(key,value) VALUES($1,$2)',['promotion-report:'+entry.id,JSON.stringify(entry)]);
@@ -94,6 +101,12 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
   const ranks=await c.query<{id:number;name:string}>('SELECT id,name FROM ranks WHERE id=ANY($1::int[])',[[target.rank,nextRank].filter(Boolean)]);
   const rankName=(id:number)=>ranks.rows.find(row=>row.id===id)?.name;
   if(changesRank&&!rankName(nextRank!))throw new HttpError('Звання не знайдено.');
+  if(type==='promote'){
+   const progress=await promotionProgress(targetId,c);
+   if(!action.qualified)throw new HttpError('Підтвердьте виконання нормативів і проходження атестацій.',409);
+   if(progress.step&&(progress.points<progress.step[2]||promotionRankName(nextRank!,rankName(nextRank!)!).toLocaleLowerCase('uk')!==progress.step[1].toLocaleLowerCase('uk')))
+    throw new HttpError('Потрібні '+progress.step[2]+' підтверджених балів та наступне звання '+progress.step[1]+'.',409);
+  }
   const unitId=type==='admit'||type==='transfer'?destination!:target.unit_id;
   const rankId=changesRank?nextRank!:target.rank;
   const active=type!=='dismiss';
@@ -114,7 +127,7 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
   const record={action:type,author:author.name,actorStaticId:author.static_id,name:target.name,staticId,member:targetId,
    fromUnit:target.unit_id,unitId,fromUnitName:units.find(unit=>unit.id===target.unit_id)?.name,unitName:units.find(unit=>unit.id===unitId)?.name,
    fromRankName:rankName(target.rank),rankName:rankName(rankId),reason:action.reason,
-   links:action.kind==='record'?action.links:promotion!.links,promotionId:promotion?.id};
+   qualified:type==='promote'?action.qualified:undefined,links:action.kind==='record'?action.links:promotion!.links,promotionId:promotion?.id};
   await audit(c,actor,'personnel.record',personId,{unitId:target.unit_id,rank:target.rank,active:target.active},record,action.reason);
   if(promotion){
    const next={...promotion,status:'approved',decision:action.reason};
