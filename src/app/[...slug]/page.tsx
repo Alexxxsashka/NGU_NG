@@ -23,14 +23,10 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
  if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword}/>;}
  if(slug[0]==='portal'&&slug.length===2&&Object.hasOwn(portalPreviews,slug[1])){
   const section=slug[1];
-  if(Object.hasOwn(adminPortalRoutes,section)||section==='administration'){
-   const user=await viewer(await headers());
-   if(user?.role==='admin'&&!user.mustChangePassword){
-    if(Object.hasOwn(adminPortalRoutes,section))redirect(adminPortalRoutes[section]);
-    return <PortalPreview slug={section} showAdminLinks/>;
-   }
-  }
-  return <PortalPreview slug={section}/>;
+  const user=await viewer(await headers());
+  if(!user||user.role!=='admin'||user.mustChangePassword)notFound();
+  if(Object.hasOwn(adminPortalRoutes,section))redirect(adminPortalRoutes[section]);
+  return <PortalPreview slug={section} showAdminLinks={section==='administration'}/>;
  }
  if(slug[0]==='admin'){
   const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword||u.role!=='admin')redirect('/weekly-bonus/me');

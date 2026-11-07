@@ -4,7 +4,7 @@ import {ArrowUpRight} from 'lucide-react';
 import {headers} from 'next/headers';
 import {viewer} from '@/lib/auth';
 import {PortalIcon} from '@/components/portal-icon';
-import {adminPortalRoutes,portalGroups} from '@/lib/portal-navigation';
+import {adminPortalRoutes,visiblePortalGroups} from '@/lib/portal-navigation';
 
 export default async function Home(){
  const user=await viewer(await headers()).catch(()=>null);
@@ -26,7 +26,7 @@ export default async function Home(){
   </section>
   <section className="portal-index" aria-labelledby="portal-index-title">
    <h2 id="portal-index-title">Розділи порталу</h2>
-   <div className="portal-index-grid">{portalGroups.map(group=><section className="portal-index-group" key={group.title}>
+   <div className="portal-index-grid">{visiblePortalGroups(admin).map(group=><section className="portal-index-group" key={group.title}>
     <h3><PortalIcon href={group.links[0][0]} size={22}/>{group.title}</h3>
     {group.links.map(([href,label])=><Link key={href} href={href}><PortalIcon href={href}/><span>{label}</span>{href.startsWith('/portal/')&&!(admin&&Object.hasOwn(adminPortalRoutes,href.slice(8)))&&<small>{admin&&href==='/portal/administration'?'Доступно частково':'У розробці'}</small>}<ArrowUpRight aria-hidden="true" size={15}/></Link>)}
    </section>)}</div>

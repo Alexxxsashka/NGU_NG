@@ -5,7 +5,7 @@ import {usePathname,useRouter} from 'next/navigation';
 import {Shield,ClipboardList,ChartNoAxesCombined,Users,SlidersHorizontal,CalendarDays,History,Upload,LogOut,UserRound,Menu} from 'lucide-react';
 import {useState,type ReactNode} from 'react';
 import {PortalIcon} from './portal-icon';
-import {adminPortalRoutes,portalGroups} from '@/lib/portal-navigation';
+import {adminPortalRoutes,visiblePortalGroups} from '@/lib/portal-navigation';
 import type {Viewer} from '@/lib/domain';
 const bonusLinks=[['/admin/weekly-bonus','Огляд',ChartNoAxesCombined],['/admin/weekly-bonus/reports','Звіти',ClipboardList],['/admin/weekly-bonus/units','Підрозділи',Users],['/admin/weekly-bonus/tasks','Завдання і бали',SlidersHorizontal],['/admin/weekly-bonus/periods','Звітні тижні',CalendarDays],['/admin/weekly-bonus/settings','Налаштування',SlidersHorizontal],['/admin/weekly-bonus/import','Перенесення історії',Upload]] as const;
 export function Shell({user,children}:{user:Viewer|null;children:ReactNode}){
@@ -13,7 +13,7 @@ export function Shell({user,children}:{user:Viewer|null;children:ReactNode}){
  const isAdmin=user?.role==='admin'&&!user.mustChangePassword;
  const bonusAdminOpen=pathname==='/admin/weekly-bonus'||pathname.startsWith('/admin/weekly-bonus/');
  async function logout(){setError('');try{const r=await fetch('/api/auth/sign-out',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});if(!r.ok)throw new Error();router.push('/login');router.refresh();}catch{setError('Не вдалося завершити сеанс.');}}
- return <div className="app-shell"><aside className={'sidebar '+(menu?'open':'')}><Link href="/" className="brand"><span className="brand-mark"><Image src="/ngu-emblem.svg" alt="" width={44} height={44}/></span><span><strong>НГУ</strong><small>Єдина інформаційна система</small></span></Link><button className="mobile-menu" onClick={()=>setMenu(!menu)} aria-expanded={menu} aria-label="Навігація"><Menu/></button><nav aria-label="Головна навігація">{portalGroups.map(group=><div className="portal-nav-group" key={group.title}>
+ return <div className="app-shell"><aside className={'sidebar '+(menu?'open':'')}><Link href="/" className="brand"><span className="brand-mark"><Image src="/ngu-emblem.svg" alt="" width={44} height={44}/></span><span><strong>НГУ</strong><small>Єдина інформаційна система</small></span></Link><button className="mobile-menu" onClick={()=>setMenu(!menu)} aria-expanded={menu} aria-label="Навігація"><Menu/></button><nav aria-label="Головна навігація">{visiblePortalGroups(isAdmin).map(group=><div className="portal-nav-group" key={group.title}>
  <div className="nav-label">{group.title}</div>
  {group.links.map(([href,label])=><Link key={href} onClick={()=>setMenu(false)} href={href} aria-current={pathname===href?'page':undefined} className={pathname===href||href==='/weekly-bonus'&&pathname==='/weekly-bonus/report'?'selected':''}><PortalIcon href={href}/><span className="portal-nav-label">{label}</span>{href.startsWith('/portal/')&&!(isAdmin&&Object.hasOwn(adminPortalRoutes,href.slice(8)))&&<span className="portal-nav-mark" title="У розробці"/>}</Link>)}
  </div>)}{user?.role==='admin'&&!user.mustChangePassword&&<><div className="nav-label">Робоча адмінпанель</div><Link onClick={()=>setMenu(false)} className={bonusAdminOpen?'selected':''} href="/admin/weekly-bonus"><SlidersHorizontal size={18}/>Налаштування щотижневого преміювання</Link>

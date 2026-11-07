@@ -47,3 +47,10 @@ export const portalAdminLinks=[
  ['/admin/weekly-bonus/settings','Налаштування преміювання'],
  ['/admin/audit','Журнал змін'],
 ] as const;
+
+export function visiblePortalGroups(isAdmin: boolean) {
+ return portalGroups.map(group=>({
+  title:group.title,
+  links:group.links.filter(([href])=>isAdmin||!href.startsWith('/portal/')),
+ })).filter(group=>group.links.length>0);
+}
