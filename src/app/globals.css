@@ -98,3 +98,41 @@ dialog::backdrop {background:#05080bbc}
 }
 
 .bonus-nav{padding-left:12px;border-left:1px solid var(--line);margin-left:12px}
+
+.account-action {
+  margin-bottom: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.account-action summary {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  min-height: clamp(132px, 24vw, 190px);
+  padding: 20px;
+  border-radius: inherit;
+  list-style: none;
+  cursor: pointer;
+  color: var(--ink);
+  font: 800 clamp(22px, 4vw, 30px)/1.15 "Roboto Condensed", Arial, sans-serif;
+}
+.account-action summary::-webkit-details-marker { display: none; }
+.account-action summary img { object-fit: cover; z-index: -2; }
+.account-action summary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(0deg, #0b1118 2%, #0b1118a8 36%, transparent 80%);
+}
+.account-action summary svg { color: var(--gold); }
+.account-action summary:hover span { color: var(--gold); }
+.account-action[open] summary { border-radius: var(--radius) var(--radius) 0 0; }
+.account-action[open] summary svg { transform: rotate(180deg); }
+.account-action-content { border-top: 1px solid var(--line); padding: clamp(16px, 4vw, 26px); }
+.account-action-content > p:first-child { margin-top: 0; }
