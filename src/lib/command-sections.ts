@@ -12,3 +12,9 @@ export const commandSections=[
  ['documents','Редактор документів','cabinet/documents'],
 ] as const;
 export type CommandSection=(typeof commandSections)[number][0];
+
+export function workspaceForPath(path:string){
+ if(path==='/command'||path.startsWith('/command/'))return 'command';
+ if(path==='/admin'||path.startsWith('/admin/'))return 'admin';
+ return 'personal';
+}

@@ -45,6 +45,7 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
  }
  if(['login','register','recover','setup'].includes(path))return <AuthScreen returnToReport={(await searchParams).next==='report'} passwordChanged={path==='login'&&(await searchParams).password==='changed'} mode={path as 'login'|'register'|'recover'|'setup'}/>;
  if(path==='portal/command')redirect('/command');
+ if(path==='portal/administration')redirect('/admin');
  if(path==='my-unit'||path==='portal/structure'||slug[0]==='units'&&slug.length===2){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <UnitSpace userId={u.id} ownOnly={path==='my-unit'} unitId={slug[0]==='units'?slug[1]:undefined}/>;}
  if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <section id="content"><h1>Мої звіти</h1><details className="account-action profile-action service-reports" open={!!((await searchParams).report||(await searchParams).from)}><IllustratedSummary title="Журнал звітів" image="/portal-art/catalog/report-journal.webp"/><div className="account-action-content"><ReportList personal/></div></details></section>;}
  if(slug[0]==='command'&&(slug.length===1||slug.length===3)){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <CommandWorkspace actor={u} unitId={slug[1]} section={slug[2]}/>;}
@@ -74,7 +75,7 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
   return <PortalPreview slug={section} showAdminLinks={section==='administration'}/>;
  }
  if(slug[0]==='admin'){
-  const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword||u.role!=='admin')redirect('/cabinet');
+  const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');if(u.role!=='admin')notFound();
   if(slug.length===1)redirect('/admin/weekly-bonus');
   if(slug.length===2&&['personnel','audit','unit-directory'].includes(slug[1]))return <AdminWorkspace section={slug[1]}/>;
   if(slug[1]!=='weekly-bonus')notFound();
