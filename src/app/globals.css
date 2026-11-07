@@ -96,3 +96,5 @@ dialog::backdrop {background:#05080bbc}
   .hero-copy {padding:0 24px 28px}
   .hero h1 {font-size:clamp(30px,6vw,48px)}
 }
+
+.bonus-nav{padding-left:12px;border-left:1px solid var(--line);margin-left:12px}

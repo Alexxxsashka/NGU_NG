@@ -13,8 +13,8 @@ export default function Home(){
     <h1>Звітний кабінет<br/>Національної гвардії</h1>
     <p>Фіксуйте виконані завдання, додавайте докази та переглядайте підтверджені бали за тиждень.</p>
     <div className="actions">
-     <Link className="button gold" href="/report">Подати звіт</Link>
-     <Link className="hero-link" href="/me">Особистий кабінет</Link>
+     <Link className="button gold" href="/weekly-bonus">Щотижневе преміювання</Link>
+     <Link className="hero-link" href="/weekly-bonus/me">Особистий кабінет</Link>
     </div>
    </div>
   </section>
