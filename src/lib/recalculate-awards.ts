@@ -3,6 +3,14 @@ import type {PoolClient} from 'pg';
 
 // Preserve paid snapshots and distribute each weekly cap in submission order.
 export async function recalculateAwards(c:PoolClient,week:string|null=null){
+ await c.query(`UPDATE weekly_awards a SET cap=(current_cap.value#>>'{}')::numeric
+  FROM settings current_cap
+  WHERE current_cap.key='weeklyCap' AND ($1::date IS NULL OR a.week_start=$1)
+  AND a.cap IS DISTINCT FROM (current_cap.value#>>'{}')::numeric
+  AND NOT EXISTS(SELECT 1 FROM audit_logs log WHERE log.action='award.cap' AND log.entity_id=a.id::text)
+  AND NOT EXISTS(SELECT 1 FROM settings orders WHERE orders.key='award-order:'||a.week_start::text)
+  AND EXISTS(SELECT 1 FROM reports r WHERE r.week_start=a.week_start AND r.static_id=a.static_id
+   AND NOT EXISTS(SELECT 1 FROM settings payment WHERE payment.key='report-paid:'||r.id::text))`,[week]);
  const result=await c.query(`WITH paid AS (
    SELECT r.static_id,r.week_start,sum(i.approved_amount) AS amount
    FROM reports r JOIN report_items i ON i.report_id=r.id AND i.status='approved'

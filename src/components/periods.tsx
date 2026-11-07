@@ -24,7 +24,7 @@ export function Periods(){
   setBusy(true);setError('');setMessage('');
   try{
    const {recalculated}=await api<{recalculated:number}>('admin/periods/recalculate',{week});
-   setMessage('Перераховано позицій: '+recalculated+'.');
+   setMessage(recalculated?'Перераховано позицій: '+recalculated+'.':'Усі невиплачені позиції вже відповідають чинним ставкам і лімітам.');
   }catch(e){setError((e as Error).message);}
   finally{setBusy(false);}
  }
