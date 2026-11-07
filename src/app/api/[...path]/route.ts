@@ -8,9 +8,11 @@ import { taskReward } from '@/lib/rewards';
 import { currentWeek } from '@/lib/domain';
 import { week,staticId } from '@/lib/validation';
 import { filters,listReports,submitReport } from '@/lib/reports';
-import { saveTask,changePeriod,markReportPaid,reviewItems,deleteReportItem,adjustAward,saveSettings,savePerson,reviewClaim,linkReport,changeRole,issueRecovery } from '@/lib/admin';
+import { saveTask,changePeriod,reviewItems,deleteReportItem,adjustAward,saveSettings,savePerson,reviewClaim,linkReport,changeRole,issueRecovery } from '@/lib/admin';
 import {changeServiceWorkspace,serviceWorkspace} from '@/lib/service-workspace';
 import {serviceModules} from '@/lib/portal-navigation';
+import {finalizeAwards,recalculateAwardWeek} from '@/lib/finalize-awards';
+import {awardOrderDocx} from '@/lib/award-order-docx';
 import { updateUnitPage } from '@/lib/unit-page';
 import { assignService,savePersonalServiceDetails } from '@/lib/service-assignment';
 import { unitMatrix } from '@/lib/matrix';
@@ -32,7 +34,7 @@ export async function GET(request:Request,ctx:Context){try{
   if(path==='admin/reports')return json(await listReports(filters(url),u));
   if(path==='admin/matrix'){const f=filters(url);if(!f.unit)throw new HttpError('Оберіть підрозділ.');return json(await unitMatrix(f));}
   if(path==='admin/catalog'){const [tasks,units,ranks,settings]=await Promise.all([query('SELECT * FROM tasks ORDER BY sort_order,name'),query('SELECT * FROM units ORDER BY sort_order,name'),query('SELECT * FROM ranks ORDER BY id'),query('SELECT * FROM settings')]);const pointValue=settings.find(s=>s.key==='pointValue')?.value??null;return json({tasks:tasks.map(t=>({...t,reward:taskReward(t.points,pointValue)})),units,ranks,settings});}
-  if(path==='admin/periods')return json(await query('SELECT * FROM reporting_periods ORDER BY week_start DESC LIMIT 104'));
+  if(path==='admin/periods')return json(await query("SELECT p.*,(s.key IS NOT NULL) AS paid FROM reporting_periods p LEFT JOIN settings s ON s.key='award-order:'||p.week_start::text ORDER BY p.week_start DESC LIMIT 104"));
   if(path==='admin/personnel'){const [people,claims,users]=await Promise.all([query('SELECT p.*,u.name unit_name FROM personnel p LEFT JOIN units u ON u.id=p.unit_id ORDER BY p.rank DESC,p.last_name LIMIT 1000'),query('SELECT c.*,u.name FROM profile_claims c JOIN app_user u ON u.id=c.user_id ORDER BY c.created_at DESC LIMIT 100'),query(`SELECT u.id,u.name,u.role,p.first_name,p.last_name,p.unit_id,p.rank,p.active,n.name unit_name,k.name rank_name,d.value details,coalesce(substring(u.username from '^static_([0-9]+)$'),p.static_id,c.static_id) static_id,(p.id IS NOT NULL) linked FROM app_user u LEFT JOIN personnel p ON p.user_id=u.id LEFT JOIN units n ON n.id=p.unit_id LEFT JOIN ranks k ON k.id=p.rank LEFT JOIN settings d ON d.key='service:'||p.id::text LEFT JOIN LATERAL (SELECT static_id FROM profile_claims WHERE user_id=u.id AND status='pending' ORDER BY created_at DESC LIMIT 1) c ON true ORDER BY u.created_at DESC LIMIT 1000`)]);return json({people,claims,users});}
   if(path==='admin/audit'){const page=Math.max(1,Math.min(10000,Math.floor(Number(url.searchParams.get('page')))||1));return json(await query('SELECT a.*,u.name actor FROM audit_logs a LEFT JOIN app_user u ON u.id=a.actor_id ORDER BY created_at DESC LIMIT 50 OFFSET $1',[(page-1)*50]));}
   throw new HttpError('Сторінку не знайдено.',404);
@@ -50,8 +52,14 @@ export async function POST(request:Request,ctx:Context){try{
   if(path==='me/claims'){const u=await member(request);const p=z.object({staticId}).parse(input);return json(await transaction(async c=>{await lockStaticClaims(c);if((await c.query("SELECT id FROM profile_claims WHERE user_id=$1 AND status='pending'",[u.id])).rows.length)throw new HttpError('У вас уже є заявка на перевірці.');if((await c.query('SELECT id FROM personnel WHERE user_id=$1',[u.id])).rows.length)throw new HttpError('Ваш профіль уже прив’язаний.');await reserveStatic(c,p.staticId,u.id);return {saved:true};}));}
   if(path.startsWith('units/')&&path.split('/').length===2)return json(await updateUnitPage(path.split('/')[1],input,await member(request)));
   const u=await admin(request);
+  if(path==='admin/periods/recalculate')return json(await recalculateAwardWeek(input,u));
+  if(path==='admin/periods/pay'){
+    const order=await finalizeAwards(input,u);
+    const document=await awardOrderDocx(order);
+    return new Response(new Uint8Array(document),{headers:{'Cache-Control':'private, no-store','Content-Type':'application/vnd.openxmlformats-officedocument.wordprocessingml.document','Content-Disposition':'attachment; filename="ngu-awards-'+order.week+'.docx"'}});
+  }
   const actions:Record<string,(input:unknown)=>Promise<unknown>>={
-    'admin/tasks':i=>saveTask(i,u),'admin/periods':i=>changePeriod(i,u),'admin/review':i=>reviewItems(i,u),'admin/reports/pay':i=>markReportPaid(i,u),'admin/reports/delete-item':i=>deleteReportItem(i,u),'admin/award':i=>adjustAward(i,u),
+    'admin/tasks':i=>saveTask(i,u),'admin/periods':i=>changePeriod(i,u),'admin/review':i=>reviewItems(i,u),'admin/reports/delete-item':i=>deleteReportItem(i,u),'admin/award':i=>adjustAward(i,u),
     'admin/settings':i=>saveSettings(i,u),'admin/personnel':i=>savePerson(i,u),'admin/personnel/assign':i=>assignService(i,u),'admin/claims':i=>reviewClaim(i,u),'admin/link-report':i=>linkReport(i,u),
     'admin/roles':i=>changeRole(i,u),'admin/accounts/edit':i=>editAccount(i,u),'admin/accounts/delete':i=>deleteAccount(i,u),'admin/accounts/password':i=>issueTemporaryPassword(i,u),'admin/recovery':i=>issueRecovery(i,u),'admin/import':i=>importReports(i,u)
   };

@@ -5,6 +5,7 @@ import Decimal from 'decimal.js';
 import { z } from 'zod';
 import type { PoolClient } from 'pg';
 import { query,transaction } from '@/db';
+import {recalculateAwards} from './recalculate-awards';
 import { HttpError,hash } from './security';
 import { taskSchema,week,itemStatus,amount,staticId,personText } from './validation';
 import { normalizeName,type Viewer } from './domain';
@@ -23,31 +24,13 @@ export async function saveTask(input:unknown,u:Viewer){const p=taskSchema.parse(
   const id=p.id||randomUUID();
   const rows=await c.query(`INSERT INTO tasks(id,name,normalized_name,unit_id,points,active,sort_order,time_category,starts_at,ends_at,variant_group_id)
   VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,normalized_name=EXCLUDED.normalized_name,unit_id=EXCLUDED.unit_id,points=EXCLUDED.points,active=EXCLUDED.active,sort_order=EXCLUDED.sort_order,time_category=EXCLUDED.time_category,starts_at=EXCLUDED.starts_at,ends_at=EXCLUDED.ends_at,version=tasks.version+1 RETURNING *`,[id,p.name,normalized,p.unitId,p.points,p.active,p.sortOrder,p.timeCategory,p.startsAt,p.endsAt,group]);
-  await audit(c,u,old?'task.update':'task.create',id,old,rows.rows[0]);return rows.rows[0];
+  const recalculated=old?await recalculateAwards(c):0;
+  await audit(c,u,old?'task.update':'task.create',id,old,{...rows.rows[0],recalculated});return rows.rows[0];
 });revalidateTag('catalog',{expire:0});return result;}
-export async function changePeriod(input:unknown,u:Viewer){const p=z.object({week,open:z.boolean()}).parse(input);return transaction(async c=>{await lockAdmin(c,u);const old=(await c.query('SELECT * FROM reporting_periods WHERE week_start=$1 FOR UPDATE',[p.week])).rows[0];await c.query('INSERT INTO reporting_periods(week_start,open,updated_by) VALUES($1,$2,$3) ON CONFLICT(week_start) DO UPDATE SET open=$2,updated_by=$3,updated_at=now()',[p.week,p.open,u.id]);await audit(c,u,'period.update',p.week,old,p);return p;});}
+export async function changePeriod(input:unknown,u:Viewer){const p=z.object({week,open:z.boolean()}).parse(input);return transaction(async c=>{await lockAdmin(c,u);if(p.open&&(await c.query('SELECT 1 FROM settings WHERE key=$1',['award-order:'+p.week])).rowCount)throw new HttpError('Тиждень уже закрито наказом про виплату.',409);const old=(await c.query('SELECT * FROM reporting_periods WHERE week_start=$1 FOR UPDATE',[p.week])).rows[0];await c.query('INSERT INTO reporting_periods(week_start,open,updated_by) VALUES($1,$2,$3) ON CONFLICT(week_start) DO UPDATE SET open=$2,updated_by=$3,updated_at=now()',[p.week,p.open,u.id]);await audit(c,u,'period.update',p.week,old,p);return p;});}
 async function ensureUnpaid(c:PoolClient,reportId:string){
-  if((await c.query('SELECT 1 FROM settings WHERE key=$1',['report-paid:'+reportId])).rowCount)
+  if((await c.query("SELECT 1 FROM reports r JOIN settings s ON s.key IN ('report-paid:'||r.id::text,'award-order:'||r.week_start::text) WHERE r.id=$1",[reportId])).rowCount)
     throw new HttpError('Виплату вже зафіксовано. Звіт закрито для редагування.',409);
-}
-export async function markReportPaid(input:unknown,u:Viewer){
-  const p=z.object({reportId:z.uuid(),reason:z.string().trim().min(5).max(2000)}).parse(input);
-  return transaction(async c=>{
-    await lockAdmin(c,u);
-    const {rows:[report]}=await c.query('SELECT id FROM reports WHERE id=$1 FOR UPDATE',[p.reportId]);
-    if(!report)throw new HttpError('Звіт не знайдено.',404);
-    const key='report-paid:'+p.reportId;
-    const {rows:[existing]}=await c.query('SELECT value FROM settings WHERE key=$1',[key]);
-    if(existing)return existing.value;
-    const {rows:[totals]}=await c.query(`SELECT count(*) FILTER(WHERE status IN ('pending','clarification') OR (status='approved' AND approved_amount IS NULL))::int AS pending,
-      coalesce(sum(approved_amount) FILTER(WHERE status='approved'),0)::text AS amount
-      FROM report_items WHERE report_id=$1`,[p.reportId]);
-    if(totals.pending||!new Decimal(totals.amount).gt(0))throw new HttpError('Спочатку завершіть перевірку та погодьте суму.',409);
-    const value={amount:totals.amount,paidAt:new Date().toISOString()};
-    await c.query('INSERT INTO settings(key,value) VALUES($1,$2)',[key,JSON.stringify(value)]);
-    await audit(c,u,'report.payment',p.reportId,null,value,p.reason);
-    return value;
-  });
 }
 export async function reviewItems(input:unknown,u:Viewer){
   const p=z.object({
@@ -108,7 +91,7 @@ export async function deleteReportItem(input:unknown,u:Viewer){
   });
 }
 
-export async function adjustAward(input:unknown,u:Viewer){const p=z.object({itemId:z.string().uuid(),estimatedAmount:amount,reason:z.string().trim().min(5).max(2000)}).parse(input);return transaction(async c=>{await lockAdmin(c,u);const i=(await c.query('SELECT * FROM report_items WHERE id=$1 FOR UPDATE',[p.itemId])).rows[0];if(!i)throw new HttpError('Запис не знайдено.',404);if(i.status==='approved')throw new HttpError('Спочатку поверніть запис на перевірку, щоб повторно застосувати ліміт.');await c.query('UPDATE report_items SET estimated_amount=$1 WHERE id=$2',[p.estimatedAmount,i.id]);await audit(c,u,'award.adjust',i.id,{estimatedAmount:i.estimated_amount},{estimatedAmount:p.estimatedAmount},p.reason);return {saved:true};});}
+export async function adjustAward(input:unknown,u:Viewer){const p=z.object({itemId:z.string().uuid(),estimatedAmount:amount,reason:z.string().trim().min(5).max(2000)}).parse(input);return transaction(async c=>{await lockAdmin(c,u);const i=(await c.query('SELECT * FROM report_items WHERE id=$1 FOR UPDATE',[p.itemId])).rows[0];if(!i)throw new HttpError('Запис не знайдено.',404);await ensureUnpaid(c,i.report_id);if(i.status==='approved')throw new HttpError('Спочатку поверніть запис на перевірку, щоб повторно застосувати ліміт.');await c.query('UPDATE report_items SET estimated_amount=$1 WHERE id=$2',[p.estimatedAmount,i.id]);await audit(c,u,'award.adjust',i.id,{estimatedAmount:i.estimated_amount},{estimatedAmount:p.estimatedAmount},p.reason);return {saved:true};});}
 export async function saveSettings(input:unknown,u:Viewer){const p=z.discriminatedUnion('kind',[
   z.object({kind:z.literal('cap'),value:amount}),
   z.object({kind:z.literal('pointValue'),value:amount}),
@@ -121,7 +104,8 @@ export async function saveSettings(input:unknown,u:Viewer){const p=z.discriminat
   if(p.kind==='rank'){const old=(await c.query('SELECT * FROM ranks WHERE id=$1',[p.id])).rows[0];await c.query('INSERT INTO ranks(id,name,multiplier) VALUES($1,$2,$3) ON CONFLICT(id) DO UPDATE SET name=$2,multiplier=$3',[p.id,p.name,p.multiplier]);await audit(c,u,'rank.save',String(p.id),old,p);}
   if(p.kind==='unit'){const old=p.id?(await c.query('SELECT * FROM units WHERE id=$1',[p.id])).rows[0]:null;const id=p.id||randomUUID();await c.query('INSERT INTO units(id,name,active,sort_order) VALUES($1,$2,$3,$4) ON CONFLICT(id) DO UPDATE SET name=$2,active=$3,sort_order=$4',[id,p.name,p.active,p.sortOrder]);await audit(c,u,'unit.save',id,old,p);}
   if(p.kind==='weeklyCap'){const old=(await c.query('SELECT * FROM weekly_awards WHERE static_id=$1 AND week_start=$2 FOR UPDATE',[p.staticId,p.week])).rows[0];if(!old)throw new HttpError('Для цього ID й тижня ще немає нарахувань.');const [used]=(await c.query("SELECT coalesce(sum(i.approved_amount),0)::text AS total FROM report_items i JOIN reports r ON r.id=i.report_id WHERE r.static_id=$1 AND r.week_start=$2 AND i.status='approved'",[p.staticId,p.week])).rows;if(p.value!==null&&new Decimal(p.value).lt(used.total))throw new HttpError('Ліміт не може бути нижчим за вже підтверджену суму.');await c.query('UPDATE weekly_awards SET cap=$1 WHERE id=$2',[p.value,old.id]);await audit(c,u,'award.cap',old.id,old,p,p.reason);}
-  return {saved:true};});revalidateTag('catalog',{expire:0});return result;}
+  const recalculated=p.kind==='pointValue'||p.kind==='rank'?await recalculateAwards(c):0;
+  return {saved:true,recalculated};});revalidateTag('catalog',{expire:0});return result;}
 export async function savePerson(input:unknown,u:Viewer){const p=z.object({id:z.string().uuid().optional(),staticId,firstName:personText,lastName:personText,rank:z.number().int().min(1).max(100),unitId:z.string().uuid(),active:z.boolean()}).parse(input);return transaction(async c=>{await lockAdmin(c,u);await c.query("SELECT pg_advisory_xact_lock(hashtext('static-account-claims'))");const old=p.id?(await c.query('SELECT * FROM personnel WHERE id=$1 FOR UPDATE',[p.id])).rows[0]:null;if(old&&old.static_id!==p.staticId)throw new HttpError('Static ID існуючого профілю незмінний.');const id=p.id||randomUUID();await c.query('INSERT INTO personnel(id,static_id,first_name,last_name,rank,unit_id,active) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET first_name=$3,last_name=$4,rank=$5,unit_id=$6,active=$7',[id,p.staticId,p.firstName,p.lastName,p.rank,p.unitId,p.active]);await audit(c,u,'personnel.save',id,old,p);return {saved:true};});}
 export async function reviewClaim(input:unknown,u:Viewer){
  const p=z.object({id:z.string().uuid(),approve:z.boolean(),reason:z.string().trim().min(5).max(1000)}).parse(input);

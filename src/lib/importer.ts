@@ -36,6 +36,8 @@ export async function importReports(input:unknown,u:Viewer){
   return transaction(async c=>{
     await lockAdmin(c,u);await c.query("SELECT pg_advisory_xact_lock(hashtext('history-import'))");
     if((await c.query('SELECT id FROM import_batches WHERE digest=$1',[digest])).rows.length)return {...preview,imported:0};
+    const finalized=await c.query('SELECT 1 FROM settings WHERE key=ANY($1::text[]) LIMIT 1',[[...new Set(rows.map(row=>'award-order:'+row.week))]]);
+    if(finalized.rowCount)throw new HttpError('Імпорт містить тиждень із зафіксованою виплатою.',409);
     let count=0;
     for(const r of rows){
       if((await c.query('SELECT id FROM report_items WHERE external_id=$1',[r.externalItemId])).rows.length)continue;

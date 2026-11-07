@@ -11,7 +11,7 @@ import type { Viewer } from './domain';
 export async function submitReport(request:Request,input:unknown){
   const u=await member(request);
   const p=submitSchema.parse(input);
-  const [identity]=await query(`SELECT coalesce(p.static_id,substring(u.username from '^static_([0-9]+)
+  const [identity]=await query(`SELECT coalesce(p.static_id,substring(u.username from '^static_([0-9]+)$'),
     (SELECT static_id FROM profile_claims WHERE user_id=u.id AND status='pending' ORDER BY created_at DESC LIMIT 1)) AS static_id
     FROM app_user u LEFT JOIN personnel p ON p.user_id=u.id AND p.active WHERE u.id=$1`,[u.id]);
   if(!identity?.static_id||BigInt(identity.static_id)!==BigInt(p.staticId))throw new HttpError('Вкажіть Static ID свого акаунта.',403);
@@ -26,6 +26,7 @@ export async function submitReport(request:Request,input:unknown){
   }
   await throttle(request,'submit:'+u.id,30);
   return transaction(async c=>{
+    await c.query("SELECT pg_advisory_xact_lock_shared(hashtext('admin-access'))");
     await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[p.idempotencyKey]);
     const old=(await c.query('SELECT id,number,payload_hash,context_hash FROM reports WHERE idempotency_key=$1',[p.idempotencyKey])).rows[0];
     if(old){if(old.payload_hash!==digest||old.context_hash!==context)throw new HttpError('Конфлікт повторного подання.',409);return {reportId:old.id,number:old.number,week:p.week};}
@@ -72,13 +73,13 @@ export async function listReports(f:Filters,u:Viewer,personal=false){
     coalesce(sum(i.points) FILTER(WHERE i.status='rejected'),0)::float8 AS rejected_points
     ${!personal?",coalesce(sum(i.approved_amount) FILTER(WHERE i.status='approved' AND payment.key IS NULL),0)::text AS approved_amount,coalesce(sum(i.approved_amount) FILTER(WHERE i.status='approved' AND payment.key IS NOT NULL),0)::text AS paid_amount,coalesce(sum(i.estimated_amount) FILTER(WHERE i.status IN ('pending','clarification')),0)::text AS pending_amount,count(*) FILTER(WHERE i.estimated_amount IS NULL)::int AS unresolved_amounts":''}
     FROM reports r JOIN report_items i ON i.report_id=r.id LEFT JOIN settings payment ON payment.key='report-paid:'||r.id::text WHERE ${w.sql}`,w.values);
-  const matched=await query(`SELECT DISTINCT r.*,payment.value AS payment,
+  const matched=await query(`SELECT DISTINCT r.*,payment.value AS payment,(period_order.key IS NOT NULL OR payment.key IS NOT NULL) AS finalized,
     (SELECT sum(amount.estimated_amount)::text FROM report_items amount WHERE amount.report_id=r.id AND amount.status<>'rejected') AS estimated_total,
-    (SELECT sum(amount.approved_amount)::text FROM report_items amount WHERE amount.report_id=r.id AND amount.status='approved') AS approved_total FROM reports r JOIN report_items i ON i.report_id=r.id LEFT JOIN settings payment ON payment.key='report-paid:'||r.id::text WHERE ${w.sql} ORDER BY r.submitted_at DESC,r.id DESC LIMIT 20 OFFSET $${w.values.length+1}`,[...w.values,(f.page-1)*20]);
+    (SELECT sum(amount.approved_amount)::text FROM report_items amount WHERE amount.report_id=r.id AND amount.status='approved') AS approved_total FROM reports r JOIN report_items i ON i.report_id=r.id LEFT JOIN settings payment ON payment.key='report-paid:'||r.id::text LEFT JOIN settings period_order ON period_order.key='award-order:'||r.week_start::text WHERE ${w.sql} ORDER BY r.submitted_at DESC,r.id DESC LIMIT 20 OFFSET $${w.values.length+1}`,[...w.values,(f.page-1)*20]);
   const ids=matched.map(r=>r.id);
   const items=ids.length?await query(`SELECT i.id,i.report_id,i.task_id,i.task_name,i.quantity,coalesce((SELECT (a.before->>'quantity')::int FROM audit_logs a WHERE a.action='report.review' AND a.entity_id=i.id::text AND a.before ? 'quantity' ORDER BY a.created_at,a.id LIMIT 1),i.quantity) AS submitted_quantity,i.points,i.time_category,i.starts_at,i.ends_at,i.status,i.reason,i.legacy_description,
       coalesce((SELECT json_agg(e.url ORDER BY e.sort_order) FROM evidence_links e WHERE e.item_id=i.id),'[]') AS evidence_urls
       ,i.approved_amount ${!personal?',i.reward_rate,i.rank_multiplier,i.estimated_amount':''}
       FROM report_items i WHERE i.report_id=ANY($1::uuid[]) ORDER BY i.id`,[ids]):[];
-  return {profile:personal&&profile?{staticId:profile.static_id,firstName:profile.first_name,lastName:profile.last_name}:undefined,metrics,total:metrics.reports,reports:matched.map(r=>({id:r.id,number:r.number,week:r.week_start,submittedAt:r.submitted_at,staticId:r.static_id,firstName:r.first_name,lastName:r.last_name,rank:r.rank,unit:r.unit_name,personnelId:r.personnel_id,payment:r.payment,estimatedTotal:r.estimated_total,approvedTotal:r.approved_total,status:reportStatus(items.filter(i=>i.report_id===r.id).map(i=>i.status)),items:items.filter(i=>i.report_id===r.id)})),updatedAt:new Date().toISOString()};
+  return {profile:personal&&profile?{staticId:profile.static_id,firstName:profile.first_name,lastName:profile.last_name}:undefined,metrics,total:metrics.reports,reports:matched.map(r=>({id:r.id,number:r.number,week:r.week_start,submittedAt:r.submitted_at,staticId:r.static_id,firstName:r.first_name,lastName:r.last_name,rank:r.rank,unit:r.unit_name,personnelId:r.personnel_id,payment:r.payment,finalized:r.finalized,estimatedTotal:r.estimated_total,approvedTotal:r.approved_total,status:reportStatus(items.filter(i=>i.report_id===r.id).map(i=>i.status)),items:items.filter(i=>i.report_id===r.id)})),updatedAt:new Date().toISOString()};
 }
