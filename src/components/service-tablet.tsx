@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import {Award, CalendarDays, ChevronRight, ClipboardList, Layers3, Shield, Target, Users} from 'lucide-react';
+import {Award, CalendarDays, ClipboardList, Layers3, Shield, Target, Users} from 'lucide-react';
 import {query} from '@/db';
 import type {Viewer} from '@/lib/domain';
 
@@ -77,10 +77,8 @@ export async function ServiceTablet({user}:{user:Viewer}){
     <Icon size={19} aria-hidden="true"/><dt>{label}</dt><dd>{number(value)}</dd>
    </div>)}</dl>
   </section>}
-  <div className="service-actions">
-   {card?.active&&card.commander&&<Link className="button secondary" href="/my-unit"><Users size={17}/>Мій підрозділ</Link>}
-   <Link className="button" href="/weekly-bonus/report"><ClipboardList size={17} aria-hidden="true"/>Подати звіт</Link>
-   {totals&&<a className="button secondary" href="#service-reports">Історія звітів<ChevronRight size={17} aria-hidden="true"/></a>}
-  </div>
+  {card?.active&&card.commander&&<div className="service-actions">
+   <Link className="button secondary" href="/my-unit"><Users size={17} aria-hidden="true"/>Мій підрозділ</Link>
+  </div>}
  </section>;
 }
