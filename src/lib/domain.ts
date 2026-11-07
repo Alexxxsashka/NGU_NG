@@ -8,4 +8,4 @@ export function normalizeName(name:string){return name.trim().replace(/\s+/g,' '
 export function reportStatus(statuses:string[]){const values=new Set(statuses);return values.size===1?statuses[0]:'partial';}
 export type PublicTask={id:string;name:string;unitId:string|null;points:number;version:number;timeCategory:string;startsAt:string|null;endsAt:string|null};
 export type Catalog={tasks:PublicTask[];units:{id:string;name:string}[];ranks:{id:number;name:string}[];week:string;open:boolean};
-export type Viewer={id:string;name:string;email:string;username:string|null;role:string};
+export type Viewer={id:string;name:string;email:string;username:string|null;role:string;mustChangePassword:boolean};

@@ -20,7 +20,7 @@ export async function readBody(request:Request,max=100_000):Promise<unknown>{
   while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>max){await reader.cancel();throw new HttpError('Запит завеликий.',413);}chunks.push(value);}
   try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw new HttpError('Некоректні дані запиту.');}
 }
-export async function member(request:Request){const u=await viewer(request.headers);if(!u)throw new HttpError('Увійдіть у свій обліковий запис.',401);return u;}
+export async function member(request:Request){const u=await viewer(request.headers);if(!u)throw new HttpError('Увійдіть у свій обліковий запис.',401);if(u.mustChangePassword)throw new HttpError('Змініть тимчасовий пароль в особистому кабінеті.',403);return u;}
 export async function admin(request:Request){const u=await member(request);if(u.role!=='admin')throw new HttpError('Доступ лише для адміністратора.',403);return u;}
 export async function throttle(request:Request,bucket:string,max=12,seconds=3600){
   const secret=process.env.AUTH_SECRET;if(!secret)throw new HttpError('Сервіс ще не налаштовано.',503);

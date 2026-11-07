@@ -22,6 +22,13 @@
       "when": 1794007286240,
       "tag": "0002_stormy_spyke",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794054370413,
+      "tag": "0003_salty_squirrel_girl",
+      "breakpoints": true
     }
   ]
 }
