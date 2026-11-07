@@ -208,3 +208,14 @@ dialog::backdrop {background:#05080bbc}
 .service-reports { scroll-margin-top: 90px; }
 .service-reports > summary { cursor: pointer; color: var(--gold); font-weight: 700; }
 .service-reports[open] > summary { margin-bottom: 14px; }
+
+.unit-card.unit-poster { padding: 0; overflow: hidden; }
+.unit-poster-art { position: relative; aspect-ratio: 16 / 9; background: var(--paper); }
+.unit-poster-art img { object-fit: cover; }
+.unit-poster-fallback { display: grid; place-items: center; }
+.unit-poster-caption { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 16px 18px; border-top: 1px solid var(--line); }
+.unit-poster-caption h2 { margin: 0; font-size: clamp(17px, 2vw, 23px); }
+.unit-poster-caption p { margin: 4px 0 0; max-width: none; }
+.unit-poster-caption svg { color: var(--gold); }
+.unit-card.unit-poster:hover { border-color: var(--gold); }
+@media (max-width: 520px) { .unit-grid:has(.unit-poster) { grid-template-columns: 1fr; } }
