@@ -12,6 +12,9 @@ type ServiceCard={
  rank_name:string|null;
  rank:number|null;
  active:boolean;
+ joined_on:string|null;
+ position:string|null;
+ commander:boolean;
  reports:string;
  approved_quantity:string;
  approved_points:string;
@@ -21,10 +24,13 @@ type ServiceCard={
 export async function ServiceTablet({user}:{user:Viewer}){
  const [card]=await query<ServiceCard>(`
   SELECT p.static_id,p.first_name,p.last_name,p.active,p.rank,u.name AS unit_name,k.name AS rank_name,
+         details.value->>'joinedOn' AS joined_on,details.value->>'position' AS position,
+         coalesce(details.value->>'commanderUnitId'=p.unit_id::text,false) AND coalesce(u.active,false) AS commander,
          totals.reports,totals.approved_quantity,totals.approved_points,totals.pending_items
   FROM personnel p
   LEFT JOIN units u ON u.id=p.unit_id
   LEFT JOIN ranks k ON k.id=p.rank
+  LEFT JOIN settings details ON details.key='service:'||p.id::text
   CROSS JOIN LATERAL (
    SELECT count(DISTINCT r.id)::text AS reports,
     coalesce(sum(i.quantity) FILTER (WHERE i.status='approved'),0)::text AS approved_quantity,
@@ -36,10 +42,13 @@ export async function ServiceTablet({user}:{user:Viewer}){
   WHERE p.user_id=$1
  `,[user.id]);
  const number=(value:string)=>BigInt(value).toLocaleString('uk-UA');
+ const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Kyiv'}).format(new Date());
+ const days=card?.joined_on&&card.active?Math.max(0,Math.round((Date.parse(today)-Date.parse(card.joined_on))/86400000)):null;
  const facts=[
   {label:'Звання',value:card?.rank_name??(card?.rank!=null?String(card.rank):'Не призначено'),icon:Shield},
   {label:'Підрозділ',value:card?.unit_name??'Не призначено',icon:Users},
-  {label:'Днів у фракції',value:'Немає дати вступу',icon:CalendarDays},
+  {label:'Посада',value:card?.position||'Не призначено',icon:Layers3},
+  {label:'Днів у фракції',value:days===null?'—':days.toLocaleString('uk-UA'),icon:CalendarDays},
  ];
  const totals=card?.active?[
   {label:'Подані звіти',value:card.reports,icon:ClipboardList},
@@ -69,6 +78,7 @@ export async function ServiceTablet({user}:{user:Viewer}){
    </div>)}</dl>
   </section>}
   <div className="service-actions">
+   {card?.active&&card.commander&&<Link className="button secondary" href="/my-unit"><Users size={17}/>Мій підрозділ</Link>}
    <Link className="button" href="/weekly-bonus/report"><ClipboardList size={17} aria-hidden="true"/>Подати звіт</Link>
    {totals&&<a className="button secondary" href="#service-reports">Історія звітів<ChevronRight size={17} aria-hidden="true"/></a>}
   </div>
