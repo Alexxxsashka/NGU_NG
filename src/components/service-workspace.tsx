@@ -28,12 +28,12 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
   visitedEntry.current=focus;
  },[data,focus]);
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[failure,setFailure]=useState('');
- async function save(event:FormEvent<HTMLFormElement>,make:(fields:FormData)=>unknown){
+ async function save(event:FormEvent<HTMLFormElement>,make:(fields:FormData)=>unknown,onSuccess?:()=>void){
   event.preventDefault();
   const form=event.currentTarget;
   const payload=make(new FormData(form));
   setBusy(true);setMessage('');setFailure('');
-  try{await api('service',payload);form.reset();await refresh();setMessage('Зміни збережено.');}
+  try{await api('service',payload);form.reset();onSuccess?.();await refresh();setMessage('Зміни збережено.');}
   catch(e){setFailure((e as Error).message);}
   finally{setBusy(false);}
  }
@@ -41,6 +41,8 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
  const [correctionField,setCorrectionField]=useState('joinedOn');
  const [saveDraft,setSaveDraft]=useState(false);
  const [requestType,setRequestType]=useState('Переведення');
+ const [draftId,setDraftId]=useState('');
+ const draftRequest=data?.drafts.find(draft=>draft.id===draftId)?.request;
  const [requestFilter,setRequestFilter]=useState('');
  const [documentSearch,setDocumentSearch]=useState(''),[category,setCategory]=useState(''),[archive,setArchive]=useState(false);
  const categories=[...new Set(data?.entries.map(entry=>entry.category||'Без категорії'))].sort();
@@ -74,12 +76,12 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
     <button disabled={busy}>Зберегти умови</button>
    </form>
   </details>}
-  {data&&((module==='requests'&&!unitId)||(module!=='requests'&&editors.length>0))&&<details className="account-action profile-action">
-   <IllustratedSummary title={actions[module]} image={'/portal-art/catalog/'+artwork[module]+'.webp'}/>
-   <form className="stack account-action-content" onSubmit={e=>void save(e,f=>module==='requests'?
-    {kind:'request',draft:f.has('saveDraft'),type:f.get('type'),body:f.get('body'),correction:f.has('correctionValue')?{field:f.get('correctionField'),value:f.get('correctionValue')}:undefined,post:f.get('post')||undefined,replacement:f.get('replacement')||undefined,targetUnit:f.get('targetUnit')||undefined,from:f.get('from')||undefined,to:f.get('to')||undefined,links:evidenceLines(String(f.get('links')??''))}:
+  {data&&((module==='requests'&&!unitId)||(module!=='requests'&&editors.length>0))&&<details className="account-action profile-action" open={draftId?true:undefined}>
+   <IllustratedSummary title={draftId?'Редагувати чернетку рапорту':actions[module]} image={'/portal-art/catalog/'+artwork[module]+'.webp'}/>
+   <form key={draftId} className="stack account-action-content" onSubmit={e=>void save(e,f=>module==='requests'?
+    {kind:'request',draft:!!draftId||f.has('saveDraft'),draftId:draftId||undefined,type:f.get('type'),body:f.get('body'),correction:f.has('correctionValue')?{field:f.get('correctionField'),value:f.get('correctionValue')}:undefined,post:f.get('post')||undefined,replacement:f.get('replacement')||undefined,targetUnit:f.get('targetUnit')||undefined,from:f.get('from')||undefined,to:f.get('to')||undefined,links:evidenceLines(String(f.get('links')??''))}:
     {kind:'publish',module,unit:f.get('unit'),title:f.get('title'),body:f.get('body'),
-     date:f.get('date')||undefined,url:f.get('url')||undefined,revision:f.get('revision')||undefined,category:f.get('category')||undefined,replaces:f.get('replaces')||undefined,draft:f.has('draft'),requiresProof:f.has('requiresProof'),responsible:f.get('responsible')||undefined})}>
+     date:f.get('date')||undefined,url:f.get('url')||undefined,revision:f.get('revision')||undefined,category:f.get('category')||undefined,replaces:f.get('replaces')||undefined,draft:f.has('draft'),requiresProof:f.has('requiresProof'),responsible:f.get('responsible')||undefined},()=>{setDraftId('');setSaveDraft(false);})}>
     {module==='requests'?<>
      <fieldset className="request-types">
       <legend>Тип заявки</legend>
@@ -90,15 +92,15 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
        </label>)}
       </div>
      </fieldset>
-     {['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(requestType)&&<Field label="Бажаний підрозділ"><select name="targetUnit" required onChange={event=>setRecruitmentUnit(event.target.value)}><option value="">Оберіть підрозділ</option>{data.targets.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>}
+     {['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(requestType)&&<Field label="Бажаний підрозділ"><select name="targetUnit" defaultValue={draftRequest?.targetUnit} required onChange={event=>setRecruitmentUnit(event.target.value)}><option value="">Оберіть підрозділ</option>{data.targets.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>}
      {requestType==='Вступ до підрозділу'&&<p style={{whiteSpace:'pre-line'}}>{data.targets.find(unit=>unit.id===recruitmentUnit)?.rules}</p>}
-     {['Відпустка','IC-відгул','OOC-відпустка'].includes(requestType)&&<div className="form-grid"><Field label="Від"><input name="from" type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field><Field label="До"><input name="to" type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field></div>}
+     {['Відпустка','IC-відгул','OOC-відпустка'].includes(requestType)&&<div className="form-grid"><Field label="Від"><input name="from" defaultValue={draftRequest?.from} type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field><Field label="До"><input name="to" defaultValue={draftRequest?.to} type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field></div>}
      {requestType==='Виправлення особової справи'&&<div className="form-grid">
       <Field label="Поле"><select name="correctionField" value={correctionField} onChange={event=>setCorrectionField(event.target.value)}><option value="joinedOn">Дата вступу</option><option value="callsign">Позивний</option></select></Field>
-      <Field label="Нове значення"><input key={correctionField} name="correctionValue" type={correctionField==='joinedOn'?'date':'text'} required maxLength={40}/></Field>
+      <Field label="Нове значення"><input key={correctionField} name="correctionValue" defaultValue={draftRequest?.correction?.field===correctionField?draftRequest.correction.value:undefined} type={correctionField==='joinedOn'?'date':'text'} required maxLength={40}/></Field>
      </div>}
-     {requestType==='IC-відгул'&&<div className="form-grid"><Field label="Пост або службове завдання"><input name="post" required maxLength={160}/></Field><Field label="Хто замінить на посту, якщо потрібно"><input name="replacement" maxLength={160}/></Field></div>}
-     <Field label="Докази"><textarea name="links" placeholder="Одне HTTPS-посилання на рядок"/></Field>
+     {requestType==='IC-відгул'&&<div className="form-grid"><Field label="Пост або службове завдання"><input name="post" defaultValue={draftRequest?.post} required maxLength={160}/></Field><Field label="Хто замінить на посту, якщо потрібно"><input name="replacement" defaultValue={draftRequest?.replacement} maxLength={160}/></Field></div>}
+     <Field label="Докази"><textarea name="links" defaultValue={draftRequest?.links.join('\n')} placeholder="Одне HTTPS-посилання на рядок"/></Field>
     </>:<>
      <Field label="Підрозділ"><select name="unit">{editors.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>
      <Field label="Заголовок"><input name="title" maxLength={120} required/></Field>
@@ -117,9 +119,9 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
       <Field label="Посилання HTTPS"><input type="url" name="url"/></Field>
      </>}
     </>}
-    {module==='requests'&&<label className="checkbox"><input type="checkbox" name="saveDraft" checked={saveDraft} onChange={event=>setSaveDraft(event.target.checked)}/>Зберегти як приватну чернетку</label>}
-    <Field label={module==='requests'?(requestType==='OOC-відпустка'?'Причина за бажанням':'Підстава'):'Текст або опис'}><textarea name="body" rows={4} maxLength={5000} required={module!=='requests'||(!saveDraft&&requestType!=='OOC-відпустка')}/></Field>
-    <button disabled={busy}>{module==='requests'?'Подати заявку':'Опублікувати'}</button>
+    {module==='requests'&&!draftId&&<label className="checkbox"><input type="checkbox" name="saveDraft" checked={saveDraft} onChange={event=>setSaveDraft(event.target.checked)}/>Зберегти як приватну чернетку</label>}
+    <Field label={module==='requests'?(requestType==='OOC-відпустка'?'Причина за бажанням':'Підстава'):'Текст або опис'}><textarea name="body" defaultValue={draftRequest?.body} rows={4} maxLength={5000} required={module!=='requests'||(!saveDraft&&requestType!=='OOC-відпустка')}/></Field>
+    <button disabled={busy}>{draftId||saveDraft?'Зберегти чернетку':module==='requests'?'Подати заявку':'Опублікувати'}</button>
    </form>
   </details>}
   {module==='regulations'&&data&&<div className="filters">
@@ -132,6 +134,10 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
    {data.drafts.map(draft=><article key={draft.id} className="audit-row"><strong>{draft.title}</strong><p>{draft.body}</p>
     <form onSubmit={event=>{if((event.nativeEvent as SubmitEvent).submitter?.getAttribute('data-action')==='delete'){if(confirm('Видалити чернетку?'))void save(event,()=>({kind:'delete-draft',id:draft.id}));else event.preventDefault();return;}if(confirm('Подати цю чернетку на розгляд?'))void save(event,()=>({kind:'request',draftId:draft.id,type:draft.title,body:draft.body}));else event.preventDefault();}}>
      <div className="actions"><button disabled={busy}>Подати рапорт</button>
+      <button type="button" className="secondary" disabled={busy} onClick={()=>{
+       setDraftId(draft.id);setSaveDraft(true);setRequestType(draft.request.type);
+       setRecruitmentUnit(draft.request.targetUnit??'');setCorrectionField(draft.request.correction?.field??'joinedOn');
+      }}>Редагувати</button>
       <button type="submit" data-action="delete" className="secondary" disabled={busy}>Видалити чернетку</button></div>
     </form>
    </article>)}

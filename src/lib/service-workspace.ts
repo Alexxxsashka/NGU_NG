@@ -40,6 +40,7 @@ const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('result'),id:uuid,member:z.string().min(1).max(100),status:z.enum(['passed','retry']),note:z.string().trim().max(2000).optional()}),
 ]);
 
+type ServiceDraft={id:string;title:string;body:string;request:Extract<z.infer<typeof operation>,{kind:'request'}>};
 type Entry={
  id:string;module:ServiceModule;unit:string|null;author:string;name:string;title:string;body:string;createdAt:string;
  correction?:z.infer<typeof correction>&{previous:string|null;profileId:string};orderId?:string;reportId?:string;
@@ -89,7 +90,7 @@ export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:s
    AND left(value->>'to',10)>=to_char(now() AT TIME ZONE 'Europe/Kyiv','YYYY-MM-DD')
    ORDER BY value->>'from',key LIMIT 100`,[readUnits,absenceTypes]):[],
   module==='requests'&&unitId?query<{id:number;name:string}>('SELECT id,name FROM ranks ORDER BY id'):[],
-  module==='requests'&&!unitId?query<{value:{id:string;title:string;body:string}}>(`SELECT value FROM settings WHERE key LIKE 'service-draft:%'
+  module==='requests'&&!unitId?query<{value:ServiceDraft}>(`SELECT value FROM settings WHERE key LIKE 'service-draft:%'
    AND value->>'author'=$1 ORDER BY value->>'at' DESC LIMIT 50`,[actor.id]):[],
  ]);
  return {units,entries:rows.map(({value})=>value),people,results:results.map(({value})=>value),trainingUnit,absences,drafts:drafts.map(row=>row.value),targets:targets.map(unit=>({...unit,rules:unit.rules??defaultRecruitment(unit.name)})),ranks,attendance:attendance.map(row=>row.value),memberUnit:personalUnit,canTransfer:actor.role==='admin'||authority.length>0,actorId:actor.id,admin:actor.role==='admin'};
@@ -112,12 +113,14 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
   if(action.kind==='request'&&action.draftId){
    const {rows:[stored]}=await c.query('SELECT value FROM settings WHERE key=$1 FOR UPDATE',['service-draft:'+action.draftId]);
    if(!stored||stored.value.author!==actor.id)throw new HttpError('Чернетка недоступна.',404);
-   const draft=operation.parse({...stored.value.request,kind:'request',draft:false,draftId:action.draftId});
-   if(draft.kind!=='request')throw new HttpError('Некоректна чернетка.',409);
-   action=draft;
+   if(!action.draft){
+    const draft=operation.parse({...stored.value.request,kind:'request',draft:false,draftId:action.draftId});
+    if(draft.kind!=='request')throw new HttpError('Некоректна чернетка.',409);
+    action=draft;
+   }
   }
   if(action.kind==='request'&&action.draft){
-   const id=randomUUID();
+   const id=action.draftId??randomUUID();
    await write('service-draft:'+id,{id,author:actor.id,title:action.type,body:action.body,request:action,at:new Date().toISOString()});
    return {saved:true};
   }
