@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import type {serviceWorkspace} from '@/lib/service-workspace';
@@ -54,6 +55,10 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
   <header className="portal-preview-header" data-portal-art={module}><h1>{labels[module]}</h1></header>
   {error&&<Notice error>{error} <button className="text-button" onClick={refresh}>Повторити</button></Notice>}
   {failure&&<Notice error>{failure}</Notice>}{message&&<Notice>{message}</Notice>}
+  {(module==='requests'||module==='orders')&&<nav className="workspace-switch" aria-label="Реєстр рапортів і наказів"><div className="actions">
+   <Link className="button secondary" href={(unitId?'/command/'+unitId:'/portal')+'/requests'} aria-current={module==='requests'?'page':undefined}>Рапорти й заявки</Link>
+   <Link className="button secondary" href={(unitId?'/command/'+unitId:'/portal')+'/orders'} aria-current={module==='orders'?'page':undefined}>Накази</Link>
+  </div></nav>}
   {!data&&!error&&<Loading/>}
   {module==='calendar'&&data&&<section className="panel">
    <h2>Погоджені відсутності</h2>
@@ -181,7 +186,8 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
       <button disabled={busy}>Зберегти рішення</button>
      </form>}
     {entry.title==='Переведення'&&<p>Поточний підрозділ: {entry.transferApprovals?.source?.name??'очікує погодження'} · Підрозділ призначення: {entry.transferApprovals?.destination?.name??'очікує погодження'}</p>}
-    {entry.orderId&&<p>Наказ сформовано · {entry.orderId}</p>}
+    {entry.orderId&&<p><Link href={(unitId?'/command/'+(entry.targetUnit??entry.unit??unitId):'/portal')+'/orders?'+new URLSearchParams({entry:entry.orderId})}>Відкрити пов’язаний наказ</Link></p>}
+    {entry.reportId&&unitId&&<p><Link href={(unitId?'/command/'+unitId:'/portal')+'/requests?'+new URLSearchParams({entry:entry.reportId})}>Відкрити пов’язаний рапорт</Link></p>}
     {entry.appliedAt&&<p className="pill approved">Рішення застосовано</p>}
     {unitId&&entry.author!==data.actorId&&entry.status==='approved'&&!entry.appliedAt&&
      ((entry.title==='Вступ або поновлення'&&canEdit(entry.targetUnit))||(['Відпустка','Звільнення'].includes(entry.title)&&canEdit(entry.unit)))&&

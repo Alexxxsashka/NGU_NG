@@ -80,7 +80,7 @@ export async function CommandWorkspace({actor,unitId,section,filters}:{actor:Vie
   {section==='audit'&&<PersonnelWorkflow key={root+'/audit'} unitId={unit.id} mode="audit"/>}
   {section==='promotion-decisions'&&<PersonnelWorkflow key={root+'/promotion-decisions'} unitId={unit.id} mode="review" focus={filters.entry}/>}
   {(section==='review'||section==='catalog')&&<PromotionPoints key={root+'/'+section} unitId={unit.id} mode={section} focus={filters.entry}/>}
-  {(section==='requests'||section==='calendar'||section==='training'||section==='documents')&&
+  {(section==='requests'||section==='orders'||section==='calendar'||section==='training'||section==='documents')&&
    <ServiceWorkspace key={root+'/'+section} unitId={unit.id} focus={filters.entry} module={section==='documents'?'regulations':section}/>}
  </>;
 }

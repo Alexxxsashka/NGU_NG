@@ -3,6 +3,7 @@ export const commandSections=[
  ['overview','Огляд підрозділу','home/command'],
  ['content','Редактор сторінки','unit-actions/info'],
  ['roster','Керування складом','unit-actions/access'],
+ ['orders','Службові накази','catalog/approval'],
  ['requests','Черга заявок','cabinet/requests'],
  ['review','Перевірка звітів на підвищення','unit-actions/rank'],
  ['promotion-decisions','Рішення щодо нового звання','unit-actions/rank'],

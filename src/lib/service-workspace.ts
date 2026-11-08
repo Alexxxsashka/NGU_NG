@@ -67,7 +67,10 @@ export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:s
  const editors=units.filter(unit=>unit.editor).map(unit=>unit.id);
  const [rows,people,results,targets,attendance,authority,absences,ranks,drafts]=await Promise.all([
   query<{value:Entry}>(`SELECT value FROM settings WHERE key LIKE 'service-entry:%' AND value->>'module'=$1
-   AND (($5::boolean AND $1='requests' AND value->>'author'=$2) OR value->>'unit'=ANY($3::text[]) OR value->>'targetUnit'=ANY($4::text[]) OR ($5::boolean AND $1='training' AND EXISTS(SELECT 1 FROM personnel WHERE user_id=$2 AND active) AND EXISTS(
+   AND (($5::boolean AND $1='requests' AND value->>'author'=$2) OR value->>'unit'=ANY($3::text[]) OR value->>'targetUnit'=ANY($4::text[]) OR ($5::boolean AND $1='orders' AND EXISTS(
+    SELECT 1 FROM settings report WHERE report.key='service-entry:'||(settings.value->>'reportId')
+     AND report.value->>'author'=$2))
+   OR ($5::boolean AND $1='training' AND EXISTS(SELECT 1 FROM personnel WHERE user_id=$2 AND active) AND EXISTS(
     SELECT 1 FROM settings enrollment WHERE enrollment.key='service-result:'||(settings.value->>'id')||':'||$2)))
    AND ($7::boolean OR coalesce(value->>'draft','false')='false')
    AND (coalesce(value->>'archived','false')='false' OR ($1='regulations' AND value->>'unit'=ANY($3::text[]))) ORDER BY (value->>'id'=$6) DESC NULLS LAST, CASE WHEN $1='calendar' THEN value->>'date' END ASC, value->>'createdAt' DESC LIMIT 200`,
