@@ -1,3 +1,4 @@
+import {checkPromotion} from './promotion-limit';
 import 'server-only';
 import {z} from 'zod';
 import {query,transaction} from '@/db';
@@ -36,6 +37,7 @@ export async function assignService(input:unknown,actor:Viewer){
    throw new HttpError('Static ID вже належить іншому кадровому профілю.',409);
   }
   if(p.unitId&&!(await c.query('SELECT 1 FROM units WHERE id=$1 AND active',[p.unitId])).rowCount)throw new HttpError('Оберіть активний підрозділ.');
+  if(previous?.rank&&p.rank&&p.rank>previous.rank)await checkPromotion(c,previous.id,previous.rank,p.rank);
   const staticId=previous?.static_id??staticAccountKey(account.static_id).slice(7);
   const values=[staticId,p.firstName,p.lastName,p.unitId,p.rank,p.userId];
   const {rows:[profile]}=await c.query(`

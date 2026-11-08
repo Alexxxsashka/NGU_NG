@@ -1,3 +1,4 @@
+import {checkPromotion} from './promotion-limit';
 import 'server-only';
 import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
@@ -108,6 +109,7 @@ export async function updateUnitPage(unitId:string,input:unknown,actor:Viewer){
    if(!target)throw new HttpError('Редагувати можна лише бійця цього підрозділу без командної ролі.',403);
    if(action.rank!==null&&action.rank>=11)throw new HttpError('Керівні звання призначаються через кадрове адміністрування.',403);
    if(action.rank!==null&&!(await c.query('SELECT 1 FROM ranks WHERE id=$1',[action.rank])).rowCount)throw new HttpError('Звання не знайдено.');
+   if(target.rank&&action.rank&&action.rank>target.rank)await checkPromotion(c,target.id,target.rank,action.rank);
    const details={...target.details,position:action.position};
    await c.query('UPDATE personnel SET rank=$1 WHERE id=$2',[action.rank,target.id]);
    await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=excluded.value',['service:'+target.id,JSON.stringify(details)]);

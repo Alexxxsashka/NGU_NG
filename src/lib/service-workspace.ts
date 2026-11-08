@@ -14,9 +14,9 @@ const moduleSchema=z.enum(serviceModules);
 const title=z.string().trim().min(1).max(120);
 const body=z.string().trim().min(1).max(5000);
 const uuid=z.string().uuid();
-const requestTypes=['Переведення','Відпустка','Вступ або поновлення','Звільнення або оскарження','Звільнення','Виправлення особової справи'] as const;
+const requestTypes=['Переведення','Вступ до підрозділу','IC-відгул','OOC-відпустка','Відпустка','Вступ або поновлення','Звільнення або оскарження','Звільнення','Виправлення особової справи'] as const;
 const operation=z.discriminatedUnion('kind',[
- z.object({kind:z.literal('request'),type:z.enum(requestTypes),body,targetUnit:uuid.optional(),from:z.iso.date().optional(),to:z.iso.date().optional(),links:z.array(evidence).max(20).default([])}),
+ z.object({kind:z.literal('request'),type:z.enum(requestTypes),body,targetUnit:uuid.optional(),from:z.union([z.iso.date(),z.iso.datetime({local:true})]).optional(),to:z.union([z.iso.date(),z.iso.datetime({local:true})]).optional(),links:z.array(evidence).max(20).default([])}),
  z.object({kind:z.literal('decide'),id:uuid,status:z.enum(['approved','rejected','clarification']),body}),
  z.object({kind:z.literal('publish'),module:moduleSchema.exclude(['requests']),unit:uuid,title,body,
   url:z.url({protocol:/^https$/}).max(2048).refine(value=>{const link=new URL(value);return !link.username&&!link.password;}).optional(),date:z.iso.date().optional(),revision:title.optional(),category:title.optional(),replaces:uuid.optional(),draft:z.boolean().optional(),requiresProof:z.boolean().optional(),responsible:title.optional()}),
@@ -86,10 +86,21 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
   if(action.kind==='request'||action.kind==='publish'){
    if(action.kind==='publish'&&action.module==='training'&&action.unit!==trainingUnit?.id)throw new HttpError('Програмою КМБ керує НЦП.',403);
    if(action.kind==='publish'&&!editors.has(action.unit))throw new HttpError('Ви не керуєте цим підрозділом.',403);
-   if(action.kind==='request'&&action.type==='Переведення'&&(!action.targetUnit||action.targetUnit===account.unit_id||
+   if(action.kind==='request'&&['Переведення','Вступ до підрозділу'].includes(action.type)&&(!action.targetUnit||action.targetUnit===account.unit_id||
      !(await c.query('SELECT id FROM units WHERE id=$1 AND active',[action.targetUnit])).rowCount))throw new HttpError('Оберіть інший чинний підрозділ.');
    if(action.kind==='request'){
-    if(action.type==='Відпустка'&&(!action.from||!action.to||action.from>action.to))throw new HttpError('Вкажіть коректні дати відпустки.');
+    if(action.type==='Вступ до підрозділу'){
+     if(!account.id)throw new HttpError('Для вступу потрібен активний кадровий профіль.',403);
+     if((await c.query(`SELECT 1 FROM settings WHERE key LIKE 'service-entry:%'
+      AND value->>'title'='Вступ до підрозділу' AND value->>'author'=$1 AND value->>'targetUnit'=$2
+      AND value->>'status' IN ('pending','clarification','approved') LIMIT 1`,[actor.id,action.targetUnit])).rowCount)
+      throw new HttpError('Заявка до цього підрозділу вже існує.',409);
+    }
+    if(action.type==='IC-відгул'){
+     const minutes=(Date.parse(action.to+'Z')-Date.parse(action.from+'Z'))/60000;
+     if(!action.from?.includes('T')||!action.to?.includes('T')||!(minutes>0&&minutes<=120))throw new HttpError('Відгул має тривати від 1 хвилини до 2 годин.');
+    }
+    if(['Відпустка','OOC-відпустка'].includes(action.type)&&(!action.from||!action.to||action.from.includes('T')||action.to.includes('T')||action.from>action.to))throw new HttpError('Вкажіть коректні дати відпустки.');
     if(action.type==='Вступ або поновлення'&&(!action.targetUnit||!(await c.query('SELECT 1 FROM units WHERE id=$1 AND active',[action.targetUnit])).rowCount))
      throw new HttpError('Оберіть підрозділ для вступу.');
    }
@@ -106,9 +117,9 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    const previousUnit=action.kind==='request'&&action.type==='Вступ або поновлення'&&!account.unit_id?
     (await c.query<{unit_id:string|null}>('SELECT unit_id FROM personnel WHERE user_id=$1',[actor.id])).rows[0]?.unit_id:null;
    const id=randomUUID();
-   const entry:Entry={id,module:action.kind==='request'?'requests':action.module,unit:action.kind==='request'?account.unit_id??previousUnit??null:action.unit,
+   const entry:Entry={id,module:action.kind==='request'?'requests':action.module,unit:action.kind==='request'?(action.type==='Вступ до підрозділу'?null:account.unit_id??previousUnit??null):action.unit,
     author:actor.id,name:actor.name,title:action.kind==='request'?action.type:action.title,body:action.body,createdAt:new Date().toISOString(),
-    ...(action.kind==='request'?{status:'pending' as const,targetUnit:['Переведення','Вступ або поновлення'].includes(action.type)?action.targetUnit:undefined,from:action.from,to:action.to,links:action.links}:{url:action.url,date:action.date,revision:action.revision,category:action.category,replaces:action.replaces,draft:action.draft,requiresProof:action.requiresProof,responsible:action.responsible})};
+    ...(action.kind==='request'?{status:'pending' as const,targetUnit:['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(action.type)?action.targetUnit:undefined,from:action.from,to:action.to,links:action.links}:{url:action.url,date:action.date,revision:action.revision,category:action.category,replaces:action.replaces,draft:action.draft,requiresProof:action.requiresProof,responsible:action.responsible})};
    await write(prefix+id,entry);
    await audit(c,actor,'service.'+action.kind,id,null,entry);
    return {saved:true};
@@ -148,7 +159,7 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    await write(prefix+entry.id,next);
    await audit(c,actor,'service.request.applied',person.id,{unitId:person.unit_id,rank:person.rank,active:person.active},{...next,unitId:scope,rank:admission?action.rank:person.rank,active:entry.title!=='Звільнення'});
   }else if(action.kind==='decide'){
-   if(entry.module!=='requests'||entry.author===actor.id||(!canEdit&&account.role!=='admin'&&!(entry.targetUnit&&editors.has(entry.targetUnit))))throw new HttpError('Рішення недоступне.',403);
+   if(entry.module!=='requests'||entry.status!=='pending'||entry.author===actor.id||(!canEdit&&account.role!=='admin'&&!(entry.targetUnit&&editors.has(entry.targetUnit))))throw new HttpError('Рішення недоступне.',403);
    if(entry.status!=='pending')throw new HttpError('Рішення вже зафіксовано.',409);
    // Requests record a decision. Existing personnel controls apply changes to the roster.
    const next={...entry,status:action.status,decision:action.body,decidedBy:actor.name,decidedAt:new Date().toISOString()};

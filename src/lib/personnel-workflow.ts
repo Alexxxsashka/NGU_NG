@@ -1,3 +1,4 @@
+import {checkPromotion} from './promotion-limit';
 import 'server-only';
 import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
@@ -63,6 +64,7 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
     throw new HttpError('Ваш попередній звіт ще на розгляді.',409);
    const progress=await promotionProgress(actor.id,c);
    const {rows:[destinationRank]}=await c.query<{name:string}>('SELECT name FROM ranks WHERE id=$1',[action.rank]);
+   if(progress.profile)await checkPromotion(c,progress.profile.id,author.rank,action.rank);
    if(!progress.step||promotionRankName(action.rank,destinationRank.name).toLocaleLowerCase('uk')!==progress.step[1].toLocaleLowerCase('uk')||progress.points<progress.step[2])
     throw new HttpError('Потрібні підтверджені бали й наступне звання за шкалою підвищень.',409);
    const entry:Promotion={id:randomUUID(),userId:actor.id,name:author.name,staticId:author.static_id,unitId:author.unit_id,
@@ -105,6 +107,7 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
   const rankName=(id:number)=>ranks.rows.find(row=>row.id===id)?.name;
   if(changesRank&&!rankName(nextRank!))throw new HttpError('Звання не знайдено.');
   if(type==='promote'){
+   await checkPromotion(c,target.id,target.rank,nextRank!);
    const progress=await promotionProgress(targetId,c);
    if(!action.qualified)throw new HttpError('Підтвердьте виконання нормативів і проходження атестацій.',409);
    if(progress.step&&(progress.points<progress.step[2]||promotionRankName(nextRank!,rankName(nextRank!)!).toLocaleLowerCase('uk')!==progress.step[1].toLocaleLowerCase('uk')))
