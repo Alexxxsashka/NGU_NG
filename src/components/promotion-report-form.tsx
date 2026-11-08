@@ -48,7 +48,9 @@ export function PromotionReportForm({tasks,onSaved,actorId}:{actorId:string;task
  return <form className="report-layout account-action-content" onSubmit={submit}>
   <div className="panel">
    <div className="section-heading"><h2>Виконані завдання</h2><span>{rows.length} / 50</span></div>
-   {rows.map((row,index)=><div className="task-entry" key={row.id}>
+   {rows.map((row,index)=>{
+    const task=tasks.find(item=>item.id===row.taskId);
+    return <div className="task-entry" key={row.id}>
     <div className="section-heading"><strong>Завдання {index+1}</strong>{rows.length>1&&<button type="button" className="text-button danger" disabled={busy} onClick={()=>setRows(current=>current.filter(item=>item.id!==row.id))}><Trash2 size={16}/>Видалити</button>}</div>
     <div className="task-fields">
      <Field label="Завдання"><select required value={row.taskId} disabled={busy} onChange={e=>update(row.id,{taskId:e.target.value})}>
@@ -58,9 +60,10 @@ export function PromotionReportForm({tasks,onSaved,actorId}:{actorId:string;task
      </select></Field>
      <Field label="Кількість"><input type="number" min={1} max={100} step={1} required disabled={busy} value={row.quantity} onChange={e=>update(row.id,{quantity:e.target.value})}/></Field>
     </div>
-    {tasks.find(task=>task.id===row.taskId)?.requirements&&<p className="muted">{tasks.find(task=>task.id===row.taskId)?.requirements}</p>}
+    {task&&<p className="pill prime">{task.points} б. за виконання · {task.points*Number(row.quantity)} б. за рядок</p>}
+    {task?.requirements&&<p className="muted">{task?.requirements}</p>}
     <Field label="Посилання на докази"><textarea required rows={3} disabled={busy} value={row.links} placeholder="Одне HTTPS-посилання на рядок" onChange={e=>update(row.id,{links:e.target.value})}/><small>{evidenceLines(row.links).length} / 20 посилань</small></Field>
-   </div>)}
+   </div>;})}
    <button type="button" className="secondary full" disabled={busy||rows.length>=50} onClick={()=>{setRows(current=>[...current,{id:nextId,taskId:'',quantity:'1',links:''}]);setNextId(id=>id+1);}}><Plus size={17}/>Додати завдання</button>
   </div>
   <aside className="report-aside"><section className="panel summary-panel"><h2>Підсумок звіту</h2><p className="muted">{storageError?'Чернетку не вдалося зберегти в браузері.':'Чернетка зберігається в цій вкладці.'}</p><dl>

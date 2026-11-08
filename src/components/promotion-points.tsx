@@ -29,9 +29,10 @@ export function PromotionPoints({unitId,screen='',mode='personal'}:{unitId?:stri
   {(error||resource.error)&&<Notice error>{error||resource.error}</Notice>}{saved&&<Notice>Запис збережено.</Notice>}
   {!data&&!resource.error&&<Loading/>}
   {data&&<>
-   {mode==='personal'&&<nav className="panel portal-shortcuts" aria-label="Звіти й підвищення">
-    {[['','Огляд'],['/tasks','Що виконати'],['/submit','Подати виконання'],['/history','Що я виконав']].map(([suffix,label])=><Link key={suffix} href={'/portal/promotion-points'+suffix} aria-current={suffix.slice(1)===screen?'page':undefined}>{label}</Link>)}
-    <Link href="/portal/personnel-actions">Запит на підвищення</Link>
+   {mode==='personal'&&<nav className="workspace-switch" aria-label="Звіти й підвищення"><div className="actions">
+    {[['','Огляд'],['/tasks','Що виконати'],['/submit','Подати виконання'],['/history','Що я виконав']].map(([suffix,label])=><Link className="button secondary" key={suffix} href={'/portal/promotion-points'+suffix} aria-current={suffix.slice(1)===screen?'page':undefined}>{label}</Link>)}
+    <Link className="button secondary" href="/portal/personnel-actions">Запит на підвищення</Link>
+    </div>
    </nav>}
    {(mode==='catalog'||mode==='personal'&&!screen)&&<section className="panel portal-shortcuts">
     <h2>{mode==='catalog'?'Спільні правила':'Мій прогрес'}</h2>
@@ -48,7 +49,14 @@ export function PromotionPoints({unitId,screen='',mode='personal'}:{unitId?:stri
    {mode==='personal'&&screen==='tasks'&&<section className="panel"><h2>Доступні завдання</h2>
     <p>Підтверджені бали, нормативи, атестації та рішення командування враховуються під час підвищення.</p>
     {!available.length&&<p>Наразі доступних завдань немає.</p>}
-    <ul>{available.map(task=><li key={task.id}><strong>{task.name} · {task.points} б.</strong>{task.requirements&&<p>{task.requirements}</p>}</li>)}</ul>
+    {[false,true].map(local=>{
+     const tasks=available.filter(task=>Boolean(task.unitId)===local);
+     return tasks.length>0&&<section key={String(local)}><h3>{local?'Завдання мого підрозділу':'Спільні завдання НГУ'}</h3>
+      <div className="table-wrap"><table><thead><tr><th scope="col">Завдання</th><th scope="col">Балів за виконання</th></tr></thead>
+       <tbody>{tasks.map(task=><tr key={task.id}><td><strong>{task.name}</strong>{task.requirements&&<small>{task.requirements}</small>}</td><td className="number"><strong>{task.points}</strong></td></tr>)}</tbody>
+      </table></div>
+     </section>;
+    })}
    </section>}
    {mode==='personal'&&screen==='submit'&&!data.profile&&<Notice>Для подання звіту потрібен активний профіль зі званням і підрозділом.</Notice>}
    {mode==='personal'&&screen==='submit'&&data.profile&&<details id="promotion-submit" className="account-action profile-action cabinet-target" open>
@@ -56,20 +64,20 @@ export function PromotionPoints({unitId,screen='',mode='personal'}:{unitId?:stri
     <PromotionReportForm key={data.actorId} actorId={data.actorId} tasks={available} onSaved={resource.refresh}/>
    </details>}
    {mode==='catalog'&&data.units.length>0&&<section className="panel"><h2>Завдання підрозділів і заохочення</h2>
-    <details><summary>Додати завдання підрозділу</summary><form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'task',unitId:f.get('unitId'),name:f.get('name'),points:Number(f.get('points')),requirements:f.get('requirements')}))}>
-     <Field label="Підрозділ"><select name="unitId">{data.units.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>
+    <details><summary>Додати завдання</summary><form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'task',unitId:f.get('unitId')||null,name:f.get('name'),points:Number(f.get('points')),requirements:f.get('requirements')}))}>
+     <Field label="Підрозділ"><select name="unitId">{data.canEditCommon&&<option value="">Спільне для всіх підрозділів</option>}{data.units.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>
      <Field label="Завдання"><input name="name" required minLength={3} maxLength={120}/></Field>
      <Field label="Балів за виконання"><input name="points" type="number" min={1} max={1000} required/></Field>
      <Field label="Вимоги до доказів і нормативи"><textarea name="requirements" maxLength={1000}/></Field><button disabled={busy}>Створити завдання</button>
     </form></details>
-    {data.tasks.filter(task=>task.unitId&&editable(task.unitId)&&!task.archived).map(task=><details key={task.id} className="audit-row">
-     <summary>{task.name} · {task.points} б. · {data.units.find(unit=>unit.id===task.unitId)?.name}</summary>
+    {data.tasks.filter(task=>(task.unitId?editable(task.unitId):data.canEditCommon)&&!task.archived).map(task=><details key={task.id} className="audit-row">
+     <summary>{task.name} · {task.points} б. · {data.units.find(unit=>unit.id===task.unitId)?.name??'Спільне для НГУ'}</summary>
      <form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'task',id:task.id,unitId:task.unitId,name:f.get('name'),points:Number(f.get('points')),requirements:f.get('requirements')}))}>
       <Field label="Назва"><input name="name" required minLength={3} maxLength={120} defaultValue={task.name}/></Field>
       <Field label="Бали"><input name="points" type="number" min={1} max={1000} required defaultValue={task.points}/></Field>
       <Field label="Вимоги до доказів і нормативи"><textarea name="requirements" maxLength={1000} defaultValue={task.requirements}/></Field><button disabled={busy}>Зберегти</button>
      </form>
-     <form onSubmit={e=>{if(confirm('Архівувати завдання?'))void save(e,()=>({kind:'archive',id:task.id}));else e.preventDefault();}}><button className="text-button" disabled={busy}>Архівувати</button></form>
+     {(task.unitId||/^[a-f0-9-]{36}$/i.test(task.id))&&<form onSubmit={e=>{if(confirm('Архівувати завдання?'))void save(e,()=>({kind:'archive',id:task.id}));else e.preventDefault();}}><button className="text-button" disabled={busy}>Архівувати</button></form>}
     </details>)}
     <details><summary>Нарахувати додаткові бали</summary><form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'bonus',userId:f.get('userId'),points:Number(f.get('points')),reason:f.get('reason'),links:links(f)}))}>
      <Field label="Боєць"><select name="userId" required defaultValue=""><option value="">Оберіть бійця</option>{data.people.map(person=><option key={person.id} value={person.id}>{person.name} · {data.units.find(unit=>unit.id===person.unit_id)?.name}</option>)}</select></Field>

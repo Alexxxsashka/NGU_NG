@@ -14,8 +14,11 @@ import type {Viewer} from './domain';
 type Task={id:string;name:string;points:number;unitId:string|null;requirements?:string;archived?:boolean};
 type Credit={id:string;reportId?:string;order?:number;userId:string;name:string;unitId:string;rank:number;cycle:string;taskId:string;title:string;rate:number;quantity:number;links:string[];status:'pending'|'approved'|'rejected'|'clarification';reason?:string;createdAt:string};
 const common:Task[]=commonPromotionTasks.map(([id,name,points])=>({id,name,points,unitId:null}));
+function mergeTasks(saved:Task[]){
+ return [...new Map([...common,...saved].map(task=>[task.id,task])).values()];
+}
 const operation=z.discriminatedUnion('kind',[
- z.object({kind:z.literal('task'),id:z.uuid().optional(),unitId:z.uuid(),name:z.string().trim().min(3).max(120),points:z.number().int().min(1).max(1000),requirements:z.string().trim().max(1000).optional()}),
+ z.object({kind:z.literal('task'),id:z.string().min(1).max(50).optional(),unitId:z.uuid().nullable(),name:z.string().trim().min(3).max(120),points:z.number().int().min(1).max(1000),requirements:z.string().trim().max(1000).optional()}),
  z.object({kind:z.literal('archive'),id:z.uuid()}),
  z.object({kind:z.literal('submit'),taskId:z.string().min(1).max(50),quantity:z.number().int().min(1).max(100),links:z.array(evidence).min(1).max(20)}),
  z.object({kind:z.literal('submit-report'),entries:z.array(z.object({taskId:z.string().min(1).max(50),quantity:z.number().int().min(1).max(100),links:z.array(evidence).min(1).max(20)})).min(1).max(50)}),
@@ -50,7 +53,7 @@ export async function promotionPoints(actor:Viewer,unitId:string|null=null){
  const ids=units.map(unit=>unit.id);
  const [tasks,credits,people]=await Promise.all([
   query<{value:Task}>(`SELECT value FROM settings WHERE key LIKE 'promotion-task:%'
-   AND ((cardinality($2::text[])=0 AND value->>'unitId'=$1) OR value->>'unitId'=ANY($2::text[])) ORDER BY value->>'name'`,[progress.profile?.unit_id??null,ids]),
+   AND (value->>'unitId' IS NULL OR (cardinality($2::text[])=0 AND value->>'unitId'=$1) OR value->>'unitId'=ANY($2::text[])) ORDER BY value->>'name'`,[progress.profile?.unit_id??null,ids]),
   query<{value:Credit}>(`WITH visible AS (
     SELECT value,coalesce(value->>'reportId',value->>'id') AS report_id
     FROM settings WHERE key LIKE 'promotion-credit:%' AND ((cardinality($2::text[])=0 AND value->>'userId'=$1) OR value->>'unitId'=ANY($2::text[]))
@@ -61,7 +64,7 @@ export async function promotionPoints(actor:Viewer,unitId:string|null=null){
   ids.length?query<{id:string;name:string;unit_id:string}>(`SELECT p.user_id AS id,p.first_name||' '||p.last_name AS name,p.unit_id
    FROM personnel p WHERE p.active AND p.rank IS NOT NULL AND p.user_id IS NOT NULL AND p.unit_id=ANY($1::uuid[]) AND p.user_id<>$2 ORDER BY p.last_name`,[ids,actor.id]):[],
  ]);
- return {...progress,units,tasks:[...common,...tasks.map(row=>row.value)],credits:credits.map(row=>row.value),people,actorId:actor.id};
+ return {...progress,units,canEditCommon:units.some(unit=>unit.appoint),tasks:mergeTasks(tasks.map(row=>row.value)),credits:credits.map(row=>row.value),people,actorId:actor.id};
 }
 
 export async function changePromotionPoints(input:unknown,actor:Viewer){
@@ -74,11 +77,12 @@ export async function changePromotionPoints(input:unknown,actor:Viewer){
   if(action.kind==='task'||action.kind==='archive'){
    const id=action.id??randomUUID(),key='promotion-task:'+id;
    const {rows:[old]}=await c.query<{value:Task}>('SELECT value FROM settings WHERE key=$1 FOR UPDATE',[key]);
+   const previous=old?.value??common.find(task=>task.id===id);
    const unit=action.kind==='task'?action.unitId:old?.value.unitId??null;
-   if(!editable(unit)||(action.id&&(!old||old.value.unitId!==unit)))throw new HttpError('Завдання поза межами вашого підрозділу.',403);
+   if((unit===null?!units.some(item=>item.appoint):!editable(unit))||(action.id&&(!previous||previous.unitId!==unit)))throw new HttpError('Завдання поза межами вашого підрозділу.',403);
    const next=action.kind==='task'?{id,unitId:unit,name:action.name,points:action.points,requirements:action.requirements}:{...old!.value,archived:true};
    await write(key,next);
-   await audit(c,actor,'promotion.task',id,old?.value??null,next);
+   await audit(c,actor,'promotion.task',id,previous??null,next);
    return {saved:true};
   }
   if(action.kind==='review'||action.kind==='clarify'){
@@ -113,9 +117,9 @@ export async function changePromotionPoints(input:unknown,actor:Viewer){
   if(!profile||(action.kind==='bonus'&&(!editable(profile.unit_id)||userId===actor.id)))
    throw new HttpError('Потрібен активний профіль із підрозділом і званням.',403);
   const entries=action.kind==='submit-report'?action.entries:action.kind==='submit'?[action]:[{taskId:'bonus',quantity:1,links:action.links}];
-  const customIds=[...new Set(entries.filter(entry=>!common.some(task=>task.id===entry.taskId)&&entry.taskId!=='bonus').map(entry=>'promotion-task:'+entry.taskId))];
+  const customIds=[...new Set(entries.filter(entry=>entry.taskId!=='bonus').map(entry=>'promotion-task:'+entry.taskId))];
   const {rows:custom}=await c.query<{value:Task}>('SELECT value FROM settings WHERE key=ANY($1::text[])',[customIds]);
-  const tasks=new Map([...common,...custom.map(row=>row.value)].map(task=>[task.id,task]));
+  const tasks=new Map(mergeTasks(custom.map(row=>row.value)).map(task=>[task.id,task]));
   const allLinks=entries.flatMap(entry=>[...new Set(entry.links)]);
   if(new Set(allLinks).size!==allLinks.length)throw new HttpError('Одне посилання не можна використати в кількох завданнях одного звіту.',409);
   if((await c.query(`SELECT 1 FROM settings WHERE key LIKE 'promotion-credit:%' AND value->>'userId'=$1
