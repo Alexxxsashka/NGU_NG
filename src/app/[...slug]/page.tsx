@@ -43,7 +43,11 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
   const [profile]=await query<{static_id:string|null;first_name:string|null;last_name:string|null;rank:number|null;unit_id:string|null}>(`SELECT coalesce(p.static_id,substring(u.username from '^static_([0-9]+)$'),
    (SELECT static_id FROM profile_claims WHERE user_id=u.id AND status='pending' ORDER BY created_at DESC LIMIT 1)) AS static_id,
    p.first_name,p.last_name,p.rank,(SELECT id FROM units WHERE id=p.unit_id AND active) AS unit_id FROM app_user u LEFT JOIN personnel p ON p.user_id=u.id AND p.active WHERE u.id=$1`,[user.id]);
-  return <ReportForm key={user.id} userId={user.id} profile={profile}/>;
+  const reportId=(await searchParams).report;
+  const [existing]=reportId&&/^[a-f0-9-]{36}$/i.test(reportId)?await query<typeof profile&{id:string;week_start:string}>(`SELECT r.id,r.week_start,r.static_id,r.first_name,r.last_name,r.rank,r.unit_id FROM reports r
+   WHERE r.id::text=$1 AND (r.author_id=$2 OR EXISTS(SELECT 1 FROM personnel p WHERE p.id=r.personnel_id AND p.user_id=$2 AND p.active))`,[reportId,user.id]):[];
+  if(reportId&&!existing)notFound();
+  return <ReportForm key={user.id+':'+(existing?.id??'')} userId={user.id} profile={existing??profile} reportId={existing?.id} reportWeek={existing?.week_start}/>;
  }
  if(['login','register','recover','setup'].includes(path))return <AuthScreen returnToReport={(await searchParams).next==='report'} passwordChanged={path==='login'&&(await searchParams).password==='changed'} mode={path as 'login'|'register'|'recover'|'setup'}/>;
  if(path==='portal/command')redirect('/command');

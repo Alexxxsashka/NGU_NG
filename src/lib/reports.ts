@@ -30,6 +30,24 @@ export async function submitReport(request:Request,input:unknown){
     await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[p.idempotencyKey]);
     const old=(await c.query('SELECT id,number,payload_hash,context_hash FROM reports WHERE idempotency_key=$1',[p.idempotencyKey])).rows[0];
     if(old){if(old.payload_hash!==digest||old.context_hash!==context)throw new HttpError('Конфлікт повторного подання.',409);return {reportId:old.id,number:old.number,week:p.week};}
+    const amendmentKey='report-amendment:'+p.idempotencyKey;
+    const {rows:[amendment]}=p.reportId?await c.query('SELECT value FROM settings WHERE key=$1',[amendmentKey]):{rows:[]};
+    if(amendment){
+     if(amendment.value.digest!==digest||amendment.value.context!==context)throw new HttpError('Конфлікт повторного подання.',409);
+     return amendment.value.result;
+    }
+    const {rows:[existing]}=p.reportId?await c.query(`SELECT r.* FROM reports r WHERE r.id=$1 AND
+     (r.author_id=$2 OR EXISTS(SELECT 1 FROM personnel p WHERE p.id=r.personnel_id AND p.user_id=$2 AND p.active))
+     FOR UPDATE OF r`,[p.reportId,u.id]):{rows:[]};
+    if(p.reportId){
+     if(!existing)throw new HttpError('Звіт недоступний.',404);
+     if(existing.week_start!==p.week||p.week!==currentWeek()||existing.unit_id!==p.unitId||existing.rank!==p.rank)
+      throw new HttpError('Додати завдання можна до звіту поточного тижня без зміни його підрозділу й рангу.',409);
+     if((await c.query('SELECT 1 FROM settings WHERE key=ANY($1::text[])',[['award-order:'+p.week,'report-paid:'+p.reportId]])).rowCount)
+      throw new HttpError('Наказ уже затверджено або виплату зафіксовано.',409);
+     if(!(await c.query("SELECT 1 FROM report_items WHERE report_id=$1 AND status IN ('pending','approved','clarification') LIMIT 1",[p.reportId])).rowCount)
+      throw new HttpError('Попросіть перевіряючого повернути звіт на розгляд.',409);
+    }
     const period=(await c.query('SELECT open FROM reporting_periods WHERE week_start=$1 FOR SHARE',[p.week])).rows[0];
     if(!period?.open)throw new HttpError('Прийом за цей тиждень закрито.',409);
     const unit=(await c.query('SELECT * FROM units WHERE id=$1 AND active=true FOR SHARE',[p.unitId])).rows[0];
@@ -38,11 +56,11 @@ export async function submitReport(request:Request,input:unknown){
     const found=(await c.query('SELECT * FROM tasks WHERE id=ANY($1::uuid[]) FOR SHARE',[p.entries.map(e=>e.taskId)])).rows;
     const prepared=p.entries.map(e=>{const t=found.find(t=>t.id===e.taskId);if(!t||!t.active||(t.unit_id&&t.unit_id!==p.unitId)||t.version!==e.version)throw new HttpError('Довідник змінився. Оновіть завдання; докази залишаться у формі.',409);return {e,t};});
     const profile=(await c.query('SELECT p.id,(SELECT id FROM units WHERE id=p.unit_id AND active) AS unit_id,p.rank FROM personnel p WHERE p.user_id=$1 AND p.static_id=$2 AND p.active FOR SHARE',[u.id,p.staticId])).rows[0];
-    if((profile?.unit_id&&profile.unit_id!==p.unitId)||(profile?.rank!=null&&profile.rank!==p.rank))throw new HttpError('Оберіть підрозділ і звання зі своєї кадрової картки.',409);
+    if(!existing&&((profile?.unit_id&&profile.unit_id!==p.unitId)||(profile?.rank!=null&&profile.rank!==p.rank)))throw new HttpError('Оберіть підрозділ і звання зі своєї кадрової картки.',409);
     const cap=(await c.query("SELECT value FROM settings WHERE key='weeklyCap'")).rows[0]?.value??null;
     await c.query('INSERT INTO weekly_awards(static_id,week_start,cap) VALUES($1,$2,$3) ON CONFLICT(static_id,week_start) DO NOTHING',[p.staticId,p.week,cap]);
-    const id=randomUUID(),number='НГУ-'+id.slice(0,8).toUpperCase();
-    await c.query(`INSERT INTO reports(id,number,author_id,personnel_id,static_id,first_name,last_name,rank,unit_id,unit_name,week_start,idempotency_key,payload_hash,context_hash)
+    const id=existing?.id??randomUUID(),number=existing?.number??'НГУ-'+id.slice(0,8).toUpperCase();
+    if(!existing)await c.query(`INSERT INTO reports(id,number,author_id,personnel_id,static_id,first_name,last_name,rank,unit_id,unit_name,week_start,idempotency_key,payload_hash,context_hash)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,[id,number,u.id,profile?.id??null,p.staticId,p.firstName,p.lastName,p.rank,p.unitId,unit.name,p.week,p.idempotencyKey,digest,context]);
     const pointValue=(await c.query("SELECT value FROM settings WHERE key='pointValue' FOR SHARE")).rows[0]?.value??null;
     let total=0;
@@ -57,7 +75,12 @@ export async function submitReport(request:Request,input:unknown){
     await c.query(`INSERT INTO evidence_links(item_id,url,sort_order)
       SELECT item_id,url,sort_order FROM jsonb_to_recordset($1::jsonb)
       AS evidence(item_id uuid,url text,sort_order int)`,[JSON.stringify(evidence)]);
-    return {reportId:id,number,week:p.week,points:total,quantity:p.entries.reduce((n,e)=>n+e.quantity,0)};
+    const result={reportId:id,number,week:p.week,points:total,quantity:p.entries.reduce((n,e)=>n+e.quantity,0)};
+    if(existing){
+     await c.query('INSERT INTO settings(key,value) VALUES($1,$2)',[amendmentKey,JSON.stringify({digest,context,result})]);
+     await c.query("INSERT INTO audit_logs(actor_id,action,entity_id,after,reason) VALUES($1,'report.amend',$2,$3,'Додано завдання')",[u.id,id,JSON.stringify(result)]);
+    }
+    return result;
   });
 }
 export type Filters={from:string;to:string;unit:string;search:string;status:string;time:string;page:number;report?:string};
