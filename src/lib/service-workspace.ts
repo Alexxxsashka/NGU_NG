@@ -26,10 +26,10 @@ const correction=z.discriminatedUnion('field',[
 ]);
 const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('recruitment'),unit:uuid,body,minRank:z.number().int().min(1).max(15).nullable().optional()}),
- z.object({kind:z.literal('request'),draft:z.boolean().optional(),draftId:uuid.optional(),type:z.enum(requestTypes),correction:correction.optional(),post:z.string().trim().max(160).optional(),replacement:z.string().trim().max(160).optional(),body:z.string().trim().max(5000),targetUnit:uuid.optional(),from:z.union([z.iso.date(),z.iso.datetime({local:true})]).optional(),to:z.union([z.iso.date(),z.iso.datetime({local:true})]).optional(),links:z.array(evidence).max(20).default([])}),
+ z.object({kind:z.literal('request'),draft:z.boolean().optional(),draftId:uuid.optional(),recruitmentEvidence:z.object({licenses:z.array(z.enum(['B','C','S'])).max(3),fitness:z.string().trim().max(1000),manual:z.string().trim().max(1500)}).optional(),type:z.enum(requestTypes),correction:correction.optional(),post:z.string().trim().max(160).optional(),replacement:z.string().trim().max(160).optional(),body:z.string().trim().max(5000),targetUnit:uuid.optional(),from:z.union([z.iso.date(),z.iso.datetime({local:true})]).optional(),to:z.union([z.iso.date(),z.iso.datetime({local:true})]).optional(),links:z.array(evidence).max(20).default([])}),
  z.object({kind:z.literal('delete-draft'),id:uuid}),
  z.object({kind:z.literal('cancel-absence'),id:uuid}),
- z.object({kind:z.literal('decide'),id:uuid,status:z.enum(['approved','rejected','clarification']),side:z.enum(['source','destination']).optional(),body}),
+ z.object({kind:z.literal('decide'),id:uuid,status:z.enum(['approved','rejected','clarification']),side:z.enum(['source','destination']).optional(),manualVerified:z.boolean().optional(),body}),
  z.object({kind:z.literal('publish'),module:moduleSchema.exclude(['requests']),unit:uuid,title,body,
   url:z.url({protocol:/^https$/}).max(2048).refine(value=>{const link=new URL(value);return !link.username&&!link.password;}).optional(),date:z.iso.date().optional(),revision:title.optional(),category:title.optional(),replaces:uuid.optional(),draft:z.boolean().optional(),requiresProof:z.boolean().optional(),responsible:title.optional(),requirementId:uuid.optional()}),
  z.object({kind:z.literal('resubmit'),id:uuid,body,links:z.array(evidence).max(20).default([])}),
@@ -48,6 +48,7 @@ type Entry={
  id:string;module:ServiceModule;unit:string|null;author:string;name:string;title:string;body:string;createdAt:string;
  correction?:z.infer<typeof correction>&{previous:string|null;profileId:string};orderId?:string;reportId?:string;
  transferApprovals?:Partial<Record<'source'|'destination',{actorId:string;name:string;at:string;body:string}>>;
+ recruitmentEvidence?:{licenses:string[];fitness:string;manual:string};manualVerified?:boolean;
  requirementId?:string;post?:string;replacement?:string;recruitmentRequirements?:ReturnType<typeof recruitmentRequirements>;recruitmentRules?:string;targetUnit?:string;from?:string;to?:string;links?:string[];replies?:{body:string;links:string[];at:string}[];url?:string;date?:string;revision?:string;category?:string;replaces?:string;draft?:boolean;requiresProof?:boolean;responsible?:string;appliedAt?:string;status?:'pending'|'approved'|'rejected'|'clarification'|'cancelled';decision?:string;decidedBy?:string;decidedAt?:string;archived?:boolean;
 };
 const prefix='service-entry:';
@@ -83,7 +84,7 @@ export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:s
    "SELECT user_id AS id,first_name||' '||last_name AS name,unit_id AS unit FROM personnel WHERE active AND user_id IS NOT NULL AND ($2::boolean OR unit_id=ANY($1::uuid[])) ORDER BY last_name",[editors,module==='training']):[],
   module==='training'?query<{value:{entry:string;member:string;status?:string;links?:string[];note?:string}}>(`SELECT value FROM settings WHERE key LIKE 'service-result:%' AND
    (value->>'member'=$1 OR value->>'unit'=ANY($2::text[]))`,[actor.id,editors]):[],
-  module==='requests'?query<{id:string;name:string;rules:string|null}>(`SELECT u.id,u.name,s.value->>'body' AS rules FROM units u LEFT JOIN settings s ON s.key='recruitment:'||u.id::text WHERE u.active ORDER BY u.sort_order,u.name`):[],
+  module==='requests'?query<{id:string;name:string;rules:string|null;min_rank:number|null}>(`SELECT u.id,u.name,s.value->>'body' AS rules,(s.value->>'minRank')::int AS min_rank FROM units u LEFT JOIN settings s ON s.key='recruitment:'||u.id::text WHERE u.active ORDER BY u.sort_order,u.name`):[],
   module==='calendar'?query<{value:{entry:string;member:string;status:string}}>(`SELECT value FROM settings WHERE key LIKE 'service-attendance:%' AND (value->>'member'=$1 OR value->>'unit'=ANY($2::text[]))`,[actor.id,editors]):[],
   module==='requests'?query("SELECT 1 FROM personnel p WHERE p.user_id=$1 AND p.active AND p.rank BETWEEN 13 AND 15",[actor.id]):[],
   module==='calendar'&&readUnits.length?query<{id:string;name:string;from:string;to:string}>(`SELECT value->>'id' AS id,value->>'name' AS name,
@@ -97,7 +98,7 @@ export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:s
    AND value->>'author'=$1 ORDER BY value->>'at' DESC LIMIT 50`,[actor.id]):[],
   module==='calendar'&&editors.length?query<{value:Requirement}>("SELECT value FROM settings WHERE key LIKE 'promotion-requirement:%' ORDER BY value->>'title'"):[],
  ]);
- return {units,entries:rows.map(({value})=>value),people,results:results.map(({value})=>value),trainingUnit,absences,requirements:requirements.map(row=>row.value),drafts:drafts.map(row=>row.value),targets:targets.map(unit=>({...unit,rules:unit.rules??defaultRecruitment(unit.name)})),ranks,attendance:attendance.map(row=>row.value),memberUnit:personalUnit,canTransfer:actor.role==='admin'||authority.length>0,actorId:actor.id,admin:actor.role==='admin'};
+ return {units,entries:rows.map(({value})=>value),people,results:results.map(({value})=>value),trainingUnit,absences,requirements:requirements.map(row=>row.value),drafts:drafts.map(row=>row.value),targets:targets.map(unit=>({...unit,rules:unit.rules??defaultRecruitment(unit.name),requirements:{...recruitmentRequirements(unit.name),minRank:unit.min_rank??recruitmentRequirements(unit.name).minRank}})),ranks,attendance:attendance.map(row=>row.value),memberUnit:personalUnit,canTransfer:actor.role==='admin'||authority.length>0,actorId:actor.id,admin:actor.role==='admin'};
 }
 
 export async function changeServiceWorkspace(actor:Viewer,input:unknown){
@@ -133,6 +134,8 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    const {rows:[unit]}=await c.query<{name:string}>('SELECT name FROM units WHERE id=$1',[action.unit]);
    if(/^ссо|nord division/i.test(unit.name)&&account.rank!==15)
     throw new HttpError('Умови набору ССО публікує Командувач НГУ.',403);
+   if(recruitmentRequirements(unit.name).commanderApproval&&account.rank!==15)throw new HttpError('Поріг НЦП підтверджує Командувач НГУ.',403);
+   if(action.minRank&&!(await c.query('SELECT 1 FROM ranks WHERE id=$1',[action.minRank])).rowCount)throw new HttpError('Оберіть ранг із кадрового довідника.');
    const key='recruitment:'+action.unit;
    const {rows:[old]}=await c.query('SELECT value FROM settings WHERE key=$1',[key]);
    const next={body:action.body,minRank:action.minRank};
@@ -176,6 +179,10 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
      recruitmentRules=unit.rules??defaultRecruitment(unit.name);
      requirements=recruitmentRequirements(unit.name);
      requirements.minRank=unit.min_rank??requirements.minRank;
+     if(requirements.fitness&&!action.recruitmentEvidence?.fitness)throw new HttpError('Опишіть фізичну підготовку.');
+     if(requirements.manualReview&&!action.recruitmentEvidence?.manual)throw new HttpError('Заповніть відомості для ручної перевірки.');
+     const licenses=action.recruitmentEvidence?.licenses??[];
+     if(requirements.licenses.some(category=>!licenses.includes(category as 'B'|'C'|'S')))throw new HttpError('Вкажіть необхідні категорії посвідчення.');
      if(!account.id)throw new HttpError('Для вступу потрібен активний кадровий профіль.',403);
      if((await c.query(`SELECT 1 FROM settings WHERE key LIKE 'service-entry:%'
       AND value->>'title'='Вступ до підрозділу' AND value->>'author'=$1 AND value->>'targetUnit'=$2
@@ -208,7 +215,7 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    const id=randomUUID();
    const entry:Entry={id,module:action.kind==='request'?'requests':action.module,unit:action.kind==='request'?(action.type==='Вступ до підрозділу'?null:account.unit_id??previousUnit??null):action.unit,
     author:actor.id,name:actor.name,title:action.kind==='request'?action.type:action.title,body:action.body,createdAt:new Date().toISOString(),
-    ...(action.kind==='request'?{status:'pending' as const,correction:proposed,recruitmentRequirements:requirements,recruitmentRules,targetUnit:['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(action.type)?action.targetUnit:undefined,from:action.from,to:action.to,post:action.type==='IC-відгул'?action.post:undefined,replacement:action.type==='IC-відгул'?action.replacement:undefined,links:action.links}:{url:action.url,date:action.date,revision:action.revision,category:action.category,replaces:action.replaces,draft:action.draft,requiresProof:action.requiresProof,responsible:action.responsible,requirementId:action.requirementId})};
+    ...(action.kind==='request'?{status:'pending' as const,correction:proposed,recruitmentRequirements:requirements,recruitmentEvidence:requirements?action.recruitmentEvidence:undefined,recruitmentRules,targetUnit:['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(action.type)?action.targetUnit:undefined,from:action.from,to:action.to,post:action.type==='IC-відгул'?action.post:undefined,replacement:action.type==='IC-відгул'?action.replacement:undefined,links:action.links}:{url:action.url,date:action.date,revision:action.revision,category:action.category,replaces:action.replaces,draft:action.draft,requiresProof:action.requiresProof,responsible:action.responsible,requirementId:action.requirementId})};
    await write(prefix+id,entry);
    await audit(c,actor,'service.'+action.kind,id,null,entry);
    if(action.kind==='request'&&action.draftId)await c.query('DELETE FROM settings WHERE key=$1',['service-draft:'+action.draftId]);
@@ -273,7 +280,14 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    if(action.status==='approved'&&entry.title==='Вступ до підрозділу'){
     const {rows:[unit]}=await c.query<{name:string}>('SELECT name FROM units WHERE id=$1 AND active',[entry.targetUnit]);
     if(!unit||!editors.has(entry.targetUnit!))throw new HttpError('Погодження доступне командуванню підрозділу призначення.',403);
-    const rule=entry.recruitmentRequirements??recruitmentRequirements(unit.name);
+    const defaults=recruitmentRequirements(unit.name);
+    const rule={...defaults,...entry.recruitmentRequirements};
+    if(rule.commanderApproval&&rule.minRank===null){
+     const {rows:[configured]}=await c.query<{rank:number|null}>(`SELECT (value->>'minRank')::int AS rank FROM settings WHERE key=$1`,['recruitment:'+entry.targetUnit]);
+     if(!configured?.rank)throw new HttpError('Командувач має підтвердити мінімальний ранг НЦП у редакторі набору.',409);
+     rule.minRank=configured.rank;
+    }
+    if(rule.manualReview&&!action.manualVerified)throw new HttpError('Підтвердьте ручну перевірку вимог і доказів.',409);
     if(rule.commanderApproval&&(account.rank!==15||!action.body.trim()))throw new HttpError('Потрібне письмове погодження Командувача НГУ.',403);
     const {rows:[candidate]}=await c.query<{rank:number|null;days:number|null;sanction:boolean}>(`SELECT p.rank,
      CASE WHEN d.value->>'joinedOnVerified'='true' THEN (now() AT TIME ZONE 'Europe/Kyiv')::date-(d.value->>'joinedOn')::date END AS days,
@@ -316,7 +330,7 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
      if(!other)status='pending';
     }else transferApprovals=undefined;
    }
-   const next={...entry,status,appliedAt,transferApprovals,decision:action.body,decidedBy:actor.name,decidedAt};
+   const next={...entry,status,appliedAt,transferApprovals,manualVerified:action.status==='approved'&&entry.title==='Вступ до підрозділу'?action.manualVerified:undefined,decision:action.body,decidedBy:actor.name,decidedAt};
    await write(prefix+entry.id,next);
    await audit(c,actor,'service.request.decision',entry.id,entry,next,action.body);
   }else if(action.kind==='transfer'){

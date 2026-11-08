@@ -53,6 +53,7 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
   [entry.title,entry.body,entry.revision].some(text=>text?.toLocaleLowerCase('uk').includes(documentSearch.trim().toLocaleLowerCase('uk')))
  ));
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Kyiv'}).format(new Date());
+ const recruitmentTarget=data?.targets.find(unit=>unit.id===recruitmentUnit);
  const editors=data?.units.filter(unit=>unit.editor)??[];
  const canEdit=(id?:string|null)=>editors.some(unit=>unit.id===id);
  return <div id="content">
@@ -74,14 +75,14 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
    <IllustratedSummary title="Умови набору підрозділу" image="/portal-art/unit-actions/info.webp"/>
    <form className="stack account-action-content" onSubmit={event=>void save(event,fields=>({kind:'recruitment',unit:unitId,body:fields.get('rules'),minRank:fields.get('minRank')?Number(fields.get('minRank')):null}))}>
     <Field label="Опис і вимоги до вступу"><textarea name="rules" rows={6} required maxLength={5000} defaultValue={data.targets.find(unit=>unit.id===unitId)?.rules}/></Field>
-    <Field label="Мінімальний ранг (порожньо — базове правило)"><input name="minRank" type="number" min={1} max={15}/></Field>
+    <Field label="Мінімальний ранг (порожньо — базове правило)"><select name="minRank" defaultValue={data.targets.find(unit=>unit.id===unitId)?.requirements.minRank??''}><option value="">Базове правило / не підтверджено</option>{data.ranks.filter(rank=>rank.id<=15).map(rank=><option value={rank.id} key={rank.id}>{rank.id} · {rank.name}</option>)}</select></Field>
     <button disabled={busy}>Зберегти умови</button>
    </form>
   </details>}
   {data&&((module==='requests'&&!unitId)||(module!=='requests'&&editors.length>0))&&<details className="account-action profile-action" open={draftId?true:undefined}>
    <IllustratedSummary title={draftId?'Редагувати чернетку рапорту':actions[module]} image={'/portal-art/catalog/'+artwork[module]+'.webp'}/>
    <form key={draftId} className="stack account-action-content" onSubmit={e=>void save(e,f=>module==='requests'?
-    {kind:'request',draft:!!draftId||f.has('saveDraft'),draftId:draftId||undefined,type:f.get('type'),body:f.get('body'),correction:f.has('correctionValue')?{field:f.get('correctionField'),value:f.get('correctionValue')}:undefined,post:f.get('post')||undefined,replacement:f.get('replacement')||undefined,targetUnit:f.get('targetUnit')||undefined,from:f.get('from')||undefined,to:f.get('to')||undefined,links:evidenceLines(String(f.get('links')??''))}:
+    {kind:'request',draft:!!draftId||f.has('saveDraft'),draftId:draftId||undefined,type:f.get('type'),body:f.get('body'),recruitmentEvidence:f.get('type')==='Вступ до підрозділу'?{licenses:f.getAll('licenses'),fitness:f.get('fitness')??'',manual:f.get('manual')??''}:undefined,correction:f.has('correctionValue')?{field:f.get('correctionField'),value:f.get('correctionValue')}:undefined,post:f.get('post')||undefined,replacement:f.get('replacement')||undefined,targetUnit:f.get('targetUnit')||undefined,from:f.get('from')||undefined,to:f.get('to')||undefined,links:evidenceLines(String(f.get('links')??''))}:
     {kind:'publish',module,unit:f.get('unit'),title:f.get('title'),body:f.get('body'),
      date:f.get('date')||undefined,url:f.get('url')||undefined,revision:f.get('revision')||undefined,category:f.get('category')||undefined,replaces:f.get('replaces')||undefined,draft:f.has('draft'),requiresProof:f.has('requiresProof'),responsible:f.get('responsible')||undefined,requirementId:f.get('requirementId')||undefined},()=>{setDraftId('');setSaveDraft(false);})}>
     {module==='requests'?<>
@@ -95,7 +96,16 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
       </div>
      </fieldset>
      {['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(requestType)&&<Field label="Бажаний підрозділ"><select name="targetUnit" defaultValue={draftRequest?.targetUnit} required onChange={event=>setRecruitmentUnit(event.target.value)}><option value="">Оберіть підрозділ</option>{data.targets.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>}
-     {requestType==='Вступ до підрозділу'&&<p style={{whiteSpace:'pre-line'}}>{data.targets.find(unit=>unit.id===recruitmentUnit)?.rules}</p>}
+     {requestType==='Вступ до підрозділу'&&recruitmentTarget&&<>
+      <p style={{whiteSpace:'pre-line'}}>{recruitmentTarget.rules}</p>
+      <p>Мінімальний ранг: {recruitmentTarget.requirements.minRank??'ще не підтверджено'}</p>
+      <fieldset><legend>Категорії посвідчення</legend>{(['B','C','S'] as const).map(category=><label className="checkbox" key={recruitmentTarget.id+category}>
+       <input type="checkbox" name="licenses" value={category} defaultChecked={draftRequest?.recruitmentEvidence?.licenses.includes(category)}
+        required={!saveDraft&&recruitmentTarget.requirements.licenses.includes(category)}/>{category}
+      </label>)}</fieldset>
+      {recruitmentTarget.requirements.fitness&&<Field label="Фізична підготовка"><textarea name="fitness" required={!saveDraft} maxLength={1000} defaultValue={draftRequest?.recruitmentEvidence?.fitness}/></Field>}
+      {recruitmentTarget.requirements.manualReview&&<Field label="Відомості для ручної перевірки"><textarea name="manual" required={!saveDraft} maxLength={1500} defaultValue={draftRequest?.recruitmentEvidence?.manual}/></Field>}
+     </>}
      {['Відпустка','IC-відгул','OOC-відпустка'].includes(requestType)&&<div className="form-grid"><Field label="Від"><input name="from" defaultValue={draftRequest?.from} type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field><Field label="До"><input name="to" defaultValue={draftRequest?.to} type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field></div>}
      {requestType==='Виправлення особової справи'&&<div className="form-grid">
       <Field label="Поле"><select name="correctionField" value={correctionField} onChange={event=>setCorrectionField(event.target.value)}><option value="joinedOn">Дата вступу</option><option value="callsign">Позивний</option><option value="bio">Коротко про себе</option></select></Field>
@@ -167,6 +177,11 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
     {entry.revision&&<p>Редакція {entry.revision}</p>}
     <p className="unit-copy">{entry.body}</p>
     {entry.url&&<a href={entry.url} target="_blank" rel="noopener noreferrer">Відкрити документ</a>}
+    {entry.recruitmentEvidence&&<dl><dt>Категорії посвідчення</dt><dd>{entry.recruitmentEvidence.licenses.join(', ')||'Не вказано'}</dd>
+     {entry.recruitmentEvidence.fitness&&<><dt>Фізична підготовка</dt><dd>{entry.recruitmentEvidence.fitness}</dd></>}
+     {entry.recruitmentEvidence.manual&&<><dt>Відомості для перевірки</dt><dd>{entry.recruitmentEvidence.manual}</dd></>}
+    </dl>}
+    {entry.manualVerified&&<p>Ручні вимоги перевірено.</p>}
     {entry.recruitmentRules&&<details><summary>Умови на момент подання</summary><p style={{whiteSpace:'pre-line'}}>{entry.recruitmentRules}</p></details>}
     {entry.correction&&<dl><dt>{entry.correction.field==='joinedOn'?'Дата вступу':entry.correction.field==='bio'?'Коротко про себе':'Позивний'}</dt><dd>Було: {entry.correction.previous??'Не вказано'}</dd><dd>Запропоновано: {entry.correction.value}</dd></dl>}
     {entry.post&&<p>Пост або завдання: {entry.post}{entry.replacement&&' · Заміна: '+entry.replacement}</p>}
@@ -185,12 +200,13 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
     </form>}
     {entry.status&&<p>{statusLabels[entry.status]}{entry.decision?' · '+entry.decision:''}{entry.decidedBy?' · '+entry.decidedBy:''}</p>}
     {entry.status==='pending'&&entry.author!==data.actorId&&(data.admin||canEdit(entry.unit)||canEdit(entry.targetUnit))&&
-     <form className="stack" onSubmit={e=>void save(e,f=>({kind:'decide',id:entry.id,status:f.get('status'),side:f.get('side')||undefined,body:f.get('body')}))}>
+     <form className="stack" onSubmit={e=>void save(e,f=>({kind:'decide',id:entry.id,status:f.get('status'),side:f.get('side')||undefined,manualVerified:f.has('manualVerified'),body:f.get('body')}))}>
       {entry.title==='Переведення'&&<Field label="Сторона погодження"><select name="side" required defaultValue=""><option value="">Оберіть сторону</option>
        {canEdit(entry.unit)&&<option value="source">Поточний підрозділ</option>}
        {canEdit(entry.targetUnit)&&<option value="destination">Підрозділ призначення</option>}
       </select></Field>}
       <Field label="Рішення"><select name="status"><option value="approved">Погодити</option><option value="rejected">Відхилити</option><option value="clarification">Запросити уточнення</option></select></Field>
+      {entry.title==='Вступ до підрозділу'&&<label className="checkbox"><input type="checkbox" name="manualVerified"/>Ручні вимоги та докази перевірено</label>}
       <DecisionTemplate field="body"/><Field label="Пояснення"><textarea name="body" required maxLength={5000}/></Field>
       <div className="actions"><button disabled={busy}>Зберегти рішення</button>{nextHref&&<button type="submit" data-next="true" className="secondary" disabled={busy}>Зберегти й перейти до наступного</button>}</div>
      </form>}

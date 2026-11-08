@@ -17,5 +17,8 @@ export function recruitmentRequirements(name:string){
   minDays:police?14:0,
   clearDiscipline:ncp||police,
   commanderApproval:ncp,
+  licenses:title.startsWith('злп')?['B','C']:title.startsWith('ссо')?['B']:[],
+  manualReview:/^(ссо|оаз|злп)/.test(title),
+  fitness:title.startsWith('ссо'),
  };
 }
