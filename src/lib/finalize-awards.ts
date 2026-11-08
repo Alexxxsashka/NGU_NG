@@ -1,4 +1,5 @@
 import 'server-only';
+import {createHash} from 'node:crypto';
 import Decimal from 'decimal.js';
 import {z} from 'zod';
 import {transaction} from '@/db';
@@ -11,19 +12,29 @@ import type {Viewer} from './domain';
 import type {AwardOrder} from './award-order-docx';
 
 export async function recalculateAwardWeek(input:unknown,actor:Viewer){
- const p=z.object({week}).parse(input);
+ const p=z.object({week,token:z.string().regex(/^[a-f0-9]{64}$/).optional()}).parse(input);
  return transaction(async c=>{
   await lockAdmin(c,actor);
   if((await c.query('SELECT 1 FROM settings WHERE key=$1',['award-order:'+p.week])).rowCount)
    throw new HttpError('Виплату за цей тиждень уже зафіксовано.',409);
-  const before=new Map((await awardPreview(p.week,c)).map(row=>[row.static_id,row.approved]));
+  const before=await awardPreview(p.week,c);
+  const previousAmounts=new Map(before.map(row=>[row.static_id,row.approved]));
+  await c.query('SAVEPOINT award_recalculation');
   const recalculated=await recalculateAwards(c,p.week);
-  const changes:AwardChange[]=(await awardPreview(p.week,c)).flatMap(row=>{
-   const previous=before.get(row.static_id)??null;
+  const after=await awardPreview(p.week,c);
+  const changes:AwardChange[]=after.flatMap(row=>{
+   const previous=previousAmounts.get(row.static_id)??null;
    return previous===row.approved?[]:[{staticId:row.static_id,before:previous,after:row.approved}];
   });
-  await audit(c,actor,'award.recalculate',p.week,null,{recalculated,changes});
-  return {recalculated,changes};
+  const totalDifference=changes.reduce((sum,row)=>sum.plus(row.after??0).minus(row.before??0),new Decimal(0)).toFixed(2);
+  const token=createHash('sha256').update(JSON.stringify([p.week,before,after,recalculated])).digest('hex');
+  if(!p.token){
+   await c.query('ROLLBACK TO SAVEPOINT award_recalculation');
+   return {recalculated,changes,totalDifference,token};
+  }
+  if(p.token!==token)throw new HttpError('Розрахунок змінився. Перегляньте оновлені суми перед застосуванням.',409);
+  await audit(c,actor,'award.recalculate',p.week,null,{recalculated,changes,totalDifference});
+  return {recalculated,changes,totalDifference,token};
  });
 }
 

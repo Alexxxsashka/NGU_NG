@@ -11,26 +11,29 @@ export function Periods(){
  const resource=useResource<Period[]>('admin/periods');
  const [week,setWeek]=useState(currentWeek),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
  const preview=useResource<AwardPreviewRow[]>('admin/award-preview?week='+week);
- const [changes,setChanges]=useState<AwardChange[]>([]);
+ const [plan,setPlan]=useState<{token:string;recalculated:number;changes:AwardChange[];totalDifference:string}|null>(null);
  const period=resource.data?.find(p=>p.week_start===week);
  const open=period?.open??false;
  const disabled=busy||resource.loading||!!resource.error;
  const status=(period?:Period)=>period?.paid?'Виплачено':period?.open?'Прийом відкрито':'Прийом закрито';
 
  async function toggle(){
-  setBusy(true);setError('');setMessage('');
+  setPlan(null);setBusy(true);setError('');setMessage('');
   try{await api('admin/periods',{week,open:!open});await resource.refresh();}
   catch(e){setError((e as Error).message);}
   finally{setBusy(false);}
  }
 
- async function recalculate(){
+ async function recalculate(apply=false){
+  if(apply&&!plan)return;
   setBusy(true);setError('');setMessage('');
   try{
-   const {recalculated,changes}=await api<{recalculated:number;changes:AwardChange[]}>('admin/periods/recalculate',{week});
-   setChanges(changes);await preview.refresh();
-   setMessage(recalculated?'Перераховано позицій: '+recalculated+'.':'Усі невиплачені позиції вже відповідають чинним ставкам і лімітам.');
-  }catch(e){setError((e as Error).message);}
+   const result=await api<NonNullable<typeof plan>>('admin/periods/recalculate',{week,token:apply?plan?.token:undefined});
+   if(apply){
+    setPlan(null);await preview.refresh();
+    setMessage('Перераховано позицій: '+result.recalculated+'.');
+   }else setPlan(result);
+  }catch(e){setPlan(null);setError((e as Error).message);}
   finally{setBusy(false);}
  }
 
@@ -54,15 +57,18 @@ export function Periods(){
    <h2>Прийом звітів і виплата</h2>
    <p><Link href="/admin/weekly-bonus/award-orders">Реєстр наказів Word</Link></p>
    <Field label="Початок звітного тижня"><input type="date" value={week} disabled={busy} onChange={e=>{
-    if(e.target.value){setWeek(monday(e.target.value));setChanges([]);setError('');setMessage('');}
+    if(e.target.value){setWeek(monday(e.target.value));setPlan(null);setError('');setMessage('');}
    }}/></Field>
    <p>{dateLabel(week)} — {dateLabel(shiftDate(week,6))}</p>
    <p><span className={'pill '+(open||period?.paid?'approved':'pending')}>{status(period)}</span></p>
    <div className="actions">
     {!period?.paid&&<button disabled={disabled} onClick={toggle}>{open?'Закрити прийом':'Відкрити прийом'}</button>}
-    {period&&!period.paid&&<button className="secondary" disabled={disabled} onClick={recalculate}>Перерахувати звіти</button>}
+    {period&&!period.paid&&<button className="secondary" disabled={disabled} onClick={()=>void recalculate()}>Переглянути перерахунок</button>}
     {period&&!open&&<button className="secondary" disabled={disabled} onClick={payout}>{period.paid?'Завантажити наказ Word':'Виплата й наказ Word'}</button>}
    </div>
+   {plan&&<div className="stack"><p>Позицій зі змінами: {plan.recalculated}. Різниця до виплати: {plan.totalDifference} $.</p>
+    {plan.recalculated>0&&<button disabled={disabled} onClick={()=>void recalculate(true)}>Застосувати перерахунок</button>}
+   </div>}
    <p className="muted">Для виплати закрийте прийом і завершіть перевірку всіх звітів за тиждень.</p>
    {message&&<Notice>{message}</Notice>}
    {(error||resource.error)&&<Notice error>{error||resource.error}</Notice>}
@@ -72,7 +78,7 @@ export function Periods(){
    {preview.loading&&<p>Завантажуємо нарахування…</p>}
    {preview.data?.length===0&&<p>Схвалених невиплачених позицій за цей тиждень немає.</p>}
    {preview.data?.length?<div className="table-wrap"><table><thead><tr><th>Боєць</th><th>Розраховано</th><th>Ліміт</th><th>Коригувань</th><th>До виплати</th><th>Після перерахунку</th></tr></thead><tbody>
-    {preview.data.map(row=>{const change=changes.find(item=>item.staticId===row.static_id);
+    {preview.data.map(row=>{const change=plan?.changes.find(item=>item.staticId===row.static_id);
      return <tr key={row.static_id}><td>{row.name}<small>ID {row.static_id}</small></td><td>{row.estimate??'—'}</td><td>{row.cap??'Без ліміту'}</td><td>{row.manual}</td><td>{row.approved??'—'}</td><td>{change?(change.before??'—')+' → '+(change.after??'—'):'—'}</td></tr>;
     })}
    </tbody></table></div>:null}
@@ -80,7 +86,7 @@ export function Periods(){
   <Refresh loading={resource.loading} onClick={resource.refresh} at={resource.updatedAt}/>
   <div className="table-wrap"><table><thead><tr><th>Тиждень</th><th>Стан</th><th>Остання зміна</th></tr></thead><tbody>
    {resource.data?.map(p=><tr key={p.week_start}>
-    <td><button type="button" className="text-button" disabled={busy} onClick={()=>{setWeek(p.week_start);setChanges([]);setError('');setMessage('');}}>{dateLabel(p.week_start)}</button></td>
+    <td><button type="button" className="text-button" disabled={busy} onClick={()=>{setWeek(p.week_start);setPlan(null);setError('');setMessage('');}}>{dateLabel(p.week_start)}</button></td>
     <td><span className={'pill '+(p.open||p.paid?'approved':'pending')}>{status(p)}</span></td><td>{new Date(p.updated_at).toLocaleString('uk-UA')}</td>
    </tr>)}
   </tbody></table></div>
