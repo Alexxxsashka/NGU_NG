@@ -3,6 +3,7 @@ import {notFound,redirect} from 'next/navigation';
 import {query} from '@/db';
 import {accessibleUnits} from '@/lib/unit-page';
 import {kmbUnitId} from '@/lib/service-workspace';
+import {unitCover} from '@/lib/unit-artwork';
 import {commandSections} from '@/lib/command-sections';
 import type {Viewer} from '@/lib/domain';
 import {CardLink} from './card-link';
@@ -17,7 +18,7 @@ export async function CommandWorkspace({actor,unitId,section}:{actor:Viewer;unit
  if(!unitId){
   if(units.length===1)redirect('/command/'+units[0].id+'/overview');
   return <section id="content" className="panel"><h1>Керування підрозділами</h1><p>Оберіть підрозділ для роботи.</p>
-   <div className="home-card-grid">{units.map(unit=><CardLink key={unit.id} href={'/command/'+unit.id+'/overview'} title={unit.name} image="/portal-art/home/service.webp"/>)}</div>
+   <div className="home-card-grid">{units.map(unit=><CardLink key={unit.id} href={'/command/'+unit.id+'/overview'} title={unit.name} image={unitCover(unit.name)??'/portal-art/home/service.webp'}/>)}</div>
   </section>;
  }
  const unit=units.find(unit=>unit.id===unitId);
