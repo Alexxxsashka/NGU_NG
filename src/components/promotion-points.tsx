@@ -9,7 +9,7 @@ import {IllustratedSummary} from './illustrated-summary';
 import {api,Field,Loading,Modal,Notice,useResource} from './ui';
 
 const status={clarification:'Потребує уточнення',pending:'На перевірці',approved:'Зараховано',rejected:'Відхилено'};
-export function PromotionPoints({unitId,focus,screen='',mode='personal'}:{unitId?:string;focus?:string;screen?:string;mode?:'personal'|'review'|'catalog'}){
+export function PromotionPoints({unitId,focus,taskId,screen='',mode='personal'}:{unitId?:string;focus?:string;taskId?:string;screen?:string;mode?:'personal'|'review'|'catalog'}){
  const resource=useResource<Awaited<ReturnType<typeof promotionPoints>>>('promotion-points'+'?'+new URLSearchParams({...unitId?{unit:unitId}:{},...focus?{entry:focus}:{}}));
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
  async function save(event:FormEvent<HTMLFormElement>,make:(fd:FormData)=>unknown){
@@ -52,8 +52,8 @@ export function PromotionPoints({unitId,focus,screen='',mode='personal'}:{unitId
     {[false,true].map(local=>{
      const tasks=available.filter(task=>Boolean(task.unitId)===local);
      return tasks.length>0&&<section key={String(local)}><h3>{local?'Завдання мого підрозділу':'Спільні завдання НГУ'}</h3>
-      <div className="table-wrap"><table><thead><tr><th scope="col">Завдання</th><th scope="col">Балів за виконання</th></tr></thead>
-       <tbody>{tasks.map(task=><tr key={task.id}><td><strong>{task.name}</strong>{task.requirements&&<small>{task.requirements}</small>}</td><td className="number"><strong>{task.points}</strong></td></tr>)}</tbody>
+      <div className="table-wrap"><table><thead><tr><th scope="col">Завдання</th><th scope="col">Балів за виконання</th>{data.profile&&<th scope="col">Дія</th>}</tr></thead>
+       <tbody>{tasks.map(task=><tr key={task.id}><td><strong>{task.name}</strong>{task.requirements&&<small>{task.requirements}</small>}</td><td className="number"><strong>{task.points}</strong></td>{data.profile&&<td><Link className="button secondary" aria-label={'Додати до звіту: '+task.name} href={'/portal/promotion-points/submit?'+new URLSearchParams({task:task.id})}>Додати до звіту</Link></td>}</tr>)}</tbody>
       </table></div>
      </section>;
     })}
@@ -61,7 +61,7 @@ export function PromotionPoints({unitId,focus,screen='',mode='personal'}:{unitId
    {mode==='personal'&&screen==='submit'&&!data.profile&&<Notice>Для подання звіту потрібен активний профіль зі званням і підрозділом.</Notice>}
    {mode==='personal'&&screen==='submit'&&data.profile&&<details id="promotion-submit" className="account-action profile-action cabinet-target" open>
     <IllustratedSummary title="Подати звіт із завданнями" image="/portal-art/cabinet/training.webp"/>
-    <PromotionReportForm key={data.actorId} actorId={data.actorId} tasks={available} onSaved={resource.refresh}/>
+    <PromotionReportForm key={data.actorId+':'+(taskId??'')} selectedTaskId={available.find(task=>task.id===taskId)?.id} actorId={data.actorId} tasks={available} onSaved={resource.refresh}/>
    </details>}
    {mode==='catalog'&&data.units.length>0&&<section className="panel"><h2>Завдання підрозділів і заохочення</h2>
     <details><summary>Додати завдання</summary><form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'task',unitId:f.get('unitId')||null,name:f.get('name'),points:Number(f.get('points')),requirements:f.get('requirements')}))}>

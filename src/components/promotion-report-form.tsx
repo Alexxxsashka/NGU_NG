@@ -6,23 +6,29 @@ import {api,Field,Notice} from './ui';
 
 type Task={id:string;name:string;points:number;unitId:string|null;requirements?:string};
 type Row={id:number;taskId:string;quantity:string;links:string};
-export function PromotionReportForm({tasks,onSaved,actorId}:{actorId:string;tasks:Task[];onSaved:()=>Promise<void>}){
+export function PromotionReportForm({tasks,onSaved,actorId,selectedTaskId}:{actorId:string;selectedTaskId?:string;tasks:Task[];onSaved:()=>Promise<void>}){
  const [rows,setRows]=useState<Row[]>([{id:0,taskId:'',quantity:'1',links:''}]);
  const [nextId,setNextId]=useState(1),[busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
  const [loaded,setLoaded]=useState(false),[storageError,setStorageError]=useState(false);
  const draftKey='ngu.promotion-draft:'+actorId;
  useEffect(()=>{
+  let draft:Row[]=[{id:0,taskId:'',quantity:'1',links:''}];
   try{
    const raw=sessionStorage.getItem(draftKey);
-   if(raw){
-    const previous=JSON.parse(raw) as Row[];
-    if(Array.isArray(previous)&&previous.length>0&&previous.length<=50&&previous.every(row=>typeof row.id==='number'&&typeof row.taskId==='string'&&typeof row.quantity==='string'&&typeof row.links==='string')){
-     setRows(previous);setNextId(Math.max(...previous.map(row=>row.id))+1);
-    }
+   const previous:unknown=raw?JSON.parse(raw):null;
+   if(Array.isArray(previous)&&previous.length>0&&previous.length<=50&&previous.every(row=>row&&typeof row.id==='number'&&typeof row.taskId==='string'&&typeof row.quantity==='string'&&typeof row.links==='string')){
+    draft=previous;
    }
   }catch{setStorageError(true);}
-  setLoaded(true);
- },[draftKey]);
+  let next=Math.max(...draft.map(row=>row.id))+1;
+  if(selectedTaskId&&!draft.some(row=>row.taskId===selectedTaskId)){
+   const empty=draft.find(row=>!row.taskId&&!row.links&&row.quantity==='1');
+   if(empty)draft=draft.map(row=>row.id===empty.id?{...row,taskId:selectedTaskId}:row);
+   else if(draft.length<50)draft=[...draft,{id:next++,taskId:selectedTaskId,quantity:'1',links:''}];
+   else setError('У чернетці вже 50 завдань. Звільніть рядок, щоб додати нове.');
+  }
+  setRows(draft);setNextId(next);setLoaded(true);
+ },[draftKey,selectedTaskId]);
  useEffect(()=>{
   if(!loaded)return;
   try{

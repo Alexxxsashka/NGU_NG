@@ -21,7 +21,7 @@ import {Personal} from '@/components/personal';
 import {UnitSpace} from '@/components/unit-space';
 import {ServiceWorkspace} from '@/components/service-workspace';
 import {ServiceTablet} from '@/components/service-tablet';
-export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string;next?:string;entry?:string;report?:string;from?:string}>}){
+export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string;next?:string;entry?:string;task?:string;report?:string;from?:string}>}){
  const {slug}=await params;const path=slug.join('/');
  if(path==='weekly-bonus')return <div id="content"><section className="panel portal-preview-header weekly-bonus-banner">
   <h1>Щотижневе преміювання</h1>
@@ -50,7 +50,7 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
  if(path==='my-unit'||path==='portal/structure'||slug[0]==='units'&&slug.length===2){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <UnitSpace userId={u.id} ownOnly={path==='my-unit'} unitId={slug[0]==='units'?slug[1]:undefined}/>;}
  if(path==='weekly-bonus/me'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <section id="content"><h1>Мої звіти</h1><details className="account-action profile-action service-reports" open={!!((await searchParams).report||(await searchParams).from)}><IllustratedSummary title="Журнал звітів" image="/portal-art/catalog/report-journal.webp"/><div className="account-action-content"><ReportList personal/></div></details></section>;}
  if(slug[0]==='command'&&(slug.length===1||slug.length===3)){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <CommandWorkspace actor={u} unitId={slug[1]} section={slug[2]} filters={await searchParams}/>;}
- if(slug[0]==='portal'&&slug[1]==='promotion-points'&&(slug.length===2||slug.length===3&&['tasks','submit','history'].includes(slug[2]))){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <PromotionPoints screen={slug[2]} focus={(await searchParams).entry}/>;}
+ if(slug[0]==='portal'&&slug[1]==='promotion-points'&&(slug.length===2||slug.length===3&&['tasks','submit','history'].includes(slug[2]))){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <PromotionPoints screen={slug[2]} taskId={(await searchParams).task} focus={(await searchParams).entry}/>;}
  if(path==='portal/military-ticket'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <MilitaryTicket/>;}
  if(path==='cabinet'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword} overview={u.mustChangePassword?null:<ServiceTablet user={u}/>}/>;}
  if(slug[0]==='portal'&&slug.length===2&&Object.hasOwn(portalPreviews,slug[1])){
