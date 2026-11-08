@@ -24,7 +24,7 @@ const correction=z.discriminatedUnion('field',[
  z.object({field:z.literal('bio'),value:z.string().trim().max(500)}),
  z.object({field:z.literal('callsign'),value:z.string().trim().min(1).max(40)}),
 ]);
-const reportTemplate=z.object({title,fields:z.array(z.string().trim().min(1).max(80)).max(10),route:z.enum(['unit','command']),issueOrder:z.boolean()});
+const reportTemplate=z.object({title,fields:z.array(z.string().trim().min(1).max(80)).max(10),route:z.enum(['unit','command']),issueOrder:z.boolean(),personnelAction:z.enum(['Переведення','Вступ або поновлення','Звільнення','Виправлення особової справи','Відпустка']).optional()});
 type ReportTemplate=z.infer<typeof reportTemplate>&{id:string};
 const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('report-template'),id:uuid.optional(),template:reportTemplate}),
@@ -93,7 +93,7 @@ export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:s
   module==='calendar'&&readUnits.length?query<{id:string;name:string;from:string;to:string}>(`SELECT value->>'id' AS id,value->>'name' AS name,
    value->>'from' AS "from",value->>'to' AS "to" FROM settings
    WHERE key LIKE 'service-entry:%' AND value->>'module'='requests' AND value->>'status'='approved'
-   AND value->>'unit'=ANY($1::text[]) AND value->>'title'=ANY($2::text[])
+   AND value->>'unit'=ANY($1::text[]) AND coalesce(value#>>'{template,personnelAction}',value->>'title')=ANY($2::text[])
    AND left(value->>'to',10)>=to_char(now() AT TIME ZONE 'Europe/Kyiv','YYYY-MM-DD')
    ORDER BY value->>'from',key LIMIT 100`,[readUnits,absenceTypes]):[],
   module==='requests'&&unitId?query<{id:number;name:string}>('SELECT id,name FROM ranks ORDER BY id'):[],
@@ -171,22 +171,24 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
   };
   let proposed:Entry['correction'];
   let template:ReportTemplate|undefined;
+  let requestType=action.kind==='request'?action.type:undefined;
   let recruitmentRules:string|undefined;
   let requirements:Entry['recruitmentRequirements'];
   if(action.kind==='request'||action.kind==='publish'){
    if(action.kind==='publish'&&action.module==='training'&&action.unit!==trainingUnit?.id)throw new HttpError('Програмою КМБ керує НЦП.',403);
    if(action.kind==='publish'&&!editors.has(action.unit))throw new HttpError('Ви не керуєте цим підрозділом.',403);
-   if(action.kind==='request'&&['Переведення','Вступ до підрозділу'].includes(action.type)&&(!action.targetUnit||action.targetUnit===account.unit_id||
-     !(await c.query('SELECT id FROM units WHERE id=$1 AND active',[action.targetUnit])).rowCount))throw new HttpError('Оберіть інший чинний підрозділ.');
    if(action.kind==='request'){
     if(action.type==='Інший рапорт'){
      const {rows:[saved]}=await c.query<{value:ReportTemplate}>('SELECT value FROM settings WHERE key=$1',['report-template:'+action.templateId]);
-     if(!saved||!account.unit_id)throw new HttpError('Оберіть чинний тип рапорту й перевірте призначення до підрозділу.');
+     if(!saved||(!account.unit_id&&saved.value.personnelAction!=='Вступ або поновлення'))throw new HttpError('Оберіть чинний тип рапорту й перевірте призначення до підрозділу.');
      template=saved.value;
+     requestType=template.personnelAction??action.type;
      if((action.answers?.length??0)!==template.fields.length||action.answers?.some(answer=>!answer))
       throw new HttpError('Заповніть усі поля рапорту.');
     }
-    if(action.type==='Виправлення особової справи'){
+    if(['Переведення','Вступ до підрозділу'].includes(requestType!)&&(!action.targetUnit||action.targetUnit===account.unit_id||
+     !(await c.query('SELECT id FROM units WHERE id=$1 AND active',[action.targetUnit])).rowCount))throw new HttpError('Оберіть інший чинний підрозділ.');
+    if(requestType==='Виправлення особової справи'){
      if(!account.id||!account.unit_id||!action.correction)throw new HttpError('Оберіть поле й нове значення.');
      const {rows:[details]}=await c.query('SELECT value FROM settings WHERE key=$1',['service:'+account.id]);
      const previous=details?.value?.[action.correction.field]??null;
@@ -196,8 +198,8 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
       throw new HttpError('Дата вступу не може бути в майбутньому.');
      proposed={...action.correction,previous,profileId:account.id};
     }
-    if(action.type!=='OOC-відпустка'&&!action.body)throw new HttpError('Вкажіть підставу заявки.');
-    if(action.type==='Вступ до підрозділу'){
+    if(requestType!=='OOC-відпустка'&&!action.body)throw new HttpError('Вкажіть підставу заявки.');
+    if(requestType==='Вступ до підрозділу'){
      const {rows:[unit]}=await c.query<{name:string;rules:string|null;min_rank:number|null}>(`SELECT u.name,s.value->>'body' AS rules,(s.value->>'minRank')::int AS min_rank FROM units u
       LEFT JOIN settings s ON s.key='recruitment:'||u.id::text WHERE u.id=$1 AND u.active`,[action.targetUnit]);
      if(!unit)throw new HttpError('Оберіть чинний підрозділ.');
@@ -214,13 +216,13 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
       AND value->>'status' IN ('pending','clarification','approved') LIMIT 1`,[actor.id,action.targetUnit])).rowCount)
       throw new HttpError('Заявка до цього підрозділу вже існує.',409);
     }
-    if(action.type==='IC-відгул'){
+    if(requestType==='IC-відгул'){
      if(!action.post)throw new HttpError('Вкажіть пост або службове завдання.');
      const minutes=(Date.parse(action.to+'Z')-Date.parse(action.from+'Z'))/60000;
      if(!action.from?.includes('T')||!action.to?.includes('T')||!(minutes>0&&minutes<=120))throw new HttpError('Відгул має тривати від 1 хвилини до 2 годин.');
     }
-    if(['Відпустка','OOC-відпустка'].includes(action.type)&&(!action.from||!action.to||action.from.includes('T')||action.to.includes('T')||action.from>action.to))throw new HttpError('Вкажіть коректні дати відпустки.');
-    if(action.type==='Вступ або поновлення'&&(!action.targetUnit||!(await c.query('SELECT 1 FROM units WHERE id=$1 AND active',[action.targetUnit])).rowCount))
+    if(['Відпустка','OOC-відпустка'].includes(requestType!)&&(!action.from||!action.to||action.from.includes('T')||action.to.includes('T')||action.from>action.to))throw new HttpError('Вкажіть коректні дати відпустки.');
+    if(requestType==='Вступ або поновлення'&&(!action.targetUnit||!(await c.query('SELECT 1 FROM units WHERE id=$1 AND active',[action.targetUnit])).rowCount))
      throw new HttpError('Оберіть підрозділ для вступу.');
    }
    if(action.kind==='publish'&&action.requirementId&&(action.module!=='calendar'||!(await c.query('SELECT 1 FROM settings WHERE key=$1',['promotion-requirement:'+action.requirementId])).rowCount))
@@ -235,12 +237,12 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
      await audit(c,actor,'service.archive',action.replaces,previous.value,{...previous.value,archived:true});
     }
    }
-   const previousUnit=action.kind==='request'&&action.type==='Вступ або поновлення'&&!account.unit_id?
+   const previousUnit=action.kind==='request'&&requestType==='Вступ або поновлення'&&!account.unit_id?
     (await c.query<{unit_id:string|null}>('SELECT unit_id FROM personnel WHERE user_id=$1',[actor.id])).rows[0]?.unit_id:null;
    const id=randomUUID();
-   const entry:Entry={id,module:action.kind==='request'?'requests':action.module,unit:action.kind==='request'?(action.type==='Вступ до підрозділу'?null:account.unit_id??previousUnit??null):action.unit,
+   const entry:Entry={id,module:action.kind==='request'?'requests':action.module,unit:action.kind==='request'?(requestType==='Вступ до підрозділу'?null:account.unit_id??previousUnit??null):action.unit,
     author:actor.id,name:actor.name,title:action.kind==='request'?(template?.title??action.type):action.title,body:action.body,createdAt:new Date().toISOString(),
-    ...(action.kind==='request'?{status:'pending' as const,template,answers:template?action.answers:undefined,correction:proposed,recruitmentRequirements:requirements,recruitmentEvidence:requirements?action.recruitmentEvidence:undefined,recruitmentRules,targetUnit:['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(action.type)?action.targetUnit:undefined,from:action.from,to:action.to,post:action.type==='IC-відгул'?action.post:undefined,replacement:action.type==='IC-відгул'?action.replacement:undefined,links:action.links}:{url:action.url,date:action.date,revision:action.revision,category:action.category,replaces:action.replaces,draft:action.draft,requiresProof:action.requiresProof,responsible:action.responsible,requirementId:action.requirementId})};
+    ...(action.kind==='request'?{status:'pending' as const,template,answers:template?action.answers:undefined,correction:proposed,recruitmentRequirements:requirements,recruitmentEvidence:requirements?action.recruitmentEvidence:undefined,recruitmentRules,targetUnit:['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(requestType!)?action.targetUnit:undefined,from:action.from,to:action.to,post:requestType==='IC-відгул'?action.post:undefined,replacement:requestType==='IC-відгул'?action.replacement:undefined,links:action.links}:{url:action.url,date:action.date,revision:action.revision,category:action.category,replaces:action.replaces,draft:action.draft,requiresProof:action.requiresProof,responsible:action.responsible,requirementId:action.requirementId})};
    await write(prefix+id,entry);
    await audit(c,actor,'service.'+action.kind,id,null,entry);
    if(action.kind==='request'&&action.draftId)await c.query('DELETE FROM settings WHERE key=$1',['service-draft:'+action.draftId]);
@@ -249,6 +251,9 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
   const {rows:[row]}=await c.query<{value:Entry}>('SELECT value FROM settings WHERE key=$1 FOR UPDATE',[prefix+action.id]);
   const entry=row?.value;
   if(!entry||entry.archived)throw new HttpError('Запис не знайдено.',404);
+  const workflow=entry.template?.personnelAction??entry.title;
+  if(entry.template?.route==='command'&&['decide','apply','transfer'].includes(action.kind)&&!(account.role==='admin'||account.rank>=13&&account.rank<=15))
+   throw new HttpError('Цей рапорт розглядає керуючий склад.',403);
   const canEdit=!!entry.unit&&editors.has(entry.unit)&&(entry.module!=='training'||entry.unit===trainingUnit?.id);
   if(action.kind==='resubmit'){
    if(entry.module!=='requests'||entry.author!==actor.id||entry.status!=='clarification')throw new HttpError('Уточнення недоступне.',403);
@@ -256,9 +261,9 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    await write(prefix+entry.id,next);
    await audit(c,actor,'service.request.resubmit',entry.id,entry,next);
   }else if(action.kind==='apply'){
-   if(entry.module!=='requests'||entry.status!=='approved'||entry.author===actor.id||!['Вступ або поновлення','Звільнення','Відпустка'].includes(entry.title))
+   if(entry.module!=='requests'||entry.status!=='approved'||entry.author===actor.id||!['Вступ або поновлення','Звільнення','Відпустка'].includes(workflow))
     throw new HttpError('Заявка недоступна для виконання.',409);
-   const admission=entry.title==='Вступ або поновлення';
+   const admission=workflow==='Вступ або поновлення';
    const scope=admission?entry.targetUnit:entry.unit;
    if(!scope||!editors.has(scope))throw new HttpError('Виконання поза межами ваших повноважень.',403);
    if(entry.appliedAt)return {saved:true};
@@ -276,13 +281,13 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
     await write('service:'+person.id,{...person.details,joinedOn:date,joinedOnVerified:true});
    }else{
     if(!person.active)throw new HttpError('Службовий профіль неактивний.',409);
-    if(entry.title==='Звільнення')await c.query('UPDATE personnel SET active=false WHERE id=$1',[person.id]);
+    if(workflow==='Звільнення')await c.query('UPDATE personnel SET active=false WHERE id=$1',[person.id]);
    }
    const orderId=await issueOrder(entry,scope,next.appliedAt);
    await write(prefix+entry.id,{...next,orderId});
-   await audit(c,actor,'service.request.applied',person.id,{unitId:person.unit_id,rank:person.rank,active:person.active},{...next,orderId,unitId:scope,rank:admission?action.rank:person.rank,active:entry.title!=='Звільнення'});
+   await audit(c,actor,'service.request.applied',person.id,{unitId:person.unit_id,rank:person.rank,active:person.active},{...next,orderId,unitId:scope,rank:admission?action.rank:person.rank,active:workflow!=='Звільнення'});
   }else if(action.kind==='cancel-absence'){
-   if(entry.module!=='requests'||!absenceTypes.includes(entry.title)||(!canEdit&&entry.author!==actor.id))
+   if(entry.module!=='requests'||!absenceTypes.includes(workflow)||(!canEdit&&entry.author!==actor.id))
     throw new HttpError('Скасування недоступне.',403);
    if(entry.status==='cancelled')return {saved:true};
    if(entry.appliedAt||!['pending','clarification','approved'].includes(entry.status??''))
@@ -292,19 +297,17 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    await audit(c,actor,'service.request.cancel',entry.id,entry,next);
   }else if(action.kind==='decide'){
    if(entry.module!=='requests'||entry.status!=='pending'||entry.author===actor.id||(!canEdit&&account.role!=='admin'&&!(entry.targetUnit&&editors.has(entry.targetUnit))))throw new HttpError('Рішення недоступне.',403);
-   if(entry.template?.route==='command'&&!(account.role==='admin'||account.rank>=13&&account.rank<=15))
-    throw new HttpError('Цей рапорт розглядає керуючий склад.',403);
-   if(action.status==='approved'&&absenceTypes.includes(entry.title)){
+   if(action.status==='approved'&&absenceTypes.includes(workflow)){
     if(!entry.from||!entry.to)throw new HttpError('У заявці немає коректного періоду.',409);
     const overlap=await c.query(`SELECT 1 FROM settings WHERE key LIKE 'service-entry:%'
      AND value->>'module'='requests' AND value->>'author'=$1 AND value->>'status'='approved'
-     AND value->>'title'=ANY($2::text[]) AND value->>'id'<>$3
+     AND coalesce(value#>>'{template,personnelAction}',value->>'title')=ANY($2::text[]) AND value->>'id'<>$3
      AND (value->>'from')::timestamp < $5::timestamp + CASE WHEN length($5)=10 THEN interval '1 day' ELSE interval '0' END
      AND (value->>'to')::timestamp + CASE WHEN length(value->>'to')=10 THEN interval '1 day' ELSE interval '0' END > $4::timestamp
      LIMIT 1`,[entry.author,absenceTypes,entry.id,entry.from,entry.to]);
     if(overlap.rowCount)throw new HttpError('Цей період перетинається з уже погодженою відсутністю.',409);
    }
-   if(action.status==='approved'&&entry.title==='Вступ до підрозділу'){
+   if(action.status==='approved'&&workflow==='Вступ до підрозділу'){
     const {rows:[unit]}=await c.query<{name:string}>('SELECT name FROM units WHERE id=$1 AND active',[entry.targetUnit]);
     if(!unit||!editors.has(entry.targetUnit!))throw new HttpError('Погодження доступне командуванню підрозділу призначення.',403);
     const defaults=recruitmentRequirements(unit.name);
@@ -345,7 +348,7 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    }
    let transferApprovals=entry.transferApprovals;
    let status:Entry['status']=action.status;
-   if(entry.title==='Переведення'){
+   if(workflow==='Переведення'){
     const side=action.side;
     const unit=side==='source'?entry.unit:entry.targetUnit;
     if(!side||!unit||!editors.has(unit))throw new HttpError('Оберіть сторону переведення в межах своїх повноважень.',403);
@@ -357,14 +360,14 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
      if(!other)status='pending';
     }else transferApprovals=undefined;
    }
-   const orderId=entry.template?.issueOrder&&status==='approved'&&entry.unit
+   const orderId=(entry.template?.issueOrder&&!entry.template.personnelAction||!!entry.correction)&&status==='approved'&&entry.unit
     ?await issueOrder({...entry,decision:action.body},entry.unit,decidedAt):entry.orderId;
-   const next={...entry,status,orderId,appliedAt,transferApprovals,manualVerified:action.status==='approved'&&entry.title==='Вступ до підрозділу'?action.manualVerified:undefined,decision:action.body,decidedBy:actor.name,decidedAt};
+   const next={...entry,status,orderId,appliedAt,transferApprovals,manualVerified:action.status==='approved'&&workflow==='Вступ до підрозділу'?action.manualVerified:undefined,decision:action.body,decidedBy:actor.name,decidedAt};
    await write(prefix+entry.id,next);
    await audit(c,actor,'service.request.decision',entry.id,entry,next,action.body);
   }else if(action.kind==='transfer'){
    if(account.role!=='admin'&&!(account.rank>=13&&account.rank<=15))throw new HttpError('Переведення застосовує керівний склад.',403);
-   if(entry.author===actor.id||entry.module!=='requests'||entry.title!=='Переведення'||entry.status!=='approved'||!entry.targetUnit||!editors.has(entry.targetUnit))
+   if(entry.author===actor.id||entry.module!=='requests'||workflow!=='Переведення'||entry.status!=='approved'||!entry.targetUnit||!editors.has(entry.targetUnit))
     throw new HttpError('Заявка недоступна для переведення.',409);
    if(entry.appliedAt)return {saved:true};
    const {rows:[person]}=await c.query(`SELECT p.id,p.unit_id,p.rank,u.role,d.value->>'leadershipRole' AS leadership_role

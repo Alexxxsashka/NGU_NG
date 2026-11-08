@@ -55,6 +55,7 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
  ));
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Kyiv'}).format(new Date());
  const template=data?.reportTemplates.find(item=>item.id===templateId);
+ const requestWorkflow=template?.personnelAction&&requestType==='Інший рапорт'?template.personnelAction:requestType;
  const selectedTemplate=data?.reportTemplates.find(item=>item.id===manageTemplate);
  const recruitmentTarget=data?.targets.find(unit=>unit.id===recruitmentUnit);
  const editors=data?.units.filter(unit=>unit.editor)??[];
@@ -80,11 +81,12 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
     <Field label="Тип рапорту"><select value={manageTemplate} onChange={event=>setManageTemplate(event.target.value)}><option value="">Новий тип</option>{data.reportTemplates.map(item=><option value={item.id} key={item.id}>{item.title}</option>)}</select></Field>
     <form key={manageTemplate} className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'report-template',id:manageTemplate||undefined,template:{
      title:f.get('title'),fields:String(f.get('fields')??'').split(/\r?\n/).map(field=>field.trim()).filter(Boolean),
-     route:f.get('route'),issueOrder:f.has('issueOrder'),
+     route:f.get('route'),issueOrder:f.has('issueOrder'),personnelAction:f.get('personnelAction')||undefined,
     }}))}>
      <Field label="Назва"><input name="title" required maxLength={120} defaultValue={selectedTemplate?.title}/></Field>
      <Field label="Обов’язкові поля · одне на рядок"><textarea name="fields" defaultValue={selectedTemplate?.fields.join('\n')}/></Field>
      <Field label="Хто погоджує"><select name="route" defaultValue={selectedTemplate?.route??'unit'}><option value="unit">Командування підрозділу</option><option value="command">Керуючий склад</option></select></Field>
+     <Field label="Кадрова дія після погодження"><select name="personnelAction" defaultValue={selectedTemplate?.personnelAction??''}><option value="">Без кадрової дії</option>{['Переведення','Вступ або поновлення','Звільнення','Виправлення особової справи','Відпустка'].map(action=><option key={action}>{action}</option>)}</select><small>Кадровий сценарій формує наказ під час застосування рішення.</small></Field>
      <label className="checkbox"><input name="issueOrder" type="checkbox" defaultChecked={selectedTemplate?.issueOrder}/>Сформувати наказ після погодження</label>
      <button disabled={busy}>Зберегти тип</button>
     </form>
@@ -118,7 +120,7 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
        </label>)}
       </div>
      </fieldset>
-     {['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(requestType)&&<Field label="Бажаний підрозділ"><select name="targetUnit" defaultValue={draftRequest?.targetUnit} required onChange={event=>setRecruitmentUnit(event.target.value)}><option value="">Оберіть підрозділ</option>{data.targets.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>}
+     {['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(requestWorkflow)&&<Field label="Бажаний підрозділ"><select name="targetUnit" defaultValue={draftRequest?.targetUnit} required onChange={event=>setRecruitmentUnit(event.target.value)}><option value="">Оберіть підрозділ</option>{data.targets.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>}
      {requestType==='Вступ до підрозділу'&&recruitmentTarget&&<>
       <p style={{whiteSpace:'pre-line'}}>{recruitmentTarget.rules}</p>
       <p>Мінімальний ранг: {recruitmentTarget.requirements.minRank??'ще не підтверджено'}</p>
@@ -129,8 +131,8 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
       {recruitmentTarget.requirements.fitness&&<Field label="Фізична підготовка"><textarea name="fitness" required={!saveDraft} maxLength={1000} defaultValue={draftRequest?.recruitmentEvidence?.fitness}/></Field>}
       {recruitmentTarget.requirements.manualReview&&<Field label="Відомості для ручної перевірки"><textarea name="manual" required={!saveDraft} maxLength={1500} defaultValue={draftRequest?.recruitmentEvidence?.manual}/></Field>}
      </>}
-     {['Відпустка','IC-відгул','OOC-відпустка'].includes(requestType)&&<div className="form-grid"><Field label="Від"><input name="from" defaultValue={draftRequest?.from} type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field><Field label="До"><input name="to" defaultValue={draftRequest?.to} type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field></div>}
-     {requestType==='Виправлення особової справи'&&<div className="form-grid">
+     {['Відпустка','IC-відгул','OOC-відпустка'].includes(requestWorkflow)&&<div className="form-grid"><Field label="Від"><input name="from" defaultValue={draftRequest?.from} type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field><Field label="До"><input name="to" defaultValue={draftRequest?.to} type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field></div>}
+     {requestWorkflow==='Виправлення особової справи'&&<div className="form-grid">
       <Field label="Поле"><select name="correctionField" value={correctionField} onChange={event=>setCorrectionField(event.target.value)}><option value="joinedOn">Дата вступу</option><option value="callsign">Позивний</option><option value="bio">Коротко про себе</option></select></Field>
       <Field label="Нове значення"><input key={correctionField} name="correctionValue" defaultValue={draftRequest?.correction?.field===correctionField?draftRequest.correction.value:undefined} type={correctionField==='joinedOn'?'date':'text'} required maxLength={correctionField==='bio'?500:40}/></Field>
      </div>}
@@ -188,6 +190,7 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
    const attendance=data.attendance.filter(row=>row.entry===entry.id);
    const myAttendance=attendance.find(row=>row.member===data.actorId);
    const unfinished=roster.filter(person=>!data.results.some(result=>result.entry===entry.id&&result.member===person.id&&result.status==='passed'));
+   const workflow=entry.template?.personnelAction??entry.title;
    return <article className="panel cabinet-target" id={'service-'+entry.id} key={entry.id}>
     <h2>{entry.title}</h2>
     <p className="muted">{data.units.find(unit=>unit.id===entry.unit)?.name||data.targets.find(unit=>unit.id===entry.unit)?.name||'Без підрозділу'} · {entry.name}</p>
@@ -216,7 +219,7 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
      {entry.replies.map((reply,index)=><article key={reply.at}><h3>Версія {index+2} · {new Date(reply.at).toLocaleString('uk-UA',{timeZone:'Europe/Kyiv'})}</h3><p>{reply.body}</p></article>)}
     </details>}
     {entry.replies?.map(reply=><div className="notice" key={reply.at}><p>{reply.body}</p>{reply.links.map((link,index)=><a key={link} href={link} target="_blank" rel="noopener noreferrer">Доказ {index+1} </a>)}</div>)}
-    {['IC-відгул','OOC-відпустка','Відпустка'].includes(entry.title)&&!entry.appliedAt&&
+    {['IC-відгул','OOC-відпустка','Відпустка'].includes(workflow)&&!entry.appliedAt&&
      ['pending','clarification','approved'].includes(entry.status??'')&&(entry.author===data.actorId||canEdit(entry.unit))&&
      <form onSubmit={event=>{if(confirm('Скасувати заявку на відсутність?'))void save(event,()=>({kind:'cancel-absence',id:entry.id}));else event.preventDefault();}}>
       <button className="secondary" disabled={busy}>Скасувати заявку</button>
@@ -229,7 +232,7 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
     {entry.status&&<p>{statusLabels[entry.status]}{entry.decision?' · '+entry.decision:''}{entry.decidedBy?' · '+entry.decidedBy:''}</p>}
     {entry.status==='pending'&&entry.author!==data.actorId&&(entry.template?.route!=='command'||data.canTransfer)&&(data.admin||canEdit(entry.unit)||canEdit(entry.targetUnit))&&
      <form className="stack" onSubmit={e=>void save(e,f=>({kind:'decide',id:entry.id,status:f.get('status'),side:f.get('side')||undefined,manualVerified:f.has('manualVerified'),body:f.get('body')}))}>
-      {entry.title==='Переведення'&&<Field label="Сторона погодження"><select name="side" required defaultValue=""><option value="">Оберіть сторону</option>
+      {workflow==='Переведення'&&<Field label="Сторона погодження"><select name="side" required defaultValue=""><option value="">Оберіть сторону</option>
        {canEdit(entry.unit)&&<option value="source">Поточний підрозділ</option>}
        {canEdit(entry.targetUnit)&&<option value="destination">Підрозділ призначення</option>}
       </select></Field>}
@@ -238,17 +241,17 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
       <DecisionTemplate field="body"/><Field label="Пояснення"><textarea name="body" required maxLength={5000}/></Field>
       <div className="actions"><button disabled={busy}>Зберегти рішення</button>{nextHref&&<button type="submit" data-next="true" className="secondary" disabled={busy}>Зберегти й перейти до наступного</button>}</div>
      </form>}
-    {entry.title==='Переведення'&&<p>Поточний підрозділ: {entry.transferApprovals?.source?.name??'очікує погодження'} · Підрозділ призначення: {entry.transferApprovals?.destination?.name??'очікує погодження'}</p>}
+    {workflow==='Переведення'&&<p>Поточний підрозділ: {entry.transferApprovals?.source?.name??'очікує погодження'} · Підрозділ призначення: {entry.transferApprovals?.destination?.name??'очікує погодження'}</p>}
     {entry.orderId&&<p><Link href={(unitId?'/command/'+(entry.targetUnit??entry.unit??unitId):'/portal')+'/orders?'+new URLSearchParams({entry:entry.orderId})}>Відкрити пов’язаний наказ</Link></p>}
     {entry.reportId&&unitId&&<p><Link href={(unitId?'/command/'+unitId:'/portal')+'/requests?'+new URLSearchParams({entry:entry.reportId})}>Відкрити пов’язаний рапорт</Link></p>}
     {entry.appliedAt&&<p className="pill approved">Рішення застосовано</p>}
     {unitId&&entry.author!==data.actorId&&entry.status==='approved'&&!entry.appliedAt&&
-     ((entry.title==='Вступ або поновлення'&&canEdit(entry.targetUnit))||(['Відпустка','Звільнення'].includes(entry.title)&&canEdit(entry.unit)))&&
+     ((workflow==='Вступ або поновлення'&&canEdit(entry.targetUnit))||(['Відпустка','Звільнення'].includes(workflow)&&canEdit(entry.unit)))&&
      <form className="stack narrow" onSubmit={e=>{if(confirm('Застосувати погоджене рішення?'))void save(e,f=>({kind:'apply',id:entry.id,rank:f.get('rank')?Number(f.get('rank')):undefined}));else e.preventDefault();}}>
-      {entry.title==='Вступ або поновлення'&&<Field label="Початкове звання"><select name="rank" required defaultValue=""><option value="">Оберіть звання</option>{data.ranks.map(rank=><option key={rank.id} value={rank.id}>{rank.name}</option>)}</select></Field>}
+      {workflow==='Вступ або поновлення'&&<Field label="Початкове звання"><select name="rank" required defaultValue=""><option value="">Оберіть звання</option>{data.ranks.map(rank=><option key={rank.id} value={rank.id}>{rank.name}</option>)}</select></Field>}
       <button disabled={busy}>Застосувати рішення</button>
      </form>}
-    {unitId&&data.canTransfer&&entry.author!==data.actorId&&entry.title==='Переведення'&&entry.status==='approved'&&!entry.appliedAt&&<form onSubmit={e=>{
+    {unitId&&data.canTransfer&&entry.author!==data.actorId&&workflow==='Переведення'&&entry.status==='approved'&&!entry.appliedAt&&<form onSubmit={e=>{
      if(confirm('Застосувати переведення та змінити доступ до підрозділів?'))void save(e,()=>({kind:'transfer',id:entry.id}));
      else e.preventDefault();
     }}><button disabled={busy}>Застосувати переведення</button></form>}
