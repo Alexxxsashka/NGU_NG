@@ -26,6 +26,21 @@ export function awardPreview(day:string,client?:PoolClient){
  return client?client.query<AwardPreviewRow>(previewSql,[day]).then(result=>result.rows):query<AwardPreviewRow>(previewSql,[week.parse(day)]);
 }
 
+export type AwardBlocker={id:string;number:string;name:string;pending:number;clarification:number;missing:number;total:number};
+export function awardBlockers(day:string){
+ return query<AwardBlocker>(`WITH blocked AS (
+  SELECT r.id,r.number,r.last_name||' '||r.first_name AS name,r.submitted_at,
+   count(*) FILTER(WHERE i.status='pending')::int AS pending,
+   count(*) FILTER(WHERE i.status='clarification')::int AS clarification,
+   count(*) FILTER(WHERE i.status='approved' AND i.approved_amount IS NULL)::int AS missing
+  FROM reports r JOIN report_items i ON i.report_id=r.id
+  WHERE r.week_start=$1 AND NOT EXISTS(SELECT 1 FROM settings s WHERE s.key='report-paid:'||r.id::text)
+  GROUP BY r.id
+ )
+ SELECT id,number,name,pending,clarification,missing,count(*) OVER()::int AS total FROM blocked
+ WHERE pending+clarification+missing>0 ORDER BY submitted_at,id LIMIT 30`,[week.parse(day)]);
+}
+
 export async function awardOrders(){
  const [orders,corrections]=await Promise.all([
   query<OrderListRow>(`SELECT value->>'week' AS week,value->>'number' AS number,value->>'paidAt' AS "paidAt",value->>'total' AS total,

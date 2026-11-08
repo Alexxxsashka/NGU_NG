@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import type {AwardChange,AwardPreviewRow} from '@/lib/award-register';
+import type {AwardBlocker,AwardChange,AwardPreviewRow} from '@/lib/award-register';
 import {useState} from 'react';
 import {currentWeek,monday,dateLabel,shiftDate} from '@/lib/domain';
 import {api,useResource,Field,Notice,Refresh} from './ui';
@@ -11,6 +11,7 @@ export function Periods(){
  const resource=useResource<Period[]>('admin/periods');
  const [week,setWeek]=useState(currentWeek),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
  const preview=useResource<AwardPreviewRow[]>('admin/award-preview?week='+week);
+ const blockers=useResource<AwardBlocker[]>('admin/award-blockers?week='+week);
  const [plan,setPlan]=useState<{token:string;recalculated:number;changes:AwardChange[];totalDifference:string}|null>(null);
  const period=resource.data?.find(p=>p.week_start===week);
  const open=period?.open??false;
@@ -30,7 +31,7 @@ export function Periods(){
   try{
    const result=await api<NonNullable<typeof plan>>('admin/periods/recalculate',{week,token:apply?plan?.token:undefined});
    if(apply){
-    setPlan(null);await preview.refresh();
+    setPlan(null);await Promise.all([preview.refresh(),blockers.refresh()]);
     setMessage('Перераховано позицій: '+result.recalculated+'.');
    }else setPlan(result);
   }catch(e){setPlan(null);setError((e as Error).message);}
@@ -49,7 +50,7 @@ export function Periods(){
    setTimeout(()=>URL.revokeObjectURL(url),1000);
    setMessage('Наказ Word сформовано.');
   }catch(e){setError((e as Error).message);}
-  finally{await Promise.all([resource.refresh(),preview.refresh()]);setBusy(false);}
+  finally{await Promise.all([resource.refresh(),preview.refresh(),blockers.refresh()]);setBusy(false);}
  }
 
  return <>
@@ -73,6 +74,19 @@ export function Periods(){
    {message&&<Notice>{message}</Notice>}
    {(error||resource.error)&&<Notice error>{error||resource.error}</Notice>}
   </section>
+  {!period?.paid&&<section className="panel">
+   <h2>Готовність до формування наказу</h2>
+   {blockers.error&&<Notice error>{blockers.error}</Notice>}
+   {blockers.loading&&<p>Перевіряємо звіти…</p>}
+   {blockers.data?.length===0&&<p>Звітів, які потребують перевірки, уточнення або погодженої суми, немає.</p>}
+   {!!blockers.data?.length&&<>
+    <p>Потребують дії: {blockers.data[0].total}. Показано {blockers.data.length}.</p>
+    <div className="table-wrap"><table><thead><tr><th>Боєць</th><th>На перевірці</th><th>На уточненні</th><th>Без суми</th><th>Звіт</th></tr></thead>
+     <tbody>{blockers.data.map(row=><tr key={row.id}><td>{row.name}</td><td>{row.pending}</td><td>{row.clarification}</td><td>{row.missing}</td>
+      <td><Link href={'/admin/weekly-bonus/reports?'+new URLSearchParams({from:week,to:shiftDate(week,6),report:row.id})}>{row.number}</Link></td></tr>)}</tbody>
+    </table></div>
+   </>}
+  </section>}
   {!period?.paid&&<section className="panel"><h2>Попередній перегляд виплати</h2>
    {preview.error&&<Notice error>{preview.error}</Notice>}
    {preview.loading&&<p>Завантажуємо нарахування…</p>}

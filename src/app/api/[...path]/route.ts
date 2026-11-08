@@ -19,7 +19,7 @@ import { saveTask,changePeriod,reviewItems,deleteReportItem,adjustAward,saveSett
 import {changeServiceWorkspace,serviceWorkspace} from '@/lib/service-workspace';
 import {serviceModules} from '@/lib/portal-navigation';
 import {finalizeAwards,recalculateAwardWeek} from '@/lib/finalize-awards';
-import {awardOrders,awardPreview,correctAwardOrder} from '@/lib/award-register';
+import {awardOrders,awardPreview,awardBlockers,correctAwardOrder} from '@/lib/award-register';
 import {awardOrderDocx,type AwardOrder} from '@/lib/award-order-docx';
 import { updateUnitPage } from '@/lib/unit-page';
 import { assignService,savePersonalServiceDetails } from '@/lib/service-assignment';
@@ -45,6 +45,7 @@ export async function GET(request:Request,ctx:Context){try{
   if(path==='me'){const u=await member(request);return json(await listReports(filters(url),u,true));}
   if(path==='me/claims'){const u=await member(request);return json(await query('SELECT id,static_id,status,reason,created_at FROM profile_claims WHERE user_id=$1 ORDER BY created_at DESC LIMIT 30',[u.id]));}
   const u=await admin(request);
+  if(path==='admin/award-blockers')return json(await awardBlockers(week.parse(url.searchParams.get('week'))));
   if(path==='admin/award-preview')return json(await awardPreview(week.parse(url.searchParams.get('week'))));
   if(path==='admin/award-orders')return json(await awardOrders());
   if(path==='admin/award-orders/docx'){
