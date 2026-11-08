@@ -7,7 +7,7 @@ import {kmbUnitId} from '@/lib/service-workspace';
 import {unitCover} from '@/lib/unit-artwork';
 import {commandSections} from '@/lib/command-sections';
 import type {Viewer} from '@/lib/domain';
-import {CommandQueue,commandQueueHref,type QueueFilters} from './command-queue';
+import {CommandQueue,commandQueueHref,commandQueueNextHref,type QueueFilters} from './command-queue';
 import {CardLink} from './card-link';
 import {UnitSpace} from './unit-space';
 import {PersonnelWorkflow} from './personnel-workflow';
@@ -55,6 +55,7 @@ export async function CommandWorkspace({actor,unitId,section,filters}:{actor:Vie
  const managesKmb=unit.id===await kmbUnitId();
  if(section==='training'&&!managesKmb)notFound();
  const root='/command/'+unit.id;
+ const nextHref=commandQueueNextHref(unit.id,filters);
  if(section==='overview'){
   const [counts]=await query<{people:number;requests:number;reports:number;promotions:number;event:string|null}>(`SELECT
    (SELECT count(*)::int FROM personnel WHERE unit_id=$1::uuid AND active) AS people,
@@ -78,9 +79,9 @@ export async function CommandWorkspace({actor,unitId,section,filters}:{actor:Vie
   {section==='content'&&<UnitSpace userId={actor.id} unitId={unit.id} mode="content"/>}
   {section==='roster'&&<><UnitSpace userId={actor.id} unitId={unit.id} mode="roster"/><PersonnelWorkflow key={root+'/roster'} unitId={unit.id} mode="record"/></>}
   {section==='audit'&&<PersonnelWorkflow key={root+'/audit'} unitId={unit.id} mode="audit"/>}
-  {section==='promotion-decisions'&&<PersonnelWorkflow key={root+'/promotion-decisions'} unitId={unit.id} mode="review" focus={filters.entry}/>}
-  {(section==='review'||section==='catalog')&&<PromotionPoints key={root+'/'+section} unitId={unit.id} mode={section} focus={filters.entry}/>}
+  {section==='promotion-decisions'&&<PersonnelWorkflow key={root+'/promotion-decisions'} unitId={unit.id} mode="review" focus={filters.entry} nextHref={nextHref}/>}
+  {(section==='review'||section==='catalog')&&<PromotionPoints key={root+'/'+section} unitId={unit.id} mode={section} focus={filters.entry} nextHref={nextHref}/>}
   {(section==='requests'||section==='orders'||section==='calendar'||section==='training'||section==='documents')&&
-   <ServiceWorkspace key={root+'/'+section} unitId={unit.id} focus={filters.entry} module={section==='documents'?'regulations':section}/>}
+   <ServiceWorkspace key={root+'/'+section} unitId={unit.id} focus={filters.entry} nextHref={nextHref} module={section==='documents'?'regulations':section}/>}
  </>;
 }

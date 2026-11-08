@@ -1,5 +1,6 @@
 'use client';
 
+import {DecisionTemplate,wantsNext} from './decision-template';
 import Link from 'next/link';
 import {promotionRankName} from '@/lib/promotion-rules';
 import {useState,type FormEvent} from 'react';
@@ -16,15 +17,16 @@ function Proof(){
   <Field label="Докази"><textarea name="links" required rows={3} placeholder="Одне HTTPS-посилання на скріншот або документ на рядок"/><small>До 20 посилань.</small></Field></>;
 }
 
-export function PersonnelWorkflow({unitId,focus,mode='personal'}:{unitId?:string;focus?:string;mode?:'personal'|'review'|'record'|'audit'}){
+export function PersonnelWorkflow({unitId,focus,nextHref,mode='personal'}:{unitId?:string;focus?:string;nextHref?:string;mode?:'personal'|'review'|'record'|'audit'}){
  const resource=useResource<Awaited<ReturnType<typeof personnelWorkflow>>>('personnel-workflow'+'?'+new URLSearchParams({...unitId?{unit:unitId}:{},...focus?{entry:focus}:{}}));
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
  const [kind,setKind]=useState<keyof typeof actionLabels>('promote'),[target,setTarget]=useState(''),[search,setSearch]=useState('');
  async function save(event:FormEvent<HTMLFormElement>,make:(fd:FormData)=>unknown){
   event.preventDefault();
+  const navigate=nextHref&&wantsNext(event.nativeEvent);
   const form=event.currentTarget;
   setBusy(true);setSaved(false);setError('');
-  try{await api('personnel-workflow',make(new FormData(form)));form.reset();setTarget('');await resource.refresh();setSaved(true);}
+  try{await api('personnel-workflow',make(new FormData(form)));if(navigate){window.location.assign(nextHref);return;}form.reset();setTarget('');await resource.refresh();setSaved(true);}
   catch(e){setError((e as Error).message);}
   finally{setBusy(false);}
  }
@@ -79,7 +81,16 @@ export function PersonnelWorkflow({unitId,focus,mode='personal'}:{unitId?:string
     {mode==='record'&&data.units.length>0&&<details className="account-action profile-action">
      <IllustratedSummary title="Додати кадровий запис" image="/portal-art/unit-actions/info.webp"/>
      <form className="stack account-action-content" onSubmit={e=>{
-      if(confirm('Застосувати кадрову зміну та записати її в журнал?'))void save(e,fd=>({kind:'record',action:kind,userId:target,
+      const fields=new FormData(e.currentTarget);
+      const unitName=(id:string|null|undefined)=>data.destinations.find(unit=>unit.id===id)?.name??'Без підрозділу';
+      const preview=[
+       actionLabels[kind]+': '+(person?.name??'')+' · ID '+(person?.static_id??''),
+       'Звання: '+rankName(person?.rank??null)+' → '+rankName(needsRank?Number(fields.get('rank')):person?.rank??null),
+       'Підрозділ: '+unitName(person?.unit_id)+' → '+unitName(needsUnit?String(fields.get('unitId')):person?.unit_id),
+       'Служба: '+(person?.active?'активна':'неактивна')+' → '+(kind==='dismiss'?'неактивна':'активна'),
+       'Підстава: '+String(fields.get('reason')??''),
+      ].join('\n');
+      if(confirm(preview))void save(e,fd=>({kind:'record',action:kind,userId:target,
        rank:needsRank?Number(fd.get('rank')):undefined,unitId:needsUnit?fd.get('unitId'):undefined,qualified:fd.has('qualified'),...proof(fd)}));
       else e.preventDefault();
      }}>
@@ -102,11 +113,15 @@ export function PersonnelWorkflow({unitId,focus,mode='personal'}:{unitId?:string
      <ul>{report.links.map((link,index)=><li key={index}><a href={link} target="_blank" rel="noopener noreferrer">Доказ {index+1}</a></li>)}</ul>
      {report.decision&&<p>Рішення: {report.decision}</p>}
      {report.status==='pending'&&report.userId!==data.actorId&&data.units.some(unit=>unit.id===report.unitId)&&
-      <form className="stack narrow" onSubmit={e=>void save(e,fd=>({kind:'decide',id:report.id,approve:fd.get('decision')==='approve',qualified:fd.has('qualified'),reason:fd.get('reason')}))}>
+      <form className="stack narrow" onSubmit={e=>{
+       const fields=new FormData(e.currentTarget);
+       if(fields.get('decision')==='approve'&&!confirm(report.name+' · ID '+report.staticId+'\nЗвання: '+rankName(report.fromRank)+' → '+rankName(report.rank)+'\nПідстава: '+String(fields.get('reason')??''))){e.preventDefault();return;}
+       void save(e,fd=>({kind:'decide',id:report.id,approve:fd.get('decision')==='approve',qualified:fd.has('qualified'),reason:fd.get('reason')}));
+      }}>
        <Field label="Рішення"><select name="decision"><option value="approve">Погодити й застосувати звання</option><option value="reject">Відхилити</option></select></Field>
-       <Field label="Підстава рішення"><textarea name="reason" required minLength={5} maxLength={3000}/></Field>
+       <DecisionTemplate field="reason"/><Field label="Підстава рішення"><textarea name="reason" required minLength={5} maxLength={3000}/></Field>
        <label className="checkbox"><input type="checkbox" name="qualified"/>Для схвалення підтверджую нормативи, атестації та перевірки</label>
-       <button disabled={busy}>Зберегти рішення</button>
+       <div className="actions"><button disabled={busy}>Зберегти рішення</button>{nextHref&&<button type="submit" data-next="true" className="secondary" disabled={busy}>Зберегти й перейти до наступного</button>}</div>
       </form>}
     </details>)}
    </section>}

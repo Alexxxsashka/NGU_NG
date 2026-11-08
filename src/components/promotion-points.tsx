@@ -1,4 +1,5 @@
 'use client';
+import {DecisionTemplate,wantsNext} from './decision-template';
 import Link from 'next/link';
 import {useState,type FormEvent} from 'react';
 import {promotionLadder,promotionRankName} from '@/lib/promotion-rules';
@@ -9,12 +10,13 @@ import {IllustratedSummary} from './illustrated-summary';
 import {api,Field,Loading,Modal,Notice,useResource} from './ui';
 
 const status={clarification:'Потребує уточнення',pending:'На перевірці',approved:'Зараховано',rejected:'Відхилено'};
-export function PromotionPoints({unitId,focus,taskId,screen='',mode='personal'}:{unitId?:string;focus?:string;taskId?:string;screen?:string;mode?:'personal'|'review'|'catalog'}){
+export function PromotionPoints({unitId,focus,nextHref,taskId,screen='',mode='personal'}:{unitId?:string;focus?:string;nextHref?:string;taskId?:string;screen?:string;mode?:'personal'|'review'|'catalog'}){
  const resource=useResource<Awaited<ReturnType<typeof promotionPoints>>>('promotion-points'+'?'+new URLSearchParams({...unitId?{unit:unitId}:{},...focus?{entry:focus}:{}}));
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
  async function save(event:FormEvent<HTMLFormElement>,make:(fd:FormData)=>unknown){
-  event.preventDefault();const form=event.currentTarget;setBusy(true);setError('');setSaved(false);
-  try{await api('promotion-points',make(new FormData(form)));form.reset();await resource.refresh();setSaved(true);}
+  event.preventDefault();
+  const navigate=nextHref&&wantsNext(event.nativeEvent);const form=event.currentTarget;setBusy(true);setError('');setSaved(false);
+  try{await api('promotion-points',make(new FormData(form)));if(navigate){window.location.assign(nextHref);return;}form.reset();await resource.refresh();setSaved(true);}
   catch(e){setError((e as Error).message);}
   finally{setBusy(false);}
  }
@@ -108,8 +110,8 @@ export function PromotionPoints({unitId,focus,taskId,screen='',mode='personal'}:
      {entry.status==='pending'&&entry.userId!==data.actorId&&editable(entry.unitId)&&<form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'review',id:entry.id,approve:f.get('decision')==='approve',clarification:f.get('decision')==='clarification',quantity:Number(f.get('quantity')),reason:f.get('reason')}))}>
       <Field label="Рішення"><select name="decision"><option value="approve">Зарахувати</option><option value="reject">Відхилити</option><option value="clarification">Запросити уточнення</option></select></Field>
       <Field label="Кількість до зарахування"><input name="quantity" type="number" min={1} max={100} step={1} defaultValue={entry.quantity} required/></Field>
-      <Field label="Підстава рішення"><textarea name="reason" required minLength={5} maxLength={2000}/></Field>
-      <button disabled={busy}>Зберегти рішення</button>
+      <DecisionTemplate field="reason"/><Field label="Підстава рішення"><textarea name="reason" required minLength={5} maxLength={2000}/></Field>
+      <div className="actions"><button disabled={busy}>Зберегти рішення</button>{nextHref&&<button type="submit" data-next="true" className="secondary" disabled={busy}>Зберегти й перейти до наступного</button>}</div>
      </form>}
     </details>)}</div></div></Modal>}</article>;
     })}

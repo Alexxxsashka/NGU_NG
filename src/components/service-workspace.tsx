@@ -1,4 +1,5 @@
 'use client';
+import {DecisionTemplate,wantsNext} from './decision-template';
 import Link from 'next/link';
 
 import {useEffect,useRef,useState,type FormEvent} from 'react';
@@ -19,7 +20,7 @@ const actions:Record<ServiceModule,string>={
 const artwork:Record<ServiceModule,string>={requests:'transfer',training:'briefing',calendar:'assembly',regulations:'garrison',announcements:'command',orders:'approval',lectures:'radio'};
 const statusLabels={cancelled:'Скасовано',clarification:'Потребує уточнення',pending:'На розгляді',approved:'Погоджено',rejected:'Відхилено'};
 
-export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;focus?:string;unitId?:string}){
+export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceModule;focus?:string;nextHref?:string;unitId?:string}){
  const {data,error,refresh}=useResource<Awaited<ReturnType<typeof serviceWorkspace>>>('service/'+module+'?'+new URLSearchParams({...focus?{entry:focus}:{},...unitId?{unit:unitId}:{}}));
  const visitedEntry=useRef<string|null>(null);
  useEffect(()=>{
@@ -30,10 +31,11 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[failure,setFailure]=useState('');
  async function save(event:FormEvent<HTMLFormElement>,make:(fields:FormData)=>unknown,onSuccess?:()=>void){
   event.preventDefault();
+  const navigate=nextHref&&wantsNext(event.nativeEvent);
   const form=event.currentTarget;
   const payload=make(new FormData(form));
   setBusy(true);setMessage('');setFailure('');
-  try{await api('service',payload);form.reset();onSuccess?.();await refresh();setMessage('Зміни збережено.');}
+  try{await api('service',payload);if(navigate){window.location.assign(nextHref);return;}form.reset();onSuccess?.();await refresh();setMessage('Зміни збережено.');}
   catch(e){setFailure((e as Error).message);}
   finally{setBusy(false);}
  }
@@ -189,8 +191,8 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
        {canEdit(entry.targetUnit)&&<option value="destination">Підрозділ призначення</option>}
       </select></Field>}
       <Field label="Рішення"><select name="status"><option value="approved">Погодити</option><option value="rejected">Відхилити</option><option value="clarification">Запросити уточнення</option></select></Field>
-      <Field label="Пояснення"><textarea name="body" required maxLength={5000}/></Field>
-      <button disabled={busy}>Зберегти рішення</button>
+      <DecisionTemplate field="body"/><Field label="Пояснення"><textarea name="body" required maxLength={5000}/></Field>
+      <div className="actions"><button disabled={busy}>Зберегти рішення</button>{nextHref&&<button type="submit" data-next="true" className="secondary" disabled={busy}>Зберегти й перейти до наступного</button>}</div>
      </form>}
     {entry.title==='Переведення'&&<p>Поточний підрозділ: {entry.transferApprovals?.source?.name??'очікує погодження'} · Підрозділ призначення: {entry.transferApprovals?.destination?.name??'очікує погодження'}</p>}
     {entry.orderId&&<p><Link href={(unitId?'/command/'+(entry.targetUnit??entry.unit??unitId):'/portal')+'/orders?'+new URLSearchParams({entry:entry.orderId})}>Відкрити пов’язаний наказ</Link></p>}

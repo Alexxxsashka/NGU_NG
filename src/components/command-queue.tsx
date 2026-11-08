@@ -2,7 +2,7 @@ import Link from 'next/link';
 import {z} from 'zod';
 import {query} from '@/db';
 
-export type QueueFilters={kind?:string;state?:string;person?:string;page?:string;entry?:string;from?:string;to?:string;fromQueue?:string;overdue?:string};
+export type QueueFilters={kind?:string;state?:string;person?:string;page?:string;entry?:string;from?:string;to?:string;fromQueue?:string;overdue?:string;trail?:string};
 const kinds={requests:'Службова заявка',review:'Звіт на підвищення','promotion-decisions':'Запит на нове звання'};
 const states={pending:'На розгляді',clarification:'Потребує уточнення'};
 const pageSize=25;
@@ -20,6 +20,14 @@ function queueFilters(filters:QueueFilters){
 
 export function commandQueueHref(unitId:string,filters:QueueFilters){
  return '/command/'+unitId+'/queue?'+new URLSearchParams(queueFilters(filters));
+}
+
+export function commandQueueNextHref(unitId:string,filters:QueueFilters){
+ if(filters.fromQueue!=='1')return undefined;
+ const [next,...remaining]=typeof filters.trail==='string'?filters.trail.slice(0,2048).split(','):[];
+ const [kind,entry]=next?.split(':')??[];
+ if(!kind||!Object.hasOwn(kinds,kind)||!z.uuid().safeParse(entry).success)return commandQueueHref(unitId,filters);
+ return '/command/'+unitId+'/'+kind+'?'+new URLSearchParams({...queueFilters(filters),entry,fromQueue:'1',trail:remaining.join(',')});
 }
 
 export async function CommandQueue({unitId,filters,actorId}:{unitId:string;filters:QueueFilters;actorId:string}){
@@ -61,8 +69,8 @@ export async function CommandQueue({unitId,filters,actorId}:{unitId:string;filte
    <button>Застосувати</button><Link className="button secondary" href={root+'/queue'}>Скинути</Link>
   </form>
   {reversed?<p role="alert">Дата початку має бути не пізнішою за дату завершення.</p>:rows.length?<div className="table-wrap"><table><thead><tr><th>Боєць</th><th>Тип</th><th>Подано</th><th>Дія</th></tr></thead>
-   <tbody>{rows.slice(0,pageSize).map(row=><tr key={row.kind+row.id}><td>{row.person}</td><td>{row.title}<small>{kinds[row.kind]}</small></td><td>{row.submitted?.slice(0,10)}</td>
-    <td><Link href={root+'/'+row.kind+'?'+new URLSearchParams({...normalized,entry:row.id,fromQueue:'1'})}>Відкрити</Link></td></tr>)}</tbody></table></div>:<p>За цими фільтрами записів немає.</p>}
+   <tbody>{rows.slice(0,pageSize).map((row,index)=><tr key={row.kind+row.id}><td>{row.person}</td><td>{row.title}<small>{kinds[row.kind]}</small></td><td>{row.submitted?.slice(0,10)}</td>
+    <td><Link href={root+'/'+row.kind+'?'+new URLSearchParams({...normalized,entry:row.id,fromQueue:'1',trail:rows.slice(index+1,pageSize+1).map(next=>next.kind+':'+next.id).join(',')})}>Відкрити</Link></td></tr>)}</tbody></table></div>:<p>За цими фільтрами записів немає.</p>}
   <nav className="pagination" aria-label="Сторінки черги">{page>1&&<Link href={href(page-1)}>Назад</Link>}<span>Сторінка {page}</span>{rows.length>pageSize&&<Link href={href(page+1)}>Далі</Link>}</nav>
  </section>;
 }
