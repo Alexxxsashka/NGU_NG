@@ -11,17 +11,19 @@ import type {Viewer} from './domain';
 
 type Access={id:string;name:string;editor:boolean;appoint:boolean};
 const accessSql=`
- SELECT unit.id,unit.name,(account.role='admin' OR global_grant.id IS NOT NULL OR coalesce(p.rank BETWEEN 11 AND 12 AND d.value->>'commanderUnitId'=unit.id::text AND d.value->>'leadershipRole' IN ('commander','deputy'),false)) AS editor,
+ SELECT unit.id,unit.name,(account.role='admin' OR global_grant.id IS NOT NULL OR coalesce(suspension.key IS NULL AND p.rank BETWEEN 11 AND 12 AND d.value->>'commanderUnitId'=unit.id::text AND d.value->>'leadershipRole' IN ('commander','deputy'),false)) AS editor,
  (account.role='admin' OR global_grant.id IS NOT NULL) AS appoint
  FROM units unit
  JOIN app_user account ON account.id=$1 AND NOT account.must_change_password
  LEFT JOIN LATERAL (
   SELECT leader.id FROM personnel leader
   WHERE leader.user_id=account.id AND leader.active AND leader.rank BETWEEN 13 AND 15
+  AND NOT EXISTS(SELECT 1 FROM settings hold WHERE hold.key='discipline-suspension:'||leader.id::text AND (hold.value->>'until')::timestamptz>now())
   LIMIT 1
  ) global_grant ON true
  LEFT JOIN personnel p ON p.user_id=account.id AND p.active AND p.unit_id=unit.id
  LEFT JOIN settings d ON d.key='service:'||p.id::text
+ LEFT JOIN settings suspension ON suspension.key='discipline-suspension:'||p.id::text AND (suspension.value->>'until')::timestamptz>now()
  WHERE unit.active AND (account.role='admin' OR global_grant.id IS NOT NULL OR p.id IS NOT NULL)
  AND ($2::uuid IS NULL OR unit.id=$2)
  ORDER BY unit.sort_order,unit.name

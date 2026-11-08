@@ -21,6 +21,8 @@ const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('fine'),id,rule:z.enum(['34.1','34.2','34.3','34.4','34.5','34.6']),category:z.enum(['lower','higher']),amount:z.number().int().positive(),body:text}),
  z.object({kind:z.literal('submit-payment'),id,source:evidence}),
  z.object({kind:z.literal('review-payment'),id,accept:z.boolean(),body:text}),
+ z.object({kind:z.literal('suspend'),id,hours:z.number().int().min(1).max(72),responsible:z.string().trim().min(2).max(120),body:text}),
+ z.object({kind:z.literal('end-suspension'),id,body:text}),
  z.object({kind:z.literal('acknowledge'),id}),
  z.object({kind:z.literal('request-work'),id,body:text}),
  z.object({kind:z.literal('assign-work'),id,body:text}),
@@ -34,6 +36,7 @@ type Note={body:string;links?:string[];at:string};
 type Case={
  id:string;person:string;name:string;author:string;at:string;rule:string;body:string;links:string[];
  explanation?:Note;decision?:Note&{by:string;outcome:'dismiss'|'fine'|z.infer<typeof sanction>;until?:string};
+ suspension?:Note&{until:string;responsible:string;ended?:Note};
  fine?:{rule:keyof typeof fineRules;category:'lower'|'higher';rank:number;amount:number;dueAt:string;
   payment?:Note;review?:Note&{accept:boolean}};
  acknowledged?:string;lifted?:Note;appeal?:Note;appealResult?:Note&{cancel:boolean};
@@ -44,6 +47,7 @@ const delegationSql=`SELECT d.value->>'unit' AS unit FROM settings d JOIN person
  JOIN units u ON u.id=p.unit_id AND u.active JOIN settings service ON service.key='service:'||p.id::text
  WHERE p.id=$1 AND p.active AND p.rank BETWEEN 11 AND 12
  AND u.name ~* '^всп|^звп|військова служба правопорядку'
+ AND NOT EXISTS(SELECT 1 FROM settings hold WHERE hold.key='discipline-suspension:'||p.id::text AND (hold.value->>'until')::timestamptz>now())
  AND service.value->>'leadershipRole'='commander' AND service.value->>'commanderUnitId'=u.id::text
  AND (d.value->>'until')::date >= (now() AT TIME ZONE 'Europe/Kyiv')::date`;
 const rolesSql=`SELECT p.id,p.rank,coalesce(u.name ~* '^(ВСП|ЗВП)(\\s|$)|військова служба правопорядку',false) AS inspector
@@ -148,6 +152,23 @@ export async function changeDiscipline(actor:Viewer,input:unknown){
     case 'review-payment':
      if(!entry.fine?.payment||entry.fine.review||entry.appealResult?.cancel)throw unavailable();
      entry.fine={...entry.fine,review:{body:action.body,accept:action.accept,at}};
+     break;
+    case 'suspend': {
+     if(!leader)throw new HttpError('Відсторонення оформлює Командувач.',403);
+     if(entry.decision||entry.suspension)throw unavailable();
+     const key='discipline-suspension:'+entry.person;
+     const {rows:[previous]}=await c.query('SELECT value FROM settings WHERE key=$1 FOR UPDATE',[key]);
+     if(previous&&Date.parse(previous.value.until)>now.getTime())throw new HttpError('У бійця вже є чинне відсторонення.',409);
+     entry.suspension={body:action.body,responsible:action.responsible,at,until:new Date(now.getTime()+action.hours*3600000).toISOString()};
+     await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=excluded.value',
+      [key,JSON.stringify({caseId:entry.id,until:entry.suspension.until})]);
+     break;
+    }
+    case 'end-suspension':
+     if(!leader)throw new HttpError('Поновлення оформлює Командувач.',403);
+     if(!entry.suspension||entry.suspension.ended)throw unavailable();
+     entry.suspension={...entry.suspension,ended:{body:action.body,at}};
+     await c.query("DELETE FROM settings WHERE key=$1 AND value->>'caseId'=$2",['discipline-suspension:'+entry.person,entry.id]);
      break;
     case 'acknowledge':
      if(!entry.decision)throw unavailable();

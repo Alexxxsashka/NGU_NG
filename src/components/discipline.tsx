@@ -19,7 +19,7 @@ export function Discipline({staff=false}:{staff?:boolean}){
   finally{setBusy(false);}
  }
  const form=(id:string,kind:string,label:string,options?:React.ReactNode,proof=false)=><details className="account-action form-disclosure"><IllustratedSummary title={label} image="/portal-art/catalog/review.webp"/>
-  <form className="stack narrow" onSubmit={event=>void save(event,f=>({id,kind,body:f.get('body'),rule:f.get('rule'),category:f.get('category'),amount:Number(f.get('amount')),outcome:f.get('outcome'),accept:f.get('accept')==='yes',cancel:f.get('cancel')==='yes',links:evidenceLines(String(f.get('links')??''))}))}>
+  <form className="stack narrow" onSubmit={event=>void save(event,f=>({id,kind,body:f.get('body'),rule:f.get('rule'),category:f.get('category'),amount:Number(f.get('amount')),hours:Number(f.get('hours')),responsible:f.get('responsible'),outcome:f.get('outcome'),accept:f.get('accept')==='yes',cancel:f.get('cancel')==='yes',links:evidenceLines(String(f.get('links')??''))}))}>
    {options}<Field label="Підстава або пояснення"><textarea name="body" required minLength={5} maxLength={2000}/></Field>
    {proof&&<Field label="Докази"><textarea name="links" placeholder="Одне HTTPS-посилання на рядок"/></Field>}
    <button disabled={busy}>{label}</button>
@@ -52,6 +52,12 @@ export function Discipline({staff=false}:{staff?:boolean}){
    <p>{entry.body}</p>
    {entry.explanation&&<p>Пояснення: {entry.explanation.body}</p>}
    {entry.decision&&<p>{entry.decision.body}{entry.active&&' · Чинна догана'}</p>}
+   {entry.suspension&&<p>Відсторонення до {new Date(entry.suspension.until).toLocaleString('uk-UA',{timeZone:'Europe/Kyiv'})} · {entry.suspension.responsible} · {entry.suspension.body}{entry.suspension.ended&&' · Поновлено: '+entry.suspension.ended.body}</p>}
+   {staff&&data.leader&&!entry.own&&!entry.decision&&!entry.suspension&&form(entry.id,'suspend','Тимчасово відсторонити',<>
+    <Field label="Тривалість у годинах"><input name="hours" type="number" min={1} max={72} required/></Field>
+    <Field label="Відповідальний за перевірку"><input name="responsible" required maxLength={120}/></Field>
+   </>)}
+   {staff&&data.leader&&!entry.own&&entry.suspension&&!entry.suspension.ended&&form(entry.id,'end-suspension','Оформити поновлення')}
    {entry.fine&&<>
     <p>Штраф: {entry.fine.amount} $ · ст. {entry.fine.rule} Етичного кодексу · до {new Date(entry.fine.dueAt).toLocaleString('uk-UA',{timeZone:'Europe/Kyiv'})}.</p>
     {entry.fine.payment?.links?.map(link=><p key={link}><a href={link} target="_blank" rel="noreferrer">Доказ сплати</a></p>)}
