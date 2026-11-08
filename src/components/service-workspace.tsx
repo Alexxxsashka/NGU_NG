@@ -36,6 +36,7 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
   catch(e){setFailure((e as Error).message);}
   finally{setBusy(false);}
  }
+ const [recruitmentUnit,setRecruitmentUnit]=useState('');
  const [requestType,setRequestType]=useState('Переведення');
  const [requestFilter,setRequestFilter]=useState('');
  const [documentSearch,setDocumentSearch]=useState(''),[category,setCategory]=useState(''),[archive,setArchive]=useState(false);
@@ -52,6 +53,13 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
   {error&&<Notice error>{error} <button className="text-button" onClick={refresh}>Повторити</button></Notice>}
   {failure&&<Notice error>{failure}</Notice>}{message&&<Notice>{message}</Notice>}
   {!data&&!error&&<Loading/>}
+  {data&&module==='requests'&&unitId&&editors.some(unit=>unit.id===unitId)&&<details className="account-action profile-action">
+   <IllustratedSummary title="Умови набору підрозділу" image="/portal-art/unit-actions/info.webp"/>
+   <form className="stack account-action-content" onSubmit={event=>void save(event,fields=>({kind:'recruitment',unit:unitId,body:fields.get('rules')}))}>
+    <Field label="Опис і вимоги до вступу"><textarea name="rules" rows={6} required maxLength={5000} defaultValue={data.targets.find(unit=>unit.id===unitId)?.rules}/></Field>
+    <button disabled={busy}>Зберегти умови</button>
+   </form>
+  </details>}
   {data&&((module==='requests'&&!unitId)||(module!=='requests'&&editors.length>0))&&<details className="account-action profile-action">
    <IllustratedSummary title={actions[module]} image={'/portal-art/catalog/'+artwork[module]+'.webp'}/>
    <form className="stack account-action-content" onSubmit={e=>void save(e,f=>module==='requests'?
@@ -60,7 +68,8 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
      date:f.get('date')||undefined,url:f.get('url')||undefined,revision:f.get('revision')||undefined,category:f.get('category')||undefined,replaces:f.get('replaces')||undefined,draft:f.has('draft'),requiresProof:f.has('requiresProof'),responsible:f.get('responsible')||undefined})}>
     {module==='requests'?<>
      <Field label="Тип заявки"><select name="type" value={requestType} onChange={e=>setRequestType(e.target.value)}>{['Переведення','Вступ до підрозділу','IC-відгул','OOC-відпустка','Відпустка','Вступ або поновлення','Звільнення','Звільнення або оскарження','Виправлення особової справи'].map(type=><option key={type}>{type}</option>)}</select></Field>
-     {['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(requestType)&&<Field label="Бажаний підрозділ"><select name="targetUnit" required><option value="">Оберіть підрозділ</option>{data.targets.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>}
+     {['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(requestType)&&<Field label="Бажаний підрозділ"><select name="targetUnit" required onChange={event=>setRecruitmentUnit(event.target.value)}><option value="">Оберіть підрозділ</option>{data.targets.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>}
+     {requestType==='Вступ до підрозділу'&&<p style={{whiteSpace:'pre-line'}}>{data.targets.find(unit=>unit.id===recruitmentUnit)?.rules}</p>}
      {['Відпустка','IC-відгул','OOC-відпустка'].includes(requestType)&&<div className="form-grid"><Field label="Від"><input name="from" type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field><Field label="До"><input name="to" type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field></div>}
      <Field label="Докази"><textarea name="links" placeholder="Одне HTTPS-посилання на рядок"/></Field>
     </>:<>
@@ -112,6 +121,7 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
     {entry.revision&&<p>Редакція {entry.revision}</p>}
     <p className="unit-copy">{entry.body}</p>
     {entry.url&&<a href={entry.url} target="_blank" rel="noopener noreferrer">Відкрити документ</a>}
+    {entry.recruitmentRules&&<details><summary>Умови на момент подання</summary><p style={{whiteSpace:'pre-line'}}>{entry.recruitmentRules}</p></details>}
     {entry.from&&entry.to&&<p>Період: {entry.from} — {entry.to}</p>}
     {entry.links?.map((link,index)=><p key={link}><a href={link} target="_blank" rel="noopener noreferrer">Доказ {index+1}</a></p>)}
     {entry.replies?.map(reply=><div className="notice" key={reply.at}><p>{reply.body}</p>{reply.links.map((link,index)=><a key={link} href={link} target="_blank" rel="noopener noreferrer">Доказ {index+1} </a>)}</div>)}

@@ -5,6 +5,7 @@ import {query,transaction} from '@/db';
 import {audit} from './admin';
 import {evidence} from './validation';
 import {HttpError} from './security';
+import {defaultRecruitment} from './recruitment';
 import {accessibleUnits} from './unit-page';
 import {workspaceUnits} from './workspace-scope';
 import type {Viewer} from './domain';
@@ -16,6 +17,7 @@ const body=z.string().trim().min(1).max(5000);
 const uuid=z.string().uuid();
 const requestTypes=['Переведення','Вступ до підрозділу','IC-відгул','OOC-відпустка','Відпустка','Вступ або поновлення','Звільнення або оскарження','Звільнення','Виправлення особової справи'] as const;
 const operation=z.discriminatedUnion('kind',[
+ z.object({kind:z.literal('recruitment'),unit:uuid,body}),
  z.object({kind:z.literal('request'),type:z.enum(requestTypes),body,targetUnit:uuid.optional(),from:z.union([z.iso.date(),z.iso.datetime({local:true})]).optional(),to:z.union([z.iso.date(),z.iso.datetime({local:true})]).optional(),links:z.array(evidence).max(20).default([])}),
  z.object({kind:z.literal('decide'),id:uuid,status:z.enum(['approved','rejected','clarification']),body}),
  z.object({kind:z.literal('publish'),module:moduleSchema.exclude(['requests']),unit:uuid,title,body,
@@ -33,7 +35,7 @@ const operation=z.discriminatedUnion('kind',[
 
 type Entry={
  id:string;module:ServiceModule;unit:string|null;author:string;name:string;title:string;body:string;createdAt:string;
- targetUnit?:string;from?:string;to?:string;links?:string[];replies?:{body:string;links:string[];at:string}[];url?:string;date?:string;revision?:string;category?:string;replaces?:string;draft?:boolean;requiresProof?:boolean;responsible?:string;appliedAt?:string;status?:'pending'|'approved'|'rejected'|'clarification';decision?:string;decidedBy?:string;decidedAt?:string;archived?:boolean;
+ recruitmentRules?:string;targetUnit?:string;from?:string;to?:string;links?:string[];replies?:{body:string;links:string[];at:string}[];url?:string;date?:string;revision?:string;category?:string;replaces?:string;draft?:boolean;requiresProof?:boolean;responsible?:string;appliedAt?:string;status?:'pending'|'approved'|'rejected'|'clarification';decision?:string;decidedBy?:string;decidedAt?:string;archived?:boolean;
 };
 const prefix='service-entry:';
 
@@ -65,12 +67,12 @@ export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:s
    "SELECT user_id AS id,first_name||' '||last_name AS name,unit_id AS unit FROM personnel WHERE active AND user_id IS NOT NULL AND ($2::boolean OR unit_id=ANY($1::uuid[])) ORDER BY last_name",[editors,module==='training']):[],
   module==='training'?query<{value:{entry:string;member:string;status?:string;links?:string[];note?:string}}>(`SELECT value FROM settings WHERE key LIKE 'service-result:%' AND
    (value->>'member'=$1 OR value->>'unit'=ANY($2::text[]))`,[actor.id,editors]):[],
-  module==='requests'?query<{id:string;name:string}>('SELECT id,name FROM units WHERE active ORDER BY sort_order,name'):[],
+  module==='requests'?query<{id:string;name:string;rules:string|null}>(`SELECT u.id,u.name,s.value->>'body' AS rules FROM units u LEFT JOIN settings s ON s.key='recruitment:'||u.id::text WHERE u.active ORDER BY u.sort_order,u.name`):[],
   module==='calendar'?query<{value:{entry:string;member:string;status:string}}>(`SELECT value FROM settings WHERE key LIKE 'service-attendance:%' AND (value->>'member'=$1 OR value->>'unit'=ANY($2::text[]))`,[actor.id,editors]):[],
   module==='requests'?query("SELECT 1 FROM personnel p WHERE p.user_id=$1 AND p.active AND p.rank BETWEEN 13 AND 15",[actor.id]):[],
   module==='requests'&&unitId?query<{id:number;name:string}>('SELECT id,name FROM ranks ORDER BY id'):[],
  ]);
- return {units,entries:rows.map(({value})=>value),people,results:results.map(({value})=>value),trainingUnit,targets,ranks,attendance:attendance.map(row=>row.value),memberUnit:personalUnit,canTransfer:actor.role==='admin'||authority.length>0,actorId:actor.id,admin:actor.role==='admin'};
+ return {units,entries:rows.map(({value})=>value),people,results:results.map(({value})=>value),trainingUnit,targets:targets.map(unit=>({...unit,rules:unit.rules??defaultRecruitment(unit.name)})),ranks,attendance:attendance.map(row=>row.value),memberUnit:personalUnit,canTransfer:actor.role==='admin'||authority.length>0,actorId:actor.id,admin:actor.role==='admin'};
 }
 
 export async function changeServiceWorkspace(actor:Viewer,input:unknown){
@@ -83,6 +85,19 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
   const editors=new Set((await accessibleUnits(actor.id,null,c)).filter(unit=>unit.editor).map(unit=>unit.id));
   const {rows:[trainingUnit]}=await c.query<{id:string}>(trainingUnitSql);
   const write=async(key:string,value:unknown)=>{await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=excluded.value',[key,JSON.stringify(value)]);};
+  if(action.kind==='recruitment'){
+   if(!editors.has(action.unit))throw new HttpError('Ви не керуєте цим підрозділом.',403);
+   const {rows:[unit]}=await c.query<{name:string}>('SELECT name FROM units WHERE id=$1',[action.unit]);
+   if(/^ссо|nord division/i.test(unit.name)&&account.rank!==15)
+    throw new HttpError('Умови набору ССО публікує Командувач НГУ.',403);
+   const key='recruitment:'+action.unit;
+   const {rows:[old]}=await c.query('SELECT value FROM settings WHERE key=$1',[key]);
+   const next={body:action.body};
+   await write(key,next);
+   await audit(c,actor,'recruitment.rules',action.unit,old?.value??null,next);
+   return {saved:true};
+  }
+  let recruitmentRules:string|undefined;
   if(action.kind==='request'||action.kind==='publish'){
    if(action.kind==='publish'&&action.module==='training'&&action.unit!==trainingUnit?.id)throw new HttpError('Програмою КМБ керує НЦП.',403);
    if(action.kind==='publish'&&!editors.has(action.unit))throw new HttpError('Ви не керуєте цим підрозділом.',403);
@@ -90,6 +105,10 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
      !(await c.query('SELECT id FROM units WHERE id=$1 AND active',[action.targetUnit])).rowCount))throw new HttpError('Оберіть інший чинний підрозділ.');
    if(action.kind==='request'){
     if(action.type==='Вступ до підрозділу'){
+     const {rows:[unit]}=await c.query<{name:string;rules:string|null}>(`SELECT u.name,s.value->>'body' AS rules FROM units u
+      LEFT JOIN settings s ON s.key='recruitment:'||u.id::text WHERE u.id=$1 AND u.active`,[action.targetUnit]);
+     if(!unit)throw new HttpError('Оберіть чинний підрозділ.');
+     recruitmentRules=unit.rules??defaultRecruitment(unit.name);
      if(!account.id)throw new HttpError('Для вступу потрібен активний кадровий профіль.',403);
      if((await c.query(`SELECT 1 FROM settings WHERE key LIKE 'service-entry:%'
       AND value->>'title'='Вступ до підрозділу' AND value->>'author'=$1 AND value->>'targetUnit'=$2
@@ -119,7 +138,7 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    const id=randomUUID();
    const entry:Entry={id,module:action.kind==='request'?'requests':action.module,unit:action.kind==='request'?(action.type==='Вступ до підрозділу'?null:account.unit_id??previousUnit??null):action.unit,
     author:actor.id,name:actor.name,title:action.kind==='request'?action.type:action.title,body:action.body,createdAt:new Date().toISOString(),
-    ...(action.kind==='request'?{status:'pending' as const,targetUnit:['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(action.type)?action.targetUnit:undefined,from:action.from,to:action.to,links:action.links}:{url:action.url,date:action.date,revision:action.revision,category:action.category,replaces:action.replaces,draft:action.draft,requiresProof:action.requiresProof,responsible:action.responsible})};
+    ...(action.kind==='request'?{status:'pending' as const,recruitmentRules,targetUnit:['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(action.type)?action.targetUnit:undefined,from:action.from,to:action.to,links:action.links}:{url:action.url,date:action.date,revision:action.revision,category:action.category,replaces:action.replaces,draft:action.draft,requiresProof:action.requiresProof,responsible:action.responsible})};
    await write(prefix+id,entry);
    await audit(c,actor,'service.'+action.kind,id,null,entry);
    return {saved:true};
