@@ -1,3 +1,4 @@
+import {createAwardShare,readAwardShare} from '@/lib/award-share';
 import {disciplineCases,changeDiscipline} from '@/lib/discipline';
 import {militaryTickets,changeMilitaryTicket} from '@/lib/military-ticket';
 import { z } from 'zod';
@@ -65,6 +66,7 @@ export async function GET(request:Request,ctx:Context){try{
 export async function POST(request:Request,ctx:Context){try{
   sameOrigin(request);writable();const path=(await ctx.params).path.join('/');
   const input=await readBody(request,path==='admin/import'?2_500_000:(path==='reports'||path==='me/reports/clarify'||path==='promotion-points')?MAX_REPORT_BYTES:100_000);
+  if(path==='award-share')return json(await readAwardShare(request,input));
   if(path==='promotion-points')return json(await changePromotionPoints(input,await member(request)));
   if(path==='personnel-workflow')return json(await changePersonnelWorkflow(input,await member(request)));
   if(path==='military-ticket')return json(await changeMilitaryTicket(await member(request),input));
@@ -82,6 +84,7 @@ export async function POST(request:Request,ctx:Context){try{
   if(path.startsWith('units/')&&path.split('/').length===2)return json(await updateUnitPage(path.split('/')[1],input,await member(request)));
   const u=await admin(request);
   if(path==='admin/award-orders/recipients')return json(await markAwardRecipientPaid(input,u));
+  if(path==='admin/award-orders/share')return json(await createAwardShare(input,u));
   if(path==='admin/award-orders/correction')return json(await correctAwardOrder(input,u));
   if(path==='admin/periods/recalculate')return json(await recalculateAwardWeek(input,u));
   if(path==='admin/periods/pay'){

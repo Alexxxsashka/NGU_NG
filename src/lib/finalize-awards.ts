@@ -73,6 +73,7 @@ export async function finalizeAwards(input:unknown,actor:Viewer):Promise<AwardOr
    const previous=recipients.get(row.static_id);
    recipients.set(row.static_id,{
     staticId:row.static_id,name:previous?.name??row.last_name+' '+row.first_name,
+    firstName:previous?.firstName??row.first_name,lastName:previous?.lastName??row.last_name,
     amount:new Decimal(previous?.amount??0).plus(row.amount).toFixed(2),
    });
   }

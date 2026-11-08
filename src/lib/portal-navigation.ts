@@ -2,7 +2,7 @@ export const serviceModules=['requests','training','calendar','regulations','ann
 export type ServiceModule=(typeof serviceModules)[number];
 
 export const portalGroups = [
- {title:'Головне', links:[['/','Головна'],['/cabinet','Особистий кабінет'],['/portal/notifications','Сповіщення']]},
+ {title:'Головне', links:[['/','Головна'],['/award-share','Отримати звіти за премії'],['/cabinet','Особистий кабінет'],['/portal/notifications','Сповіщення']]},
  {title:'Моя служба', links:[['/my-unit','Мій підрозділ'],['/portal/requests','Рапорти й заявки'],['/portal/calendar','Календар'],['/portal/military-ticket','Військовий квиток'],['/portal/training','Мій КМБ'],['/portal/regulations','Документи підрозділу'],['/portal/logistics','Логістика й забезпечення']]},
  {title:'Підготовка', links:[['/portal/lectures','Лекції та матеріали'],['/portal/exercises','Тренування й атестації']]},
  {title:'Моя звітність', links:[['/weekly-bonus/me','Мої тижневі звіти'],['/portal/promotion-points','Мої завдання й бали'],['/portal/personnel-actions','Запит на нове звання'],['/weekly-bonus','Щотижневе преміювання'],['/portal/audit','Журнал аудиту']]},
@@ -62,7 +62,7 @@ export function visiblePortalGroups(isAdmin:boolean,signedIn=false){
  return portalGroups.map(group=>({
   title:group.title,
   links:[
-   ...group.links.filter(([href])=>isAdmin||(href==='/'||href==='/weekly-bonus')||(signedIn&&(!href.startsWith('/portal/')||['/portal/notifications','/portal/military-ticket','/portal/personnel-actions','/portal/promotion-points'].includes(href)||serviceModules.some(module=>href==='/portal/'+module)))),
+   ...group.links.filter(([href])=>isAdmin||(href==='/'||href==='/award-share'||href==='/weekly-bonus')||(signedIn&&(!href.startsWith('/portal/')||['/portal/notifications','/portal/military-ticket','/portal/personnel-actions','/portal/promotion-points'].includes(href)||serviceModules.some(module=>href==='/portal/'+module)))),
    ...(isAdmin?(adminGroupLinks[group.title]??[]).filter(([href])=>!group.links.some(([existing])=>existing===href)):[]),
   ],
  })).filter(group=>group.links.length>0);

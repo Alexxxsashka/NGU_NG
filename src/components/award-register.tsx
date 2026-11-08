@@ -33,6 +33,14 @@ function RecipientPayments({week}:{week:string}){
 export function AwardRegister(){
  const resource=useResource<Awaited<ReturnType<typeof awardOrders>>>('admin/award-orders');
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[saved,setSaved]=useState(false);
+ const [share,setShare]=useState<{week:string;code:string}|null>(null);
+ async function shareAccess(week:string,revoke=false){
+  if(!confirm(revoke?'Відкликати код доступу?':'Створити новий код? Попередній код для цього тижня припинить діяти.'))return;
+  setBusy(true);setError('');setShare(null);
+  try{const result=await api<{code:string|null}>('admin/award-orders/share',{week,revoke});if(result.code)setShare({week,code:result.code});}
+  catch(error){setError((error as Error).message);}
+  finally{setBusy(false);}
+ }
  const [paymentWeek,setPaymentWeek]=useState('');
  return <div id="content">
   <header className="portal-preview-header feature-cover award-orders-cover"><h1>Реєстр наказів про преміювання</h1><p>Виплати, файли Word та записи коригувань.</p></header>
@@ -41,11 +49,17 @@ export function AwardRegister(){
   {resource.loading&&!resource.data&&<Loading/>}
   <section className="panel portal-shortcuts"><h2>Накази</h2>
    {resource.data?.orders.length===0&&<p>Наказів поки немає.</p>}
-   {resource.data?.orders.length?<div className="table-wrap"><table><thead><tr><th>Номер</th><th>Тиждень</th><th>Отримувачів</th><th>Сума</th><th>Файл</th><th>Виплати</th></tr></thead><tbody>
+   {resource.data?.orders.length?<div className="table-wrap"><table><thead><tr><th>Номер</th><th>Тиждень</th><th>Отримувачів</th><th>Сума</th><th>Файл</th><th>Виплати</th><th>Перевірка Мінфіну</th></tr></thead><tbody>
     {resource.data.orders.map(order=><tr key={order.week}><td>{order.number}</td><td>{dateLabel(order.week)}</td><td>{order.recipientCount}</td><td>{order.total} $</td>
-     <td><a href={'/api/admin/award-orders/docx?week='+order.week}>Завантажити Word</a></td><td><button className="secondary" aria-expanded={paymentWeek===order.week} onClick={()=>setPaymentWeek(paymentWeek===order.week?'':order.week)}>Виплати</button></td></tr>)}
+     <td><a href={'/api/admin/award-orders/docx?week='+order.week}>Завантажити Word</a></td><td><button className="secondary" aria-expanded={paymentWeek===order.week} onClick={()=>setPaymentWeek(paymentWeek===order.week?'':order.week)}>Виплати</button></td>
+     <td><div className="actions"><button className="secondary" disabled={busy} onClick={()=>void shareAccess(order.week)}>Згенерувати код</button><button className="text-button" disabled={busy} onClick={()=>void shareAccess(order.week,true)}>Відкликати</button></div></td></tr>)}
    </tbody></table></div>:null}
   </section>
+  {share&&<section className="panel"><h2>Код для Мінфіну · {dateLabel(share.week)}</h2>
+   <p>Код діє 7 днів. Скопіюйте посилання й код перед закриттям сторінки.</p>
+   <Field label="Посилання"><input readOnly value={typeof window==='undefined'?'/award-share':window.location.origin+'/award-share'} onFocus={event=>event.currentTarget.select()}/></Field>
+   <Field label="Код"><input readOnly value={share.code} onFocus={event=>event.currentTarget.select()}/></Field>
+  </section>}
   {paymentWeek&&<RecipientPayments key={paymentWeek} week={paymentWeek}/>}
   {resource.data?.orders.length?<section className="panel">
    <h2>Коригування після виплати</h2>

@@ -6,7 +6,7 @@ export type AwardOrder={
  week:string;
  paidAt:string;
  total:string;
- recipients:{staticId:string;name:string;amount:string}[];
+ recipients:{staticId:string;name:string;firstName?:string;lastName?:string;amount:string}[];
 };
 
 function money(amount:string){
@@ -17,12 +17,13 @@ function cell(text:string,alignment:typeof AlignmentType[keyof typeof AlignmentT
  return new TableCell({children:[new Paragraph({alignment,children:[new TextRun({text,bold})]})]});
 }
 export async function awardOrderDocx(order:AwardOrder){
+ const separateNames=order.recipients.every(recipient=>recipient.firstName&&recipient.lastName);
  const header=new TableRow({tableHeader:true,cantSplit:true,children:[
-  cell('№',AlignmentType.CENTER,true),cell('Військовослужбовець',AlignmentType.LEFT,true),
+  cell('№',AlignmentType.CENTER,true),...(separateNames?[cell('Ім’я',AlignmentType.LEFT,true),cell('Прізвище',AlignmentType.LEFT,true)]:[cell('Військовослужбовець',AlignmentType.LEFT,true)]),
   cell('Static ID',AlignmentType.CENTER,true),cell('Премія',AlignmentType.RIGHT,true),
  ]});
  const rows=order.recipients.map((recipient,index)=>new TableRow({cantSplit:true,children:[
-  cell(String(index+1),AlignmentType.CENTER),cell(recipient.name,AlignmentType.LEFT),
+  cell(String(index+1),AlignmentType.CENTER),...(separateNames?[cell(recipient.firstName!,AlignmentType.LEFT),cell(recipient.lastName!,AlignmentType.LEFT)]:[cell(recipient.name,AlignmentType.LEFT)]),
   cell(recipient.staticId,AlignmentType.CENTER),cell(money(recipient.amount),AlignmentType.RIGHT),
  ]}));
  const date=new Intl.DateTimeFormat('uk-UA',{dateStyle:'long',timeZone:'Europe/Kyiv'}).format(new Date(order.paidAt));
@@ -35,7 +36,7 @@ export async function awardOrderDocx(order:AwardOrder){
    new Paragraph({alignment:AlignmentType.CENTER,text:'№ '+order.number+' · '+date}),
    new Paragraph({text:'Звітний період з '+dateLabel(order.week)+' до '+dateLabel(shiftDate(order.week,6))+' включно.'}),
    new Paragraph({text:'Преміювати військовослужбовців за погодженими результатами виконання завдань у звітному періоді.'}),
-   new Table({width:{size:100,type:WidthType.PERCENTAGE},columnWidths:[650,4900,1650,2600],margins:{top:90,bottom:90,left:110,right:110},rows:[header,...rows]}),
+   new Table({width:{size:100,type:WidthType.PERCENTAGE},columnWidths:separateNames?[650,2200,2900,1700,2350]:[650,4900,1650,2600],margins:{top:90,bottom:90,left:110,right:110},rows:[header,...rows]}),
    new Paragraph({spacing:{before:180,after:120},children:[new TextRun({text:'Усього до виплати '+money(order.total),bold:true})]}),
    new Paragraph({text:'Підпис уповноваженої особи ____________________'}),
   ]}],

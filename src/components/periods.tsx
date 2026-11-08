@@ -38,15 +38,16 @@ export function Periods(){
   finally{setBusy(false);}
  }
 
- async function payout(){
-  if(!period?.paid&&!confirm('Затвердити наказ за '+dateLabel(week)+'? Після цього суми за цей тиждень буде зафіксовано.'))return;
+ async function payout(selected:Period){
+  const downloadWeek=selected.week_start;
+  if(!selected.paid&&!confirm('Затвердити наказ за '+dateLabel(downloadWeek)+'? Після цього суми за цей тиждень буде зафіксовано.'))return;
   setBusy(true);setError('');setMessage('');
   try{
-   const response=await fetch('/api/admin/periods/pay',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({week,confirmed:true})});
+   const response=await fetch('/api/admin/periods/pay',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({week:downloadWeek,confirmed:true})});
    if(!response.ok){const failure=await response.json().catch(()=>null);throw new Error(failure?.error||'Не вдалося сформувати наказ. Спробуйте ще раз.');}
    const url=URL.createObjectURL(await response.blob());
    const link=document.createElement('a');
-   link.href=url;link.download='ngu-awards-'+week+'.docx';link.click();
+   link.href=url;link.download='ngu-awards-'+downloadWeek+'.docx';link.click();
    setTimeout(()=>URL.revokeObjectURL(url),1000);
    setMessage('Наказ Word сформовано.');
   }catch(e){setError((e as Error).message);}
@@ -65,12 +66,12 @@ export function Periods(){
    <div className="actions">
     {!period?.paid&&<button disabled={disabled} onClick={toggle}>{open?'Закрити прийом':'Відкрити прийом'}</button>}
     {period&&!period.paid&&<button className="secondary" disabled={disabled} onClick={()=>void recalculate()}>Переглянути перерахунок</button>}
-    {period&&!open&&<button className="secondary" disabled={disabled} onClick={payout}>{period.paid?'Завантажити наказ Word':'Затвердити й завантажити наказ'}</button>}
+    {period&&!open&&<button className="secondary" disabled={disabled} onClick={()=>void payout(period)}>{period.paid?'Завантажити наказ Word':'Затвердити й завантажити список виплат Word'}</button>}
    </div>
    {plan&&<div className="stack"><p>Позицій зі змінами: {plan.recalculated}. Різниця до виплати: {plan.totalDifference} $.</p>
     {plan.recalculated>0&&<button disabled={disabled} onClick={()=>void recalculate(true)}>Застосувати перерахунок</button>}
    </div>}
-   <p className="muted">Для виплати закрийте прийом і завершіть перевірку всіх звітів за тиждень.</p>
+   <p className="muted">Закрийте прийом і завершіть перевірку. Один Word-файл міститиме всіх отримувачів і загальну суму за тиждень.</p>
    {message&&<Notice>{message}</Notice>}
    {(error||resource.error)&&<Notice error>{error||resource.error}</Notice>}
   </section>
@@ -98,10 +99,13 @@ export function Periods(){
    </tbody></table></div>:null}
   </section>}
   <Refresh loading={resource.loading} onClick={resource.refresh} at={resource.updatedAt}/>
-  <div className="table-wrap"><table><thead><tr><th>Тиждень</th><th>Стан</th><th>Остання зміна</th></tr></thead><tbody>
+  <div className="table-wrap"><table><thead><tr><th>Тиждень</th><th>Стан</th><th>Остання зміна</th><th>Список виплат Word</th></tr></thead><tbody>
    {resource.data?.map(p=><tr key={p.week_start}>
     <td><button type="button" className="text-button" disabled={busy} onClick={()=>{setWeek(p.week_start);setPlan(null);setError('');setMessage('');}}>{dateLabel(p.week_start)}</button></td>
     <td><span className={'pill '+(p.open||p.paid?'approved':'pending')}>{status(p)}</span></td><td>{new Date(p.updated_at).toLocaleString('uk-UA')}</td>
+    <td>{p.paid?<a className="button secondary" href={'/api/admin/award-orders/docx?week='+p.week_start}>Завантажити Word</a>:
+     <><button type="button" className="secondary" disabled={disabled||p.open} onClick={()=>{setWeek(p.week_start);setPlan(null);void payout(p);}}>Сформувати Word</button>
+     {p.open&&<small>Спочатку закрийте прийом звітів.</small>}</>}</td>
    </tr>)}
   </tbody></table></div>
  </>;
