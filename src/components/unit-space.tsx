@@ -16,7 +16,7 @@ export async function UnitSpace({userId,unitId,mode='personal',ownOnly=false}:{u
   if(units.length===1)redirect('/units/'+units[0].id);
   return <section id="content" className="panel">
    <h1>{units.length>1?'Підрозділи':'Мої підрозділи'}</h1>
-   {units.length?<div className="home-card-grid">{units.map(unit=><CardLink key={unit.id} href={'/units/'+unit.id} title={unit.name} image={unitCover(unit.name)||'/portal-art/home/service.webp'} icon={<Shield size={19}/>}/>)}</div>:<p>Після призначення до підрозділу його сторінка з’явиться в кабінеті.</p>}
+   {units.length?<div className="home-card-grid">{units.map(unit=><CardLink key={unit.id} href={'/units/'+unit.id} title={unit.name} showImageTitle={false} image={unitCover(unit.name)||'/portal-art/home/service.webp'} icon={<Shield size={19}/>}/>)}</div>:<p>Після призначення до підрозділу його сторінка з’явиться в кабінеті.</p>}
   </section>;
  }
  const unit=units[0];
@@ -45,7 +45,7 @@ export async function UnitSpace({userId,unitId,mode='personal',ownOnly=false}:{u
   <nav className="home-card-grid portal-shortcuts" aria-label="Розділи підрозділу">
    <CardLink href="/portal/promotion-points/submit" title="Звіт на підвищення" image="/portal-art/unit-actions/rank.webp" icon={<ClipboardList size={19}/>}/>
    <CardLink href="#unit-news" title="Новини" image="/portal-art/unit-actions/news.webp" icon={<Megaphone size={19}/>}/>
-   <CardLink href="#unit-roster" title="Особовий склад" image={unitCover(unit.name)||'/portal-art/home/service.webp'} icon={<Users size={19}/>}/>
+   <CardLink href="#unit-roster" title="Особовий склад" showImageTitle={false} image={unitCover(unit.name)||'/portal-art/home/service.webp'} icon={<Users size={19}/>}/>
    <CardLink href="/portal/calendar" title="Календар і участь" image="/portal-art/cabinet/calendar.webp" icon={<CalendarDays size={19}/>}/>
    <CardLink href="/portal/regulations" title="Документи" image="/portal-art/cabinet/documents.webp" icon={<FileText size={19}/>}/>
   </nav>

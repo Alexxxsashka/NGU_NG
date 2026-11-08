@@ -18,7 +18,7 @@ export async function CommandWorkspace({actor,unitId,section}:{actor:Viewer;unit
  if(!unitId){
   if(units.length===1)redirect('/command/'+units[0].id+'/overview');
   return <section id="content" className="panel"><h1>Керування підрозділами</h1><p>Оберіть підрозділ для роботи.</p>
-   <div className="home-card-grid">{units.map(unit=><CardLink key={unit.id} href={'/command/'+unit.id+'/overview'} title={unit.name} image={unitCover(unit.name)??'/portal-art/home/service.webp'}/>)}</div>
+   <div className="home-card-grid">{units.map(unit=><CardLink key={unit.id} href={'/command/'+unit.id+'/overview'} title={unit.name} showImageTitle={false} image={unitCover(unit.name)??'/portal-art/home/service.webp'}/>)}</div>
   </section>;
  }
  const unit=units.find(unit=>unit.id===unitId);
