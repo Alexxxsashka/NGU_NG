@@ -6,13 +6,14 @@ import {kmbUnitId} from '@/lib/service-workspace';
 import {unitCover} from '@/lib/unit-artwork';
 import {commandSections} from '@/lib/command-sections';
 import type {Viewer} from '@/lib/domain';
+import {CommandQueue,type QueueFilters} from './command-queue';
 import {CardLink} from './card-link';
 import {UnitSpace} from './unit-space';
 import {PersonnelWorkflow} from './personnel-workflow';
 import {PromotionPoints} from './promotion-points';
 import {ServiceWorkspace} from './service-workspace';
 
-export async function CommandWorkspace({actor,unitId,section}:{actor:Viewer;unitId?:string;section?:string}){
+export async function CommandWorkspace({actor,unitId,section,filters}:{actor:Viewer;unitId?:string;section?:string;filters:QueueFilters}){
  const units=(await accessibleUnits(actor.id)).filter(unit=>unit.editor);
  if(!units.length)notFound();
  if(!unitId){
@@ -45,12 +46,13 @@ export async function CommandWorkspace({actor,unitId,section}:{actor:Viewer;unit
   </div>;
  }
  return <><nav className="portal-crumb" aria-label="Шлях до розділу"><Link href={root+'/overview'}>{unit.name}</Link><span>/</span><span>{view[1]}</span></nav>
+  {section==='queue'&&<CommandQueue unitId={unit.id} actorId={actor.id} filters={filters}/>}
   {section==='content'&&<UnitSpace userId={actor.id} unitId={unit.id} mode="content"/>}
   {section==='roster'&&<><UnitSpace userId={actor.id} unitId={unit.id} mode="roster"/><PersonnelWorkflow key={root+'/roster'} unitId={unit.id} mode="record"/></>}
   {section==='audit'&&<PersonnelWorkflow key={root+'/audit'} unitId={unit.id} mode="audit"/>}
-  {section==='promotion-decisions'&&<PersonnelWorkflow key={root+'/promotion-decisions'} unitId={unit.id} mode="review"/>}
-  {(section==='review'||section==='catalog')&&<PromotionPoints key={root+'/'+section} unitId={unit.id} mode={section}/>}
+  {section==='promotion-decisions'&&<PersonnelWorkflow key={root+'/promotion-decisions'} unitId={unit.id} mode="review" focus={filters.entry}/>}
+  {(section==='review'||section==='catalog')&&<PromotionPoints key={root+'/'+section} unitId={unit.id} mode={section} focus={filters.entry}/>}
   {(section==='requests'||section==='calendar'||section==='training'||section==='documents')&&
-   <ServiceWorkspace key={root+'/'+section} unitId={unit.id} module={section==='documents'?'regulations':section}/>}
+   <ServiceWorkspace key={root+'/'+section} unitId={unit.id} focus={filters.entry} module={section==='documents'?'regulations':section}/>}
  </>;
 }

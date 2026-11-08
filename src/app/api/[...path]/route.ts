@@ -35,8 +35,8 @@ export async function GET(request:Request,ctx:Context){try{
   if(path==='catalog')return json(await getCatalog(week.parse(url.searchParams.get('week')||currentWeek())));
   if(path==='viewer')return json({user:await viewer(request.headers),configured:!!process.env.DATABASE_URL&&!!process.env.AUTH_SECRET&&!!process.env.APP_URL});
   if(path==='personnel-lookup')return json(await lookupPersonnel(await member(request),url.searchParams.get('q'),url.searchParams.get('unit')));
-  if(path==='promotion-points')return json(await promotionPoints(await member(request),url.searchParams.get('unit')));
-  if(path==='personnel-workflow')return json(await personnelWorkflow(await member(request),url.searchParams.get('unit')));
+  if(path==='promotion-points')return json(await promotionPoints(await member(request),url.searchParams.get('unit'),url.searchParams.get('entry')));
+  if(path==='personnel-workflow')return json(await personnelWorkflow(await member(request),url.searchParams.get('unit'),url.searchParams.get('entry')));
   if(path==='me/notifications')return json(await notifications((await member(request)).id));
   if(path==='me'){const u=await member(request);return json(await listReports(filters(url),u,true));}
   if(path==='me/claims'){const u=await member(request);return json(await query('SELECT id,static_id,status,reason,created_at FROM profile_claims WHERE user_id=$1 ORDER BY created_at DESC LIMIT 30',[u.id]));}

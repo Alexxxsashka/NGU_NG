@@ -16,8 +16,8 @@ function Proof(){
   <Field label="Докази"><textarea name="links" required rows={3} placeholder="Одне HTTPS-посилання на скріншот або документ на рядок"/><small>До 20 посилань.</small></Field></>;
 }
 
-export function PersonnelWorkflow({unitId,mode='personal'}:{unitId?:string;mode?:'personal'|'review'|'record'|'audit'}){
- const resource=useResource<Awaited<ReturnType<typeof personnelWorkflow>>>('personnel-workflow'+(unitId?'?unit='+unitId:''));
+export function PersonnelWorkflow({unitId,focus,mode='personal'}:{unitId?:string;focus?:string;mode?:'personal'|'review'|'record'|'audit'}){
+ const resource=useResource<Awaited<ReturnType<typeof personnelWorkflow>>>('personnel-workflow'+'?'+new URLSearchParams({...unitId?{unit:unitId}:{},...focus?{entry:focus}:{}}));
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
  const [kind,setKind]=useState<keyof typeof actionLabels>('promote'),[target,setTarget]=useState(''),[search,setSearch]=useState('');
  async function save(event:FormEvent<HTMLFormElement>,make:(fd:FormData)=>unknown){
@@ -74,7 +74,7 @@ export function PersonnelWorkflow({unitId,mode='personal'}:{unitId?:string;mode?
    </div>
    {(mode==='personal'||mode==='review')&&<section className="panel"><h2>Звіти на підвищення</h2>
     {!data.promotions.length&&<p>Звітів поки немає.</p>}
-    {data.promotions.map(report=><details className="audit-row" key={report.id} id={'promotion-'+report.id}>
+    {data.promotions.map(report=><details className="audit-row" key={report.id} id={'promotion-'+report.id} open={focus===report.id||undefined}>
      <summary><strong>{report.name} · ID {report.staticId}</strong> · {rankName(report.fromRank)} → {rankName(report.rank)} · {statusLabels[report.status]}</summary>
      <p>{report.reason}</p>
      <ul>{report.links.map((link,index)=><li key={index}><a href={link} target="_blank" rel="noopener noreferrer">Доказ {index+1}</a></li>)}</ul>

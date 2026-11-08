@@ -1,4 +1,5 @@
 export const commandSections=[
+ ['queue','Єдина черга','cabinet/requests'],
  ['overview','Огляд підрозділу','home/command'],
  ['content','Редактор сторінки','unit-actions/info'],
  ['roster','Керування складом','unit-actions/access'],

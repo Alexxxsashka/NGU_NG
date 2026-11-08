@@ -47,7 +47,7 @@ export async function promotionProgress(userId:string,c?:PoolClient){
  return {profile,points:total.points,creditIds:total.ids,step:promotionStep(promotionRankName(profile.rank,profile.rank_name))};
 }
 
-export async function promotionPoints(actor:Viewer,unitId:string|null=null){
+export async function promotionPoints(actor:Viewer,unitId:string|null=null,focus:string|null=null){
  const units=await workspaceUnits(actor.id,unitId);
  const progress=await promotionProgress(actor.id);
  const ids=units.map(unit=>unit.id);
@@ -58,9 +58,9 @@ export async function promotionPoints(actor:Viewer,unitId:string|null=null){
     SELECT value,coalesce(value->>'reportId',value->>'id') AS report_id
     FROM settings WHERE key LIKE 'promotion-credit:%' AND ((cardinality($2::text[])=0 AND value->>'userId'=$1) OR value->>'unitId'=ANY($2::text[]))
    ), recent AS (
-    SELECT report_id,max(value->>'createdAt') AS submitted FROM visible GROUP BY report_id ORDER BY submitted DESC,report_id LIMIT 50
+    SELECT report_id,max(value->>'createdAt') AS submitted FROM visible GROUP BY report_id ORDER BY (report_id=$3) DESC NULLS LAST,submitted DESC,report_id LIMIT 50
    )
-   SELECT visible.value FROM visible JOIN recent USING(report_id) ORDER BY recent.submitted DESC,visible.report_id,(visible.value->>'order')::int NULLS LAST,visible.value->>'id'`,[actor.id,ids]),
+   SELECT visible.value FROM visible JOIN recent USING(report_id) ORDER BY recent.submitted DESC,visible.report_id,(visible.value->>'order')::int NULLS LAST,visible.value->>'id'`,[actor.id,ids,focus]),
   ids.length?query<{id:string;name:string;unit_id:string}>(`SELECT p.user_id AS id,p.first_name||' '||p.last_name AS name,p.unit_id
    FROM personnel p WHERE p.active AND p.rank IS NOT NULL AND p.user_id IS NOT NULL AND p.unit_id=ANY($1::uuid[]) AND p.user_id<>$2 ORDER BY p.last_name`,[ids,actor.id]):[],
  ]);

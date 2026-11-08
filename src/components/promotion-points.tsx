@@ -9,8 +9,8 @@ import {IllustratedSummary} from './illustrated-summary';
 import {api,Field,Loading,Modal,Notice,useResource} from './ui';
 
 const status={clarification:'Потребує уточнення',pending:'На перевірці',approved:'Зараховано',rejected:'Відхилено'};
-export function PromotionPoints({unitId,screen='',mode='personal'}:{unitId?:string;screen?:string;mode?:'personal'|'review'|'catalog'}){
- const resource=useResource<Awaited<ReturnType<typeof promotionPoints>>>('promotion-points'+(unitId?'?unit='+unitId:''));
+export function PromotionPoints({unitId,focus,screen='',mode='personal'}:{unitId?:string;focus?:string;screen?:string;mode?:'personal'|'review'|'catalog'}){
+ const resource=useResource<Awaited<ReturnType<typeof promotionPoints>>>('promotion-points'+'?'+new URLSearchParams({...unitId?{unit:unitId}:{},...focus?{entry:focus}:{}}));
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
  async function save(event:FormEvent<HTMLFormElement>,make:(fd:FormData)=>unknown){
   event.preventDefault();const form=event.currentTarget;setBusy(true);setError('');setSaved(false);
@@ -22,7 +22,7 @@ export function PromotionPoints({unitId,screen='',mode='personal'}:{unitId?:stri
  const links=(fd:FormData)=>evidenceLines(String(fd.get('links')??''));
  const editable=(unitId:string|null)=>data?.units.some(unit=>unit.id===unitId);
  const available=data?.tasks.filter(task=>!task.archived&&(!task.unitId||task.unitId===data.profile?.unit_id))??[];
- const [selected,setSelected]=useState<string|null>(null);
+ const [selected,setSelected]=useState<string|null>(focus??null);
  const groups=Object.groupBy(data?.credits??[],entry=>entry.reportId??entry.id);
  return <div id="content">
   <header className="portal-preview-header feature-cover personnel-cover"><h1>{mode==='review'?'Перевірка звітів':mode==='catalog'?'Каталог завдань підвищення':'Завдання й бали підвищення'}</h1><p>Підтверджені RP-дії та прогрес до наступного звання.</p></header>

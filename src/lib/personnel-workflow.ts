@@ -22,13 +22,13 @@ const operation=z.discriminatedUnion('kind',[
 ]);
 type Promotion={id:string;userId:string;name:string;staticId:string;unitId:string;fromRank:number;rank:number;reason:string;links:string[];status:string;decision?:string;createdAt:string;creditIds?:string[]};
 
-export async function personnelWorkflow(actor:Viewer,unitId:string|null=null){
+export async function personnelWorkflow(actor:Viewer,unitId:string|null=null,focus:string|null=null){
  const units=await workspaceUnits(actor.id,unitId);
  const [me,ranks,promotions,people,history,leadership]=await Promise.all([
   query<{rank:number|null;unit_id:string|null;active:boolean}>('SELECT rank,unit_id,active FROM personnel WHERE user_id=$1',[actor.id]),
   query<{id:number;name:string}>('SELECT id,name FROM ranks ORDER BY id'),
   query<{value:Promotion}>(`SELECT value FROM settings WHERE key LIKE 'promotion-report:%' AND
-   ((cardinality($2::text[])=0 AND value->>'userId'=$1) OR value->>'unitId'=ANY($2::text[])) ORDER BY value->>'createdAt' DESC LIMIT 100`,[actor.id,units.map(unit=>unit.id)]),
+   ((cardinality($2::text[])=0 AND value->>'userId'=$1) OR value->>'unitId'=ANY($2::text[])) ORDER BY (value->>'id'=$3) DESC NULLS LAST,value->>'createdAt' DESC LIMIT 100`,[actor.id,units.map(unit=>unit.id),focus]),
   units.length?query<{id:string;name:string;static_id:string;unit_id:string|null;rank:number|null;active:boolean|null}>(`SELECT u.id,u.name,p.unit_id,p.rank,p.active,coalesce(p.static_id,substring(u.username from '^static_([0-9]+)$')) AS static_id
    FROM app_user u LEFT JOIN personnel p ON p.user_id=u.id LEFT JOIN settings d ON d.key='service:'||p.id::text
    WHERE cardinality($2::uuid[])>0 AND u.id<>$1 AND u.role<>'admin' AND (coalesce(d.value->>'leadershipRole','member')='member' OR $3::boolean OR (d.value->>'leadershipRole' IN ('commander','deputy') AND EXISTS(SELECT 1 FROM personnel leader WHERE leader.user_id=$1 AND leader.active AND leader.rank BETWEEN 13 AND 15)))
