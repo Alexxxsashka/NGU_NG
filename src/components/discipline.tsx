@@ -1,6 +1,7 @@
 'use client';
 import {IllustratedSummary} from './illustrated-summary';
 import {useState,type FormEvent} from 'react';
+import {fineRules} from '@/lib/discipline-fines';
 import type {disciplineCases} from '@/lib/discipline';
 import {evidenceLines} from '@/lib/report-limits';
 import {api,Field,Loading,Notice,useResource} from './ui';
@@ -18,7 +19,7 @@ export function Discipline({staff=false}:{staff?:boolean}){
   finally{setBusy(false);}
  }
  const form=(id:string,kind:string,label:string,options?:React.ReactNode,proof=false)=><details className="account-action form-disclosure"><IllustratedSummary title={label} image="/portal-art/catalog/review.webp"/>
-  <form className="stack narrow" onSubmit={event=>void save(event,f=>({id,kind,body:f.get('body'),outcome:f.get('outcome'),accept:f.get('accept')==='yes',cancel:f.get('cancel')==='yes',links:evidenceLines(String(f.get('links')??''))}))}>
+  <form className="stack narrow" onSubmit={event=>void save(event,f=>({id,kind,body:f.get('body'),rule:f.get('rule'),category:f.get('category'),amount:Number(f.get('amount')),outcome:f.get('outcome'),accept:f.get('accept')==='yes',cancel:f.get('cancel')==='yes',links:evidenceLines(String(f.get('links')??''))}))}>
    {options}<Field label="Підстава або пояснення"><textarea name="body" required minLength={5} maxLength={2000}/></Field>
    {proof&&<Field label="Докази"><textarea name="links" placeholder="Одне HTTPS-посилання на рядок"/></Field>}
    <button disabled={busy}>{label}</button>
@@ -47,10 +48,24 @@ export function Discipline({staff=false}:{staff?:boolean}){
     <Field label="Докази"><textarea name="links" placeholder="Одне HTTPS-посилання на рядок"/></Field><button disabled={busy}>Зареєструвати справу</button>
    </form></details>}
   {data?.cases.length===0&&<p>Дисциплінарних справ немає.</p>}
-  {data?.cases.map(entry=><details className="account-action form-disclosure" key={entry.id}><IllustratedSummary title={[entry.name,entry.rule,entry.decision?outcomes[entry.decision.outcome]:'Перевірка'].join(' · ')} image="/portal-art/unit-actions/archive.webp"/>
+  {data?.cases.map(entry=><details className="account-action form-disclosure" key={entry.id}><IllustratedSummary title={[entry.name,entry.rule,entry.decision?entry.decision.outcome==='fine'?'Дисциплінарний штраф':outcomes[entry.decision.outcome]:'Перевірка'].join(' · ')} image="/portal-art/unit-actions/archive.webp"/>
    <p>{entry.body}</p>
    {entry.explanation&&<p>Пояснення: {entry.explanation.body}</p>}
    {entry.decision&&<p>{entry.decision.body}{entry.active&&' · Чинна догана'}</p>}
+   {entry.fine&&<>
+    <p>Штраф: {entry.fine.amount} $ · ст. {entry.fine.rule} Етичного кодексу · до {new Date(entry.fine.dueAt).toLocaleString('uk-UA',{timeZone:'Europe/Kyiv'})}.</p>
+    {entry.fine.payment?.links?.map(link=><p key={link}><a href={link} target="_blank" rel="noreferrer">Доказ сплати</a></p>)}
+    {entry.fine.review&&<p>{entry.fine.review.accept?'Сплату підтверджено':'Доказ відхилено'} · {entry.fine.review.body}</p>}
+    {entry.own&&!entry.appealResult?.cancel&&(!entry.fine.payment||entry.fine.review?.accept===false)&&<form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'submit-payment',id:entry.id,source:f.get('source')}))}>
+     <Field label="Доказ сплати до бюджету НГУ"><input name="source" type="url" required/></Field><button disabled={busy}>Подати доказ</button>
+    </form>}
+    {staff&&entry.canDecide&&!entry.own&&!entry.appealResult?.cancel&&entry.fine.payment&&!entry.fine.review&&form(entry.id,'review-payment','Перевірити сплату',<Field label="Рішення"><select name="accept"><option value="yes">Підтвердити</option><option value="no">Відхилити</option></select></Field>)}
+   </>}
+   {staff&&entry.canDecide&&!entry.own&&!entry.decision&&form(entry.id,'fine','Оформити штраф',<>
+    <Field label="Правова підстава"><select name="rule">{Object.entries(fineRules).map(([rule,info])=><option key={rule} value={rule}>{rule} · {info.title}</option>)}</select></Field>
+    <Field label="Категорія"><select name="category"><option value="lower">Нижча</option><option value="higher">Вища</option></select></Field>
+    <Field label="Сума в ігрових доларах"><input name="amount" type="number" min={1} step={1} required/></Field>
+   </>)}
    {entry.work?.assignment&&<p>Норматив: {entry.work.assignment.body}</p>}
    {entry.work?.submission&&<p>Виконання: {entry.work.submission.body}</p>}
    {entry.work?.review&&<p>Рішення щодо нормативу: {entry.work.review.body}</p>}

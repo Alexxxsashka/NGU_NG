@@ -4,6 +4,7 @@ import {z} from 'zod';
 import {query,transaction} from '@/db';
 import {audit} from './admin';
 import {HttpError} from './security';
+import {fineRules} from './discipline-fines';
 import {evidence} from './validation';
 import type {Viewer} from './domain';
 
@@ -17,6 +18,9 @@ const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('file'),person:id,rule:text,body:text,links}),
  z.object({kind:z.literal('explain'),id,body:text,links}),
  z.object({kind:z.literal('decide'),id,outcome:z.enum(['dismiss',...sanction.options]),body:text}),
+ z.object({kind:z.literal('fine'),id,rule:z.enum(['34.1','34.2','34.3','34.4','34.5','34.6']),category:z.enum(['lower','higher']),amount:z.number().int().positive(),body:text}),
+ z.object({kind:z.literal('submit-payment'),id,source:evidence}),
+ z.object({kind:z.literal('review-payment'),id,accept:z.boolean(),body:text}),
  z.object({kind:z.literal('acknowledge'),id}),
  z.object({kind:z.literal('request-work'),id,body:text}),
  z.object({kind:z.literal('assign-work'),id,body:text}),
@@ -29,7 +33,9 @@ const operation=z.discriminatedUnion('kind',[
 type Note={body:string;links?:string[];at:string};
 type Case={
  id:string;person:string;name:string;author:string;at:string;rule:string;body:string;links:string[];
- explanation?:Note;decision?:Note&{by:string;outcome:'dismiss'|z.infer<typeof sanction>;until?:string};
+ explanation?:Note;decision?:Note&{by:string;outcome:'dismiss'|'fine'|z.infer<typeof sanction>;until?:string};
+ fine?:{rule:keyof typeof fineRules;category:'lower'|'higher';rank:number;amount:number;dueAt:string;
+  payment?:Note;review?:Note&{accept:boolean}};
  acknowledged?:string;lifted?:Note;appeal?:Note;appealResult?:Note&{cancel:boolean};
  work?:{request:Note;assignment?:Note;submission?:Note;review?:Note&{accept:boolean}};
 };
@@ -99,7 +105,7 @@ export async function changeDiscipline(actor:Viewer,input:unknown){
    if(!row)throw new HttpError('Справу не знайдено.',404);
    previous=row.value;entry={...previous};
    const own=role?.id===entry.person;
-   const subjectAction=['explain','acknowledge','request-work','submit-work','appeal'].includes(action.kind);
+   const subjectAction=['explain','acknowledge','request-work','submit-work','appeal','submit-payment'].includes(action.kind);
    const {rows:[grant]}=role?.inspector?await c.query<{unit:string}>(delegationSql,[role.id]):{rows:[]};
    const delegated=!!grant&&!!(await c.query('SELECT 1 FROM personnel WHERE id=$1 AND unit_id=$2 AND active',[entry.person,grant.unit])).rowCount;
    const canDecide=leader||delegated&&action.kind!=='resolve-appeal';
@@ -123,6 +129,26 @@ export async function changeDiscipline(actor:Viewer,input:unknown){
       ...(action.outcome==='reprimand'||action.outcome==='severe'?{until:new Date(now.getTime()+7*day).toISOString()}:{})};
      break;
     }
+    case 'fine': {
+     if(entry.decision||Date.parse(calendarDay(now))-Date.parse(calendarDay(new Date(entry.at)))>7*86400000)throw unavailable();
+     const {rows:[person]}=await c.query<{rank:number|null}>('SELECT rank FROM personnel WHERE id=$1 AND active FOR UPDATE',[entry.person]);
+     const rank=person?.rank;
+     if(!rank||rank<1||rank>15)throw new HttpError('Для розрахунку потрібен чинний порядковий ранг.',409);
+     const rates=rank<=4?[2000,10000]:rank<=10?[4500,25000]:rank<=12?[7500,35000]:rank===13?[12500,65000]:[25000,75000];
+     const limit=Math.min(rates[action.category==='higher'?1:0],fineRules[action.rule].limit);
+     if(action.amount>limit)throw new HttpError('Максимальна сума за цією нормою і категорією: '+limit+' $.');
+     entry.decision={outcome:'fine',body:action.body,by:actor.id,at};
+     entry.fine={rule:action.rule,category:action.category,rank,amount:action.amount,dueAt:new Date(now.getTime()+86400000).toISOString()};
+     break;
+    }
+    case 'submit-payment':
+     if(!entry.fine||entry.appealResult?.cancel||(entry.fine.payment&&entry.fine.review?.accept!==false))throw unavailable();
+     entry.fine={...entry.fine,payment:{body:'Доказ сплати до бюджету НГУ',links:[action.source],at},review:undefined};
+     break;
+    case 'review-payment':
+     if(!entry.fine?.payment||entry.fine.review||entry.appealResult?.cancel)throw unavailable();
+     entry.fine={...entry.fine,review:{body:action.body,accept:action.accept,at}};
+     break;
     case 'acknowledge':
      if(!entry.decision)throw unavailable();
      if(entry.acknowledged)return {saved:true};
