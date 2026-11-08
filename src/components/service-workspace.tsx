@@ -42,6 +42,7 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
  const [recruitmentUnit,setRecruitmentUnit]=useState('');
  const [correctionField,setCorrectionField]=useState('joinedOn');
  const [saveDraft,setSaveDraft]=useState(false);
+ const [templateId,setTemplateId]=useState(''),[manageTemplate,setManageTemplate]=useState('');
  const [requestType,setRequestType]=useState('Переведення');
  const [draftId,setDraftId]=useState('');
  const draftRequest=data?.drafts.find(draft=>draft.id===draftId)?.request;
@@ -53,6 +54,8 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
   [entry.title,entry.body,entry.revision].some(text=>text?.toLocaleLowerCase('uk').includes(documentSearch.trim().toLocaleLowerCase('uk')))
  ));
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Kyiv'}).format(new Date());
+ const template=data?.reportTemplates.find(item=>item.id===templateId);
+ const selectedTemplate=data?.reportTemplates.find(item=>item.id===manageTemplate);
  const recruitmentTarget=data?.targets.find(unit=>unit.id===recruitmentUnit);
  const editors=data?.units.filter(unit=>unit.editor)??[];
  const canEdit=(id?:string|null)=>editors.some(unit=>unit.id===id);
@@ -71,6 +74,22 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
     <tbody>{data.absences.map(item=><tr key={item.id}><td>{item.name}</td><td>{item.from.replace('T',' ')}</td><td>{item.to.replace('T',' ')}</td></tr>)}</tbody>
    </table></div>:<p>Поточних і майбутніх погоджених відсутностей немає.</p>}
   </section>}
+  {data&&module==='requests'&&unitId&&data.canTransfer&&<details className="account-action profile-action">
+   <IllustratedSummary title="Типи й маршрути рапортів" image="/portal-art/catalog/approval.webp"/>
+   <div className="account-action-content stack">
+    <Field label="Тип рапорту"><select value={manageTemplate} onChange={event=>setManageTemplate(event.target.value)}><option value="">Новий тип</option>{data.reportTemplates.map(item=><option value={item.id} key={item.id}>{item.title}</option>)}</select></Field>
+    <form key={manageTemplate} className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'report-template',id:manageTemplate||undefined,template:{
+     title:f.get('title'),fields:String(f.get('fields')??'').split(/\r?\n/).map(field=>field.trim()).filter(Boolean),
+     route:f.get('route'),issueOrder:f.has('issueOrder'),
+    }}))}>
+     <Field label="Назва"><input name="title" required maxLength={120} defaultValue={selectedTemplate?.title}/></Field>
+     <Field label="Обов’язкові поля · одне на рядок"><textarea name="fields" defaultValue={selectedTemplate?.fields.join('\n')}/></Field>
+     <Field label="Хто погоджує"><select name="route" defaultValue={selectedTemplate?.route??'unit'}><option value="unit">Командування підрозділу</option><option value="command">Керуючий склад</option></select></Field>
+     <label className="checkbox"><input name="issueOrder" type="checkbox" defaultChecked={selectedTemplate?.issueOrder}/>Сформувати наказ після погодження</label>
+     <button disabled={busy}>Зберегти тип</button>
+    </form>
+   </div>
+  </details>}
   {data&&module==='requests'&&unitId&&editors.some(unit=>unit.id===unitId)&&<details className="account-action profile-action">
    <IllustratedSummary title="Умови набору підрозділу" image="/portal-art/unit-actions/info.webp"/>
    <form className="stack account-action-content" onSubmit={event=>void save(event,fields=>({kind:'recruitment',unit:unitId,body:fields.get('rules'),minRank:fields.get('minRank')?Number(fields.get('minRank')):null}))}>
@@ -82,14 +101,18 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
   {data&&((module==='requests'&&!unitId)||(module!=='requests'&&editors.length>0))&&<details className="account-action profile-action" open={draftId?true:undefined}>
    <IllustratedSummary title={draftId?'Редагувати чернетку рапорту':actions[module]} image={'/portal-art/catalog/'+artwork[module]+'.webp'}/>
    <form key={draftId} className="stack account-action-content" onSubmit={e=>void save(e,f=>module==='requests'?
-    {kind:'request',draft:!!draftId||f.has('saveDraft'),draftId:draftId||undefined,type:f.get('type'),body:f.get('body'),recruitmentEvidence:f.get('type')==='Вступ до підрозділу'?{licenses:f.getAll('licenses'),fitness:f.get('fitness')??'',manual:f.get('manual')??''}:undefined,correction:f.has('correctionValue')?{field:f.get('correctionField'),value:f.get('correctionValue')}:undefined,post:f.get('post')||undefined,replacement:f.get('replacement')||undefined,targetUnit:f.get('targetUnit')||undefined,from:f.get('from')||undefined,to:f.get('to')||undefined,links:evidenceLines(String(f.get('links')??''))}:
+    {kind:'request',draft:!!draftId||f.has('saveDraft'),draftId:draftId||undefined,templateId:f.get('templateId')||undefined,answers:f.getAll('answer'),type:f.get('type'),body:f.get('body'),recruitmentEvidence:f.get('type')==='Вступ до підрозділу'?{licenses:f.getAll('licenses'),fitness:f.get('fitness')??'',manual:f.get('manual')??''}:undefined,correction:f.has('correctionValue')?{field:f.get('correctionField'),value:f.get('correctionValue')}:undefined,post:f.get('post')||undefined,replacement:f.get('replacement')||undefined,targetUnit:f.get('targetUnit')||undefined,from:f.get('from')||undefined,to:f.get('to')||undefined,links:evidenceLines(String(f.get('links')??''))}:
     {kind:'publish',module,unit:f.get('unit'),title:f.get('title'),body:f.get('body'),
      date:f.get('date')||undefined,url:f.get('url')||undefined,revision:f.get('revision')||undefined,category:f.get('category')||undefined,replaces:f.get('replaces')||undefined,draft:f.has('draft'),requiresProof:f.has('requiresProof'),responsible:f.get('responsible')||undefined,requirementId:f.get('requirementId')||undefined},()=>{setDraftId('');setSaveDraft(false);})}>
     {module==='requests'?<>
      <fieldset className="request-types">
       <legend>Тип заявки</legend>
       <div className="request-type-grid">
-       {['Переведення','Вступ до підрозділу','IC-відгул','OOC-відпустка','Відпустка','Вступ або поновлення','Звільнення','Звільнення або оскарження','Виправлення особової справи'].map(type=><label className="request-type" key={type}>
+       {requestType==='Інший рапорт'&&<>
+      <Field label="Тип рапорту"><select name="templateId" required value={templateId} onChange={event=>setTemplateId(event.target.value)}><option value="">Оберіть тип</option>{data.reportTemplates.map(item=><option value={item.id} key={item.id}>{item.title}</option>)}</select></Field>
+      {template?.fields.map((label,index)=><Field key={template.id+':'+index} label={label}><textarea name="answer" required={!saveDraft} maxLength={1000} defaultValue={draftRequest?.templateId===template.id?draftRequest.answers?.[index]:undefined}/></Field>)}
+     </>}
+     {['Переведення','Вступ до підрозділу','IC-відгул','OOC-відпустка','Відпустка','Вступ або поновлення','Звільнення','Звільнення або оскарження','Виправлення особової справи',...(data.reportTemplates.length?['Інший рапорт']:[])].map(type=><label className="request-type" key={type}>
         <input type="radio" name="type" value={type} checked={requestType===type} onChange={()=>setRequestType(type)}/>
         <span>{type}</span>
        </label>)}
@@ -148,7 +171,7 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
     <form onSubmit={event=>{if((event.nativeEvent as SubmitEvent).submitter?.getAttribute('data-action')==='delete'){if(confirm('Видалити чернетку?'))void save(event,()=>({kind:'delete-draft',id:draft.id}));else event.preventDefault();return;}if(confirm('Подати цю чернетку на розгляд?'))void save(event,()=>({kind:'request',draftId:draft.id,type:draft.title,body:draft.body}));else event.preventDefault();}}>
      <div className="actions"><button disabled={busy}>Подати рапорт</button>
       <button type="button" className="secondary" disabled={busy} onClick={()=>{
-       setDraftId(draft.id);setSaveDraft(true);setRequestType(draft.request.type);
+       setDraftId(draft.id);setSaveDraft(true);setRequestType(draft.request.type);setTemplateId(draft.request.templateId??'');
        setRecruitmentUnit(draft.request.targetUnit??'');setCorrectionField(draft.request.correction?.field??'joinedOn');
       }}>Редагувати</button>
       <button type="submit" data-action="delete" className="secondary" disabled={busy}>Видалити чернетку</button></div>
@@ -187,6 +210,11 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
     {entry.post&&<p>Пост або завдання: {entry.post}{entry.replacement&&' · Заміна: '+entry.replacement}</p>}
     {entry.from&&entry.to&&<p>Період: {entry.from} — {entry.to}</p>}
     {entry.links?.map((link,index)=><p key={link}><a href={link} target="_blank" rel="noopener noreferrer">Доказ {index+1}</a></p>)}
+    {entry.template&&<dl>{entry.template.fields.map((label,index)=><div key={index}><dt>{label}</dt><dd>{entry.answers?.[index]}</dd></div>)}</dl>}
+    {!!entry.replies?.length&&<details><summary>Історія подання та уточнень ({entry.replies.length+1})</summary>
+     <p>Початкова версія · {new Date(entry.createdAt).toLocaleString('uk-UA',{timeZone:'Europe/Kyiv'})}</p><p>{entry.body}</p>
+     {entry.replies.map((reply,index)=><article key={reply.at}><h3>Версія {index+2} · {new Date(reply.at).toLocaleString('uk-UA',{timeZone:'Europe/Kyiv'})}</h3><p>{reply.body}</p></article>)}
+    </details>}
     {entry.replies?.map(reply=><div className="notice" key={reply.at}><p>{reply.body}</p>{reply.links.map((link,index)=><a key={link} href={link} target="_blank" rel="noopener noreferrer">Доказ {index+1} </a>)}</div>)}
     {['IC-відгул','OOC-відпустка','Відпустка'].includes(entry.title)&&!entry.appliedAt&&
      ['pending','clarification','approved'].includes(entry.status??'')&&(entry.author===data.actorId||canEdit(entry.unit))&&
@@ -199,7 +227,7 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
      <button disabled={busy}>Повторно подати</button>
     </form>}
     {entry.status&&<p>{statusLabels[entry.status]}{entry.decision?' · '+entry.decision:''}{entry.decidedBy?' · '+entry.decidedBy:''}</p>}
-    {entry.status==='pending'&&entry.author!==data.actorId&&(data.admin||canEdit(entry.unit)||canEdit(entry.targetUnit))&&
+    {entry.status==='pending'&&entry.author!==data.actorId&&(entry.template?.route!=='command'||data.canTransfer)&&(data.admin||canEdit(entry.unit)||canEdit(entry.targetUnit))&&
      <form className="stack" onSubmit={e=>void save(e,f=>({kind:'decide',id:entry.id,status:f.get('status'),side:f.get('side')||undefined,manualVerified:f.has('manualVerified'),body:f.get('body')}))}>
       {entry.title==='Переведення'&&<Field label="Сторона погодження"><select name="side" required defaultValue=""><option value="">Оберіть сторону</option>
        {canEdit(entry.unit)&&<option value="source">Поточний підрозділ</option>}
