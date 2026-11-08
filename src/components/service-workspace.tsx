@@ -167,7 +167,7 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
       <form className="actions" onSubmit={e=>void save(e,()=>({kind:'attendance',id:entry.id,status:myAttendance?.status==='confirmed'?'declined':'confirmed'}))}>
        <button disabled={busy}>{myAttendance?.status==='confirmed'?'Скасувати участь':'Підтвердити участь'}</button>
       </form>}
-     {canEdit(entry.unit)&&<details><summary>Участь і відвідування ({attendance.filter(row=>row.status==='confirmed'||row.status==='present').length})</summary>
+     {canEdit(entry.unit)&&<details className="account-action form-disclosure"><IllustratedSummary title={'Участь і відвідування ('+attendance.filter(row=>row.status==='confirmed'||row.status==='present').length+')'} image="/portal-art/cabinet/calendar.webp"/>
       <ul>{roster.map(person=><li key={person.id}>{person.name} · {({confirmed:'підтверджено',declined:'відмова',present:'присутній',absent:'відсутній'} as Record<string,string>)[attendance.find(row=>row.member===person.id)?.status??'']||'без відповіді'}</li>)}</ul>
       {entry.date<=today&&<form className="stack" onSubmit={e=>void save(e,f=>({kind:'attendance',id:entry.id,member:f.get('member'),status:f.get('status')}))}>
        <Field label="Боєць"><select name="member" required><option value="">Оберіть бійця</option>{roster.map(person=><option key={person.id} value={person.id}>{person.name}</option>)}</select></Field>

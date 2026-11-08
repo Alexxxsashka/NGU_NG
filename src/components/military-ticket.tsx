@@ -1,4 +1,5 @@
 'use client';
+import {IllustratedSummary} from './illustrated-summary';
 import {useState,type FormEvent} from 'react';
 import type {militaryTickets} from '@/lib/military-ticket';
 import {api,Field,Loading,Notice,useResource} from './ui';
@@ -34,7 +35,7 @@ export function MilitaryTicket({unitId}:{unitId?:string}){
     <form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'verify-date',id:person.id,date:f.get('date')}))}>
      <Field label="Кадрова дата вступу"><input type="date" name="date" required defaultValue={person.joined??''}/></Field><button disabled={busy}>Підтвердити дату</button>
     </form>
-    {!ticket?.issued&&<details><summary>Програма та виконання умов</summary>
+    {!ticket?.issued&&<details className="account-action form-disclosure"><IllustratedSummary title="Програма та виконання умов" image="/portal-art/cabinet/training.webp"/>
      <form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'confirm',id:person.id,ticket:{
       program:f.get('program'),course:f.has('course'),rankFive:f.has('rankFive'),external:f.has('external'),orientation:f.has('orientation'),oath:f.has('oath'),
       ...Object.fromEntries(['lectures','assessments','exercises'].map(key=>[key,String(f.get(key)??'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean)])),

@@ -1,4 +1,5 @@
 'use client';
+import {IllustratedSummary} from './illustrated-summary';
 import {useState,type FormEvent} from 'react';
 import type {disciplineCases} from '@/lib/discipline';
 import {evidenceLines} from '@/lib/report-limits';
@@ -16,7 +17,7 @@ export function Discipline({staff=false}:{staff?:boolean}){
   catch(e){setMessage((e as Error).message);}
   finally{setBusy(false);}
  }
- const form=(id:string,kind:string,label:string,options?:React.ReactNode,proof=false)=><details><summary>{label}</summary>
+ const form=(id:string,kind:string,label:string,options?:React.ReactNode,proof=false)=><details className="account-action form-disclosure"><IllustratedSummary title={label} image="/portal-art/catalog/review.webp"/>
   <form className="stack narrow" onSubmit={event=>void save(event,f=>({id,kind,body:f.get('body'),outcome:f.get('outcome'),accept:f.get('accept')==='yes',cancel:f.get('cancel')==='yes',links:evidenceLines(String(f.get('links')??''))}))}>
    {options}<Field label="Підстава або пояснення"><textarea name="body" required minLength={5} maxLength={2000}/></Field>
    {proof&&<Field label="Докази"><textarea name="links" placeholder="Одне HTTPS-посилання на рядок"/></Field>}
@@ -25,7 +26,7 @@ export function Discipline({staff=false}:{staff?:boolean}){
  return <section className="panel" id="content">
   <h1>{staff?'Дисциплінарний облік ВСП':'Мої дисциплінарні справи'}</h1>
   {(error||message)&&<Notice error>{error||message}</Notice>}{!data&&!error&&<Loading/>}
-  {staff&&!!data?.people.length&&<details><summary>Зафіксувати проступок</summary>
+  {staff&&!!data?.people.length&&<details className="account-action form-disclosure"><IllustratedSummary title="Зафіксувати проступок" image="/portal-art/catalog/checkpoint.webp"/>
    <form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'file',person:f.get('person'),rule:f.get('rule'),body:f.get('body'),links:evidenceLines(String(f.get('links')??''))}))}>
     <Field label="Боєць"><select name="person" required defaultValue=""><option value="">Оберіть профіль</option>{data.people.map(p=><option value={p.id} key={p.id}>{p.name} · {p.static_id}</option>)}</select></Field>
     <Field label="Порушена норма"><input name="rule" required minLength={5} maxLength={2000}/></Field>
@@ -33,7 +34,7 @@ export function Discipline({staff=false}:{staff?:boolean}){
     <Field label="Докази"><textarea name="links" placeholder="Одне HTTPS-посилання на рядок"/></Field><button disabled={busy}>Зареєструвати справу</button>
    </form></details>}
   {data?.cases.length===0&&<p>Дисциплінарних справ немає.</p>}
-  {data?.cases.map(entry=><details className="audit-row" key={entry.id}><summary>{entry.name} · {entry.rule} · {entry.decision?outcomes[entry.decision.outcome]:'Перевірка'}</summary>
+  {data?.cases.map(entry=><details className="account-action form-disclosure" key={entry.id}><IllustratedSummary title={[entry.name,entry.rule,entry.decision?outcomes[entry.decision.outcome]:'Перевірка'].join(' · ')} image="/portal-art/unit-actions/archive.webp"/>
    <p>{entry.body}</p>
    {entry.explanation&&<p>Пояснення: {entry.explanation.body}</p>}
    {entry.decision&&<p>{entry.decision.body}{entry.active&&' · Чинна догана'}</p>}

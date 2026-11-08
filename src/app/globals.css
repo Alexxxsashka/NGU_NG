@@ -112,7 +112,7 @@ dialog::backdrop {background:#020909cc}
   border-radius: var(--radius);
   background: var(--surface);
 }
-.account-action summary {
+.account-action > summary {
   position: relative;
   isolation: isolate;
   overflow: hidden;
@@ -128,19 +128,19 @@ dialog::backdrop {background:#020909cc}
   color: var(--ink);
   font: 800 clamp(22px, 4vw, 30px)/1.15 "Roboto Condensed", Arial, sans-serif;
 }
-.account-action summary::-webkit-details-marker { display: none; }
-.account-action summary img { object-fit: cover; z-index: -2; }
-.account-action summary::before {
+.account-action > summary::-webkit-details-marker { display: none; }
+.account-action > summary img { object-fit: cover; z-index: -2; }
+.account-action > summary::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
   background: linear-gradient(0deg, var(--paper) 2%, color-mix(in srgb, var(--paper) 66%, transparent) 36%, transparent 80%);
 }
-.account-action summary svg { color: var(--accent); }
-.account-action summary:hover span { color: var(--accent); }
-.account-action[open] summary { border-radius: var(--radius) var(--radius) 0 0; }
-.account-action[open] summary svg { transform: rotate(180deg); }
+.account-action > summary svg { color: var(--accent); }
+.account-action > summary:hover span { color: var(--accent); }
+.account-action[open] > summary { border-radius: var(--radius) var(--radius) 0 0; }
+.account-action[open] > summary svg { transform: rotate(180deg); }
 .account-action-content { border-top: 1px solid var(--line); padding: clamp(16px, 4vw, 26px); }
 .account-action-content > p:first-child { margin-top: 0; }
 
@@ -494,3 +494,13 @@ select option, select optgroup { color: var(--ink); background: var(--surface); 
  select option { padding: 8px 12px; border-radius: 6px; }
  select option:is(:hover,:focus-visible,:checked) { color: var(--accent); background: var(--raised); }
 }
+
+.form-disclosure { margin-block: 12px; }
+.form-disclosure:not([open]) > .illustrated-summary {
+ min-height: 84px;
+ align-items: center;
+ font-size: clamp(16px, 3vw, 22px);
+}
+.form-disclosure > .illustrated-summary span { overflow-wrap: anywhere; }
+.form-disclosure[open] > :not(summary) { margin-inline: 16px; }
+.form-disclosure[open] > :last-child { margin-bottom: 16px; }

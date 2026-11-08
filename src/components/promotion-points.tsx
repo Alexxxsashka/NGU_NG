@@ -65,14 +65,14 @@ export function PromotionPoints({unitId,focus,taskId,screen='',mode='personal'}:
     <PromotionReportForm key={data.actorId+':'+(taskId??'')} selectedTaskId={available.find(task=>task.id===taskId)?.id} actorId={data.actorId} tasks={available} onSaved={resource.refresh}/>
    </details>}
    {mode==='catalog'&&data.units.length>0&&<section className="panel"><h2>Завдання підрозділів і заохочення</h2>
-    <details><summary>Додати завдання</summary><form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'task',unitId:f.get('unitId')||null,name:f.get('name'),points:Number(f.get('points')),requirements:f.get('requirements')}))}>
+    <details className="account-action form-disclosure"><IllustratedSummary title="Додати завдання" image="/portal-art/unit-actions/info.webp"/><form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'task',unitId:f.get('unitId')||null,name:f.get('name'),points:Number(f.get('points')),requirements:f.get('requirements')}))}>
      <Field label="Підрозділ"><select name="unitId">{data.canEditCommon&&<option value="">Спільне для всіх підрозділів</option>}{data.units.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>
      <Field label="Завдання"><input name="name" required minLength={3} maxLength={120}/></Field>
      <Field label="Балів за виконання"><input name="points" type="number" min={1} max={1000} required/></Field>
      <Field label="Вимоги до доказів і нормативи"><textarea name="requirements" maxLength={1000}/></Field><button disabled={busy}>Створити завдання</button>
     </form></details>
-    {data.tasks.filter(task=>(task.unitId?editable(task.unitId):data.canEditCommon)&&!task.archived).map(task=><details key={task.id} className="audit-row">
-     <summary>{task.name} · {task.points} б. · {data.units.find(unit=>unit.id===task.unitId)?.name??'Спільне для НГУ'}</summary>
+    {data.tasks.filter(task=>(task.unitId?editable(task.unitId):data.canEditCommon)&&!task.archived).map(task=><details key={task.id} className="account-action form-disclosure">
+     <IllustratedSummary title={[task.name,task.points+' б.',data.units.find(unit=>unit.id===task.unitId)?.name??'Спільне для НГУ'].join(' · ')} image="/portal-art/unit-actions/rank.webp"/>
      <form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'task',id:task.id,unitId:task.unitId,name:f.get('name'),points:Number(f.get('points')),requirements:f.get('requirements')}))}>
       <Field label="Назва"><input name="name" required minLength={3} maxLength={120} defaultValue={task.name}/></Field>
       <Field label="Бали"><input name="points" type="number" min={1} max={1000} required defaultValue={task.points}/></Field>
@@ -80,7 +80,7 @@ export function PromotionPoints({unitId,focus,taskId,screen='',mode='personal'}:
      </form>
      {(task.unitId||/^[a-f0-9-]{36}$/i.test(task.id))&&<form onSubmit={e=>{if(confirm('Архівувати завдання?'))void save(e,()=>({kind:'archive',id:task.id}));else e.preventDefault();}}><button className="text-button" disabled={busy}>Архівувати</button></form>}
     </details>)}
-    <details><summary>Нарахувати додаткові бали</summary><form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'bonus',userId:f.get('userId'),points:Number(f.get('points')),reason:f.get('reason'),links:links(f)}))}>
+    <details className="account-action form-disclosure"><IllustratedSummary title="Нарахувати додаткові бали" image="/portal-art/catalog/approval.webp"/><form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'bonus',userId:f.get('userId'),points:Number(f.get('points')),reason:f.get('reason'),links:links(f)}))}>
      <Field label="Боєць"><select name="userId" required defaultValue=""><option value="">Оберіть бійця</option>{data.people.map(person=><option key={person.id} value={person.id}>{person.name} · {data.units.find(unit=>unit.id===person.unit_id)?.name}</option>)}</select></Field>
      <Field label="Бали"><input name="points" type="number" min={1} max={1000} required/></Field>
      <Field label="Підстава"><textarea name="reason" required minLength={5} maxLength={2000}/></Field>
@@ -97,8 +97,8 @@ export function PromotionPoints({unitId,focus,taskId,screen='',mode='personal'}:
       <div className="report-row-identity"><strong>{items[0]?.name}</strong><small>{items[0]?.createdAt?new Date(items[0].createdAt).toLocaleDateString('uk-UA'):''}</small></div>
       <dl className="report-row-totals"><div><dt>Завдань</dt><dd>{items.length}</dd></div><div><dt>Балів у звіті</dt><dd>{items.reduce((sum,item)=>sum+item.rate*item.quantity,0)}</dd></div><div><dt>Зараховано</dt><dd>{approved}</dd></div></dl>
       <small>{[...new Set(items.map(item=>status[item.status]))].join(" · ")}</small><button type="button" className="secondary" aria-haspopup="dialog" onClick={()=>setSelected(id)}>Відкрити звіт</button>
-      {selected===id&&<Modal title={'Звіт на підвищення · '+items[0]?.name} className="report-dialog" onClose={()=>setSelected(null)}><div className="report-dialog-scroll" tabIndex={0} role="region" aria-label="Завдання звіту"><div className="report-body">{items.map(entry=><details className="audit-row" key={entry.id}>
-     <summary><strong>{entry.title} · {entry.rate*entry.quantity} б.</strong> · {entry.name} · {status[entry.status]}</summary>
+      {selected===id&&<Modal title={'Звіт на підвищення · '+items[0]?.name} className="report-dialog" onClose={()=>setSelected(null)}><div className="report-dialog-scroll" tabIndex={0} role="region" aria-label="Завдання звіту"><div className="report-body">{items.map(entry=><details className="account-action form-disclosure" key={entry.id}>
+     <IllustratedSummary title={[entry.title,entry.rate*entry.quantity+' б.',entry.name,status[entry.status]].join(' · ')} image="/portal-art/catalog/review.webp"/>
      <p>{entry.quantity} × {entry.rate} б. · {new Date(entry.createdAt).toLocaleDateString('uk-UA')}</p>
      <ul>{entry.links.map((url,i)=><li key={url}><a href={url} target="_blank" rel="noopener noreferrer">Доказ {i+1}</a></li>)}</ul>
      {entry.reason&&<p>{entry.reason}</p>}

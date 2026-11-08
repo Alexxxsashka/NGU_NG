@@ -75,8 +75,8 @@ export function PersonnelWorkflow({unitId,focus,mode='personal'}:{unitId?:string
    </div>
    {(mode==='personal'||mode==='review')&&<section className="panel"><h2>Звіти на підвищення</h2>
     {!data.promotions.length&&<p>Звітів поки немає.</p>}
-    {data.promotions.map(report=><details className="audit-row" key={report.id} id={'promotion-'+report.id} open={focus===report.id||undefined}>
-     <summary><strong>{report.name} · ID {report.staticId}</strong> · {rankName(report.fromRank)} → {rankName(report.rank)} · {statusLabels[report.status]}</summary>
+    {data.promotions.map(report=><details className="account-action form-disclosure" key={report.id} id={'promotion-'+report.id} open={focus===report.id||undefined}>
+     <IllustratedSummary title={[report.name,'ID '+report.staticId,rankName(report.fromRank)+' → '+rankName(report.rank),statusLabels[report.status]].join(' · ')} image="/portal-art/unit-actions/rank.webp"/>
      <p>{report.reason}</p>
      <ul>{report.links.map((link,index)=><li key={index}><a href={link} target="_blank" rel="noopener noreferrer">Доказ {index+1}</a></li>)}</ul>
      {report.decision&&<p>Рішення: {report.decision}</p>}
