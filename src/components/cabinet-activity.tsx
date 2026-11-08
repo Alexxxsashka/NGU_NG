@@ -62,6 +62,7 @@ export async function CabinetActivity({user,today,joinedOn}:{user:Viewer;today:s
   </section>
   <section className="panel" aria-labelledby="cabinet-history">
    <h2 id="cabinet-history">Історія служби</h2>
+   <p><Link href="/portal/discipline">Мої дисциплінарні справи</Link></p>
    {timeline.length?<ol className="cabinet-items">
     {timeline.map(item=><li key={item.id}><time dateTime={item.date}>{shortDate.format(new Date(item.date))}</time>
      <strong>{item.label}</strong>{item.detail&&<p>{item.detail}</p>}

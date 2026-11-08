@@ -1,3 +1,4 @@
+import {canOpenDiscipline} from '@/lib/discipline';
 import type {Metadata} from 'next';
 import {headers} from 'next/headers';
 import {viewer} from '@/lib/auth';
@@ -15,4 +16,4 @@ import '@fontsource/roboto-condensed/latin-800.css';
 import './globals.css';
 export const metadata:Metadata={title:{default:'Портал НГУ',template:'%s | НГУ'},description:'Єдина інформаційна система НГУ в NG GTA 5 RP.',robots:{index:false,follow:false}};
 export const dynamic='force-dynamic';
-export default async function RootLayout({children}:{children:React.ReactNode}){let user=null;try{user=await viewer(await headers());}catch{/* A disconnected database must not expose private content. */}const commandUnits=user&&!user.mustChangePassword?(await accessibleUnits(user.id).catch(()=>[])).filter(unit=>unit.editor):[];const trainingUnitId=commandUnits.length?await kmbUnitId().catch(()=>undefined):undefined;return <html lang="uk"><body><a className="skip" href="#content">Перейти до вмісту</a><Shell user={user} commandUnits={commandUnits} trainingUnitId={trainingUnitId}>{children}</Shell></body></html>;}
+export default async function RootLayout({children}:{children:React.ReactNode}){let user=null;try{user=await viewer(await headers());}catch{/* A disconnected database must not expose private content. */}const commandUnits=user&&!user.mustChangePassword?(await accessibleUnits(user.id).catch(()=>[])).filter(unit=>unit.editor):[];const trainingUnitId=commandUnits.length?await kmbUnitId().catch(()=>undefined):undefined;const disciplineAccess=user&&!user.mustChangePassword?await canOpenDiscipline(user.id).catch(()=>false):false;return <html lang="uk"><body><a className="skip" href="#content">Перейти до вмісту</a><Shell user={user} commandUnits={commandUnits} trainingUnitId={trainingUnitId} disciplineAccess={disciplineAccess}>{children}</Shell></body></html>;}

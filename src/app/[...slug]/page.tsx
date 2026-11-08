@@ -1,3 +1,4 @@
+import {Discipline} from '@/components/discipline';
 import {MilitaryTicket} from '@/components/military-ticket';
 import Link from 'next/link';
 import {query} from '@/db';
@@ -52,6 +53,7 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
  if(slug[0]==='command'&&(slug.length===1||slug.length===3)){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <CommandWorkspace actor={u} unitId={slug[1]} section={slug[2]} filters={await searchParams}/>;}
  if(slug[0]==='portal'&&slug[1]==='promotion-points'&&(slug.length===2||slug.length===3&&['tasks','submit','history'].includes(slug[2]))){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <PromotionPoints screen={slug[2]} taskId={(await searchParams).task} focus={(await searchParams).entry}/>;}
  if(path==='portal/military-ticket'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <MilitaryTicket/>;}
+ if(path==='portal/discipline'||path==='command/discipline'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <Discipline staff={path==='command/discipline'}/>;}
  if(path==='cabinet'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword} overview={u.mustChangePassword?null:<ServiceTablet user={u}/>}/>;}
  if(slug[0]==='portal'&&slug.length===2&&Object.hasOwn(portalPreviews,slug[1])){
   const section=slug[1];

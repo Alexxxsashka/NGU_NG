@@ -3,6 +3,10 @@ import {HttpError} from './security';
 
 export async function checkPromotion(c:PoolClient,id:string,rank:number,next:number){
  if(next!==rank+1)throw new HttpError('Підвищення можливе лише на один ранг.',409);
+ if((await c.query(`SELECT 1 FROM settings WHERE key LIKE 'discipline:%' AND value->>'person'=$1
+  AND (value#>>'{decision,until}')::timestamptz>now() AND value->'lifted' IS NULL
+  AND (value#>>'{appealResult,cancel}') IS DISTINCT FROM 'true' LIMIT 1`,[id])).rowCount)
+  throw new HttpError('Підвищення недоступне, поки діє догана.',409);
  const {rows:[latest]}=await c.query<{available_at:string}>(`SELECT to_char(
   (created_at + interval '24 hours') AT TIME ZONE 'Europe/Kyiv','DD.MM.YYYY HH24:MI') AS available_at
   FROM audit_logs WHERE entity_id=$1 AND created_at > now()-interval '24 hours' AND (

@@ -57,6 +57,14 @@ export async function finalizeAwards(input:unknown,actor:Viewer):Promise<AwardOr
    GROUP BY r.id ORDER BY r.submitted_at DESC,r.id DESC`,[p.week]);
   const pending=rows.filter(row=>row.pending>0).length;
   if(pending)throw new HttpError('Завершіть перевірку звітів і погодьте суми. Залишилося звітів: '+pending+'.',409);
+  const {rows:[blocked]}=await c.query<{count:number}>(`SELECT count(DISTINCT r.static_id)::int AS count
+   FROM reports r JOIN personnel p ON (p.id=r.personnel_id OR (r.personnel_id IS NULL AND ltrim(p.static_id,'0')=ltrim(r.static_id,'0')))
+   JOIN settings d ON d.key LIKE 'discipline:%' AND d.value->>'person'=p.id::text
+   WHERE r.week_start=$1 AND (d.value#>>'{decision,until}')::timestamptz>now()
+   AND d.value->'lifted' IS NULL AND (d.value#>>'{appealResult,cancel}') IS DISTINCT FROM 'true'
+   AND EXISTS(SELECT 1 FROM report_items i WHERE i.report_id=r.id AND i.status='approved' AND i.approved_amount>0)
+   AND NOT EXISTS(SELECT 1 FROM settings payment WHERE payment.key='report-paid:'||r.id::text)`,[p.week]);
+  if(blocked.count)throw new HttpError('Преміювання заблоковано через чинні догани. Бійців із доганою: '+blocked.count+'.',409);
   const paidAt=new Date().toISOString();
   const recipients=new Map<string,AwardOrder['recipients'][number]>();
   const payments=rows.filter(row=>new Decimal(row.amount).gt(0));
