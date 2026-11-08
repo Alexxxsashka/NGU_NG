@@ -37,6 +37,7 @@ export function PromotionPoints({unitId,focus,taskId,screen='',mode='personal'}:
    {(mode==='catalog'||mode==='personal'&&!screen)&&<section className="panel portal-shortcuts">
     <h2>{mode==='catalog'?'Спільні правила':'Мій прогрес'}</h2>
     {mode==='personal'&&(data.profile?<p>{promotionRankName(data.profile.rank,data.profile.rank_name)} · {data.points} підтверджених балів{data.step?' із '+data.step[2]+' до звання «'+data.step[1]+'»':''}.</p>:<p>Для обліку балів потрібен активний профіль зі званням і підрозділом.</p>)}
+    {mode==='personal'&&data.restriction&&<Notice>{data.restriction}</Notice>}
     {mode==='personal'&&data.step&&<progress aria-label="Прогрес до наступного звання" max={data.step[2]} value={Math.min(data.points,data.step[2])}/>}
     {mode==='personal'&&data.step&&<p>До порога залишилося {Math.max(0,data.step[2]-data.points)} балів.</p>}
     {mode==='personal'&&data.profile&&<p><Link href={data.credits.some(entry=>entry.status==='clarification')?'/portal/promotion-points/history':data.step&&data.points>=data.step[2]?'/portal/personnel-actions':'/portal/promotion-points/tasks'}>

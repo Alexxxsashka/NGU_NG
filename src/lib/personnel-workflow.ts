@@ -1,4 +1,4 @@
-import {checkPromotion} from './promotion-limit';
+import {checkPromotion,promotionRestriction} from './promotion-limit';
 import 'server-only';
 import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
@@ -41,7 +41,8 @@ export async function personnelWorkflow(actor:Viewer,unitId:string|null=null,foc
  ]);
  const progress=await promotionProgress(actor.id);
  const destinations=unitId?(await accessibleUnits(actor.id)).filter(unit=>unit.editor):[];
- return {units,destinations,progress:{points:progress.points,step:progress.step},canTransfer:actor.role==='admin'||leadership.length>0,me:me[0],ranks,promotions:promotions.map(row=>row.value),people,history,actorId:actor.id};
+ const restriction=!unitId&&progress.profile?await promotionRestriction(progress.profile.id):null;
+ return {units,destinations,progress:{restriction,points:progress.points,step:progress.step},canTransfer:actor.role==='admin'||leadership.length>0,me:me[0],ranks,promotions:promotions.map(row=>row.value),people,history,actorId:actor.id};
 }
 
 export async function changePersonnelWorkflow(input:unknown,actor:Viewer){

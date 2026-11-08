@@ -4,6 +4,7 @@ import type {PoolClient} from 'pg';
 import {z} from 'zod';
 import {query,transaction} from '@/db';
 import {audit} from './admin';
+import {promotionRestriction} from './promotion-limit';
 import {HttpError} from './security';
 import {evidence} from './validation';
 import {workspaceUnits} from './workspace-scope';
@@ -64,7 +65,8 @@ export async function promotionPoints(actor:Viewer,unitId:string|null=null,focus
   ids.length?query<{id:string;name:string;unit_id:string}>(`SELECT p.user_id AS id,p.first_name||' '||p.last_name AS name,p.unit_id
    FROM personnel p WHERE p.active AND p.rank IS NOT NULL AND p.user_id IS NOT NULL AND p.unit_id=ANY($1::uuid[]) AND p.user_id<>$2 ORDER BY p.last_name`,[ids,actor.id]):[],
  ]);
- return {...progress,units,canEditCommon:units.some(unit=>unit.appoint),tasks:mergeTasks(tasks.map(row=>row.value)),credits:credits.map(row=>row.value),people,actorId:actor.id};
+ const restriction=!unitId&&progress.profile?await promotionRestriction(progress.profile.id):null;
+ return {...progress,restriction,units,canEditCommon:units.some(unit=>unit.appoint),tasks:mergeTasks(tasks.map(row=>row.value)),credits:credits.map(row=>row.value),people,actorId:actor.id};
 }
 
 export async function changePromotionPoints(input:unknown,actor:Viewer){

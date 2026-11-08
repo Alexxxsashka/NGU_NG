@@ -49,8 +49,9 @@ export function PersonnelWorkflow({unitId,focus,mode='personal'}:{unitId?:string
       {data.me?.active&&data.me.rank&&data.me.unit_id?<form className="stack" onSubmit={e=>void save(e,fd=>({kind:'submit',rank:Number(fd.get('rank')),...proof(fd)}))}>
        <p>Поточне звання: {rankName(data.me.rank)}. Підтверджені бали: {data.progress.points}{data.progress.step?' / '+data.progress.step[2]:''}.</p>
        <Link href="/portal/promotion-points">Завдання й бали підвищення</Link>
-       <Field label="Запитуване звання"><select name="rank" required defaultValue=""><option value="">Оберіть вище звання</option>{data.ranks.filter(rank=>rankName(rank.id).toLocaleLowerCase('uk')===data.progress.step?.[1].toLocaleLowerCase('uk')).map(rank=><option key={rank.id} value={rank.id}>{rankName(rank.id)}</option>)}</select></Field>
-       <Proof/><button disabled={busy||!data.progress.step||data.progress.points<data.progress.step[2]}>Надіслати звіт</button>
+       {data.progress.restriction&&<Notice>{data.progress.restriction}</Notice>}
+       <Field label="Запитуване звання"><select name="rank" required defaultValue=""><option value="">Оберіть вище звання</option>{data.ranks.filter(rank=>rank.id===Number(data.me?.rank)+1&&rankName(rank.id).toLocaleLowerCase('uk')===data.progress.step?.[1].toLocaleLowerCase('uk')).map(rank=><option key={rank.id} value={rank.id}>{rankName(rank.id)}</option>)}</select></Field>
+       <Proof/><button disabled={busy||!!data.progress.restriction||!data.progress.step||data.progress.points<data.progress.step[2]}>Надіслати звіт</button>
       </form>:<p>Для подання потрібні активний кадровий профіль, підрозділ і звання.</p>}
      </div>
     </details>}
