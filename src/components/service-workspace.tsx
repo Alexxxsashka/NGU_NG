@@ -53,6 +53,12 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
   {error&&<Notice error>{error} <button className="text-button" onClick={refresh}>Повторити</button></Notice>}
   {failure&&<Notice error>{failure}</Notice>}{message&&<Notice>{message}</Notice>}
   {!data&&!error&&<Loading/>}
+  {module==='calendar'&&data&&<section className="panel">
+   <h2>Погоджені відсутності</h2>
+   {data.absences.length?<div className="table-wrap"><table><thead><tr><th>Боєць</th><th>Від</th><th>До</th></tr></thead>
+    <tbody>{data.absences.map(item=><tr key={item.id}><td>{item.name}</td><td>{item.from.replace('T',' ')}</td><td>{item.to.replace('T',' ')}</td></tr>)}</tbody>
+   </table></div>:<p>Поточних і майбутніх погоджених відсутностей немає.</p>}
+  </section>}
   {data&&module==='requests'&&unitId&&editors.some(unit=>unit.id===unitId)&&<details className="account-action profile-action">
    <IllustratedSummary title="Умови набору підрозділу" image="/portal-art/unit-actions/info.webp"/>
    <form className="stack account-action-content" onSubmit={event=>void save(event,fields=>({kind:'recruitment',unit:unitId,body:fields.get('rules')}))}>

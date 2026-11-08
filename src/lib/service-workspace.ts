@@ -58,7 +58,7 @@ export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:s
  const personalUnit=membership[0]?.unit_id;
  const readUnits=unitId?units.map(unit=>unit.id):personalUnit?[personalUnit]:[];
  const editors=units.filter(unit=>unit.editor).map(unit=>unit.id);
- const [rows,people,results,targets,attendance,authority,ranks]=await Promise.all([
+ const [rows,people,results,targets,attendance,authority,absences,ranks]=await Promise.all([
   query<{value:Entry}>(`SELECT value FROM settings WHERE key LIKE 'service-entry:%' AND value->>'module'=$1
    AND (($5::boolean AND $1='requests' AND value->>'author'=$2) OR value->>'unit'=ANY($3::text[]) OR value->>'targetUnit'=ANY($4::text[]) OR ($5::boolean AND $1='training' AND EXISTS(SELECT 1 FROM personnel WHERE user_id=$2 AND active) AND EXISTS(
     SELECT 1 FROM settings enrollment WHERE enrollment.key='service-result:'||(settings.value->>'id')||':'||$2)))
@@ -72,9 +72,15 @@ export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:s
   module==='requests'?query<{id:string;name:string;rules:string|null}>(`SELECT u.id,u.name,s.value->>'body' AS rules FROM units u LEFT JOIN settings s ON s.key='recruitment:'||u.id::text WHERE u.active ORDER BY u.sort_order,u.name`):[],
   module==='calendar'?query<{value:{entry:string;member:string;status:string}}>(`SELECT value FROM settings WHERE key LIKE 'service-attendance:%' AND (value->>'member'=$1 OR value->>'unit'=ANY($2::text[]))`,[actor.id,editors]):[],
   module==='requests'?query("SELECT 1 FROM personnel p WHERE p.user_id=$1 AND p.active AND p.rank BETWEEN 13 AND 15",[actor.id]):[],
+  module==='calendar'&&readUnits.length?query<{id:string;name:string;from:string;to:string}>(`SELECT value->>'id' AS id,value->>'name' AS name,
+   value->>'from' AS "from",value->>'to' AS "to" FROM settings
+   WHERE key LIKE 'service-entry:%' AND value->>'module'='requests' AND value->>'status'='approved'
+   AND value->>'unit'=ANY($1::text[]) AND value->>'title'=ANY($2::text[])
+   AND left(value->>'to',10)>=to_char(now() AT TIME ZONE 'Europe/Kyiv','YYYY-MM-DD')
+   ORDER BY value->>'from',key LIMIT 100`,[readUnits,absenceTypes]):[],
   module==='requests'&&unitId?query<{id:number;name:string}>('SELECT id,name FROM ranks ORDER BY id'):[],
  ]);
- return {units,entries:rows.map(({value})=>value),people,results:results.map(({value})=>value),trainingUnit,targets:targets.map(unit=>({...unit,rules:unit.rules??defaultRecruitment(unit.name)})),ranks,attendance:attendance.map(row=>row.value),memberUnit:personalUnit,canTransfer:actor.role==='admin'||authority.length>0,actorId:actor.id,admin:actor.role==='admin'};
+ return {units,entries:rows.map(({value})=>value),people,results:results.map(({value})=>value),trainingUnit,absences,targets:targets.map(unit=>({...unit,rules:unit.rules??defaultRecruitment(unit.name)})),ranks,attendance:attendance.map(row=>row.value),memberUnit:personalUnit,canTransfer:actor.role==='admin'||authority.length>0,actorId:actor.id,admin:actor.role==='admin'};
 }
 
 export async function changeServiceWorkspace(actor:Viewer,input:unknown){

@@ -16,7 +16,7 @@ export function Periods(){
  const period=resource.data?.find(p=>p.week_start===week);
  const open=period?.open??false;
  const disabled=busy||resource.loading||!!resource.error;
- const status=(period?:Period)=>period?.paid?'Виплачено':period?.open?'Прийом відкрито':'Прийом закрито';
+ const status=(period?:Period)=>period?.paid?'Наказ затверджено':period?.open?'Прийом відкрито':'Прийом закрито';
 
  async function toggle(){
   setPlan(null);setBusy(true);setError('');setMessage('');
@@ -39,7 +39,7 @@ export function Periods(){
  }
 
  async function payout(){
-  if(!period?.paid&&!confirm('Зафіксувати виплату за '+dateLabel(week)+' та сформувати наказ? Після цього суми за цей тиждень буде зафіксовано.'))return;
+  if(!period?.paid&&!confirm('Затвердити наказ за '+dateLabel(week)+'? Після цього суми за цей тиждень буде зафіксовано.'))return;
   setBusy(true);setError('');setMessage('');
   try{
    const response=await fetch('/api/admin/periods/pay',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({week,confirmed:true})});
@@ -65,7 +65,7 @@ export function Periods(){
    <div className="actions">
     {!period?.paid&&<button disabled={disabled} onClick={toggle}>{open?'Закрити прийом':'Відкрити прийом'}</button>}
     {period&&!period.paid&&<button className="secondary" disabled={disabled} onClick={()=>void recalculate()}>Переглянути перерахунок</button>}
-    {period&&!open&&<button className="secondary" disabled={disabled} onClick={payout}>{period.paid?'Завантажити наказ Word':'Виплата й наказ Word'}</button>}
+    {period&&!open&&<button className="secondary" disabled={disabled} onClick={payout}>{period.paid?'Завантажити наказ Word':'Затвердити й завантажити наказ'}</button>}
    </div>
    {plan&&<div className="stack"><p>Позицій зі змінами: {plan.recalculated}. Різниця до виплати: {plan.totalDifference} $.</p>
     {plan.recalculated>0&&<button disabled={disabled} onClick={()=>void recalculate(true)}>Застосувати перерахунок</button>}
