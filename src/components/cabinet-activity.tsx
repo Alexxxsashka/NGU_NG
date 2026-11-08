@@ -18,27 +18,33 @@ const entryLink=(module:string,id:string)=>'/portal/'+module+'?entry='+encodeURI
 const shortDate=new Intl.DateTimeFormat('uk-UA',{timeZone:'Europe/Kyiv',dateStyle:'medium'});
 
 export async function CabinetActivity({user,today,joinedOn}:{user:Viewer;today:string;joinedOn?:string|null}){
- const [{requests,learning,event,reports,history},feed]=await Promise.all([loadCabinetActivity(user.id,today),notifications(user.id)]);
+ const [{requests,learning,event,reports,history,promotionClarifications},feed]=await Promise.all([loadCabinetActivity(user.id,today),notifications(user.id)]);
  const timeline=[...history.map(item=>({...item,date:new Date(item.date).toISOString()})),
-  ...(joinedOn?[{id:'joined',date:joinedOn+'T12:00:00.000Z',label:'Дата вступу до НГУ',detail:null}]:[]),
+  ...(joinedOn?[{id:'joined',date:joinedOn+'T12:00:00.000Z',label:'Заявлена дата вступу до НГУ',detail:null,author:null,reason:null}]:[]),
  ].sort((a,b)=>b.date.localeCompare(a.date));
  const complete=learning.filter(item=>item.status==='passed').length;
  const next=learning.find(item=>item.status!=='passed');
  const attention=[
+  ...promotionClarifications.map(item=>({key:'promotion-'+item.id,title:'Доповнити виконання: '+item.title,detail:item.reason,
+   href:'/portal/promotion-points/history?'+new URLSearchParams({entry:item.id})})),
+  ...requests.filter(item=>item.status==='clarification').map(item=>({key:item.id,title:'Уточнити заявку: '+item.title,detail:item.decision,href:entryLink('requests',item.id)})),
   ...reports.map(report=>({key:report.id,title:'Звіт '+report.number+' потребує уточнення',detail:report.reason,
    href:'/weekly-bonus/me?'+new URLSearchParams({from:report.week,to:report.week,report:report.id})+'#report-'+report.id})),
   ...learning.filter(item=>item.status==='retry').slice(0,5).map(item=>({key:item.id,title:'Повторити етап КМБ: '+item.title,detail:null,href:entryLink('training',item.id)})),
-  ...requests.map(item=>({key:item.id,title:(item.status==='approved'?'Погоджено: ':'Відхилено: ')+item.title,detail:item.decision,href:entryLink('requests',item.id)})),
+  ...requests.filter(item=>item.status!=='clarification').map(item=>({key:item.id,title:(item.status==='approved'?'Погоджено: ':'Відхилено: ')+item.title,detail:item.decision,href:entryLink('requests',item.id)})),
  ];
+ const [primary,...other]=attention.filter((item,index)=>attention.findIndex(candidate=>candidate.key===item.key)===index);
  return <>
   <div className="cabinet-overview">
    <section className="panel" aria-labelledby="cabinet-attention">
     <h2 id="cabinet-attention"><Bell size={19} aria-hidden="true"/> Потребує уваги</h2>
     <p><Link href="/portal/notifications">Сповіщення · {feed.filter(item=>!item.read).length} непрочитаних</Link></p>
-    {attention.length?<ul className="cabinet-items">{attention.map(item=><li key={item.key}>
-     <Link href={item.href}>{item.title}<ArrowUpRight size={15} aria-hidden="true"/></Link>
-     {item.detail&&<p>{item.detail}</p>}
-    </li>)}</ul>:<p className="muted">Звітів на уточненні, повторних етапів КМБ і рішень за заявками поки немає.</p>}
+    {primary?<><Link className="button" href={primary.href}>{primary.title}<ArrowUpRight size={15} aria-hidden="true"/></Link>
+     {primary.detail&&<p>{primary.detail}</p>}
+     {other.length>0&&<details><summary>Інші справи ({other.length})</summary><ul className="cabinet-items">{other.map(item=><li key={item.key}>
+      <Link href={item.href}>{item.title}</Link>{item.detail&&<p>{item.detail}</p>}
+     </li>)}</ul></details>}
+    </>:<p className="muted">Наразі справ, що потребують уваги, немає.</p>}
    </section>
    <div className="cabinet-status">
     <section className="panel"><h2>Найближча подія</h2>
@@ -58,7 +64,10 @@ export async function CabinetActivity({user,today,joinedOn}:{user:Viewer;today:s
    <h2 id="cabinet-history">Історія служби</h2>
    {timeline.length?<ol className="cabinet-items">
     {timeline.map(item=><li key={item.id}><time dateTime={item.date}>{shortDate.format(new Date(item.date))}</time>
-     <strong>{item.label}</strong>{item.detail&&<p>{item.detail}</p>}</li>)}
+     <strong>{item.label}</strong>{item.detail&&<p>{item.detail}</p>}
+     {(item.author||item.reason)&&<details><summary>Деталі рішення</summary>
+      {item.author&&<p>Оформив: {item.author}</p>}{item.reason&&<p>{item.reason}</p>}
+     </details>}</li>)}
    </ol>:<p className="muted">Кадрових рішень і результатів навчання поки немає.</p>}
   </section>
  </>;

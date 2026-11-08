@@ -3,13 +3,13 @@ import {query} from '@/db';
 
 type Entry={id:string;title:string;status?:string;decision?:string;date?:string};
 type Learning={id:string;title:string;status:string|null};
-type Change={id:string;date:string;label:string;detail:string|null};
+type Change={id:string;date:string;label:string;detail:string|null;author:string|null;reason:string|null};
 type Report={id:string;number:string;week:string;reason:string|null};
 
 export async function loadCabinetActivity(userId:string,today:string){
- const [requests,learning,event,reports,history]=await Promise.all([
+ const [requests,learning,event,reports,history,promotionClarifications]=await Promise.all([
   query<{value:Entry}>(`SELECT value FROM settings WHERE key LIKE 'service-entry:%' AND value->>'module'='requests'
-   AND value->>'author'=$1 AND value->>'status' IN ('approved','rejected')
+   AND value->>'author'=$1 AND value->>'status' IN ('approved','rejected','clarification')
    ORDER BY coalesce(value->>'decidedAt',value->>'createdAt') DESC LIMIT 5`,[userId]),
   query<Learning>(`SELECT entry.value->>'id' AS id,entry.value->>'title' AS title,result.value->>'status' AS status
    FROM personnel p JOIN units u ON u.id=p.unit_id AND u.active
@@ -26,7 +26,7 @@ export async function loadCabinetActivity(userId:string,today:string){
     ORDER BY i.reviewed_at DESC NULLS LAST,i.id LIMIT 1) review ON true
    WHERE r.author_id=$1 OR EXISTS(SELECT 1 FROM personnel p WHERE p.id=r.personnel_id AND p.user_id=$1 AND p.active)
    ORDER BY r.submitted_at DESC,r.id LIMIT 5`,[userId]),
-  query<Change>(`SELECT a.id,a.created_at AS date,
+  query<Change>(`SELECT a.id,a.created_at AS date, author.name AS author, nullif(a.reason,'') AS reason,
     CASE WHEN a.action='service.training.result' THEN 'Результат КМБ'
          WHEN a.action='service.request.applied' THEN a.after->>'title'
          WHEN a.action='personnel.record' THEN CASE a.after->>'action' WHEN 'promote' THEN 'Підвищення' WHEN 'demote' THEN 'Пониження' WHEN 'admit' THEN 'Прийняття до НГУ' WHEN 'dismiss' THEN 'Звільнення з НГУ' ELSE 'Переведення' END
@@ -40,14 +40,18 @@ export async function loadCabinetActivity(userId:string,today:string){
       CASE WHEN a.after->>'status'='passed' THEN 'Зараховано' ELSE 'Потрібно повторити' END)
     WHEN a.action='personnel.record' THEN concat_ws(' · ',a.after->>'rankName',a.after->>'unitName')
     ELSE coalesce(unit.name,rank.name,nullif(a.after->>'position','')) END AS detail
-   FROM audit_logs a
+   FROM audit_logs a LEFT JOIN app_user author ON author.id=a.actor_id
    LEFT JOIN settings entry ON a.action='service.training.result' AND entry.key='service-entry:'||a.entity_id
    LEFT JOIN units unit ON unit.id::text=a.after->>'unitId'
    LEFT JOIN ranks rank ON rank.id::text=a.after->>'rank'
    WHERE (a.action='service.training.result' AND a.after->>'member'=$1)
-   OR (a.action IN ('personnel.assign','personnel.save','unit.assignment','unit.member.grant','unit.member.revoke','unit.transfer','personnel.record','service.request.applied')
+   OR (a.action IN ('personnel.assign','personnel.save','unit.assignment','unit.member.grant','unit.member.revoke','unit.transfer','unit.command','personnel.record','service.request.applied')
     AND EXISTS(SELECT 1 FROM personnel p WHERE p.user_id=$1 AND p.id::text=a.entity_id))
    ORDER BY a.created_at DESC,a.id DESC LIMIT 25`,[userId]),
+  query<{id:string;title:string;reason:string|null}>(`SELECT coalesce(value->>'reportId',value->>'id') AS id,
+   value->>'title' AS title,value->>'reason' AS reason FROM settings
+   WHERE key LIKE 'promotion-credit:%' AND value->>'userId'=$1 AND value->>'status'='clarification'
+   ORDER BY value->>'createdAt',key LIMIT 5`,[userId]),
  ]);
- return {requests:requests.map(row=>row.value),learning,event:event[0]?.value,reports,history};
+ return {requests:requests.map(row=>row.value),learning,event:event[0]?.value,reports,history,promotionClarifications};
 }
