@@ -293,7 +293,7 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
      CASE WHEN d.value->>'joinedOnVerified'='true' THEN (now() AT TIME ZONE 'Europe/Kyiv')::date-(d.value->>'joinedOn')::date END AS days,
      EXISTS(SELECT 1 FROM settings s WHERE s.key LIKE 'discipline:%' AND s.value->>'person'=p.id::text
       AND (s.value#>>'{decision,until}')::timestamptz>now() AND s.value->'lifted' IS NULL
-      AND (s.value#>>'{appealResult,cancel}') IS DISTINCT FROM 'true') AS sanction
+      AND (s.value#>>'{appealResult,cancel}') IS DISTINCT FROM 'true' AND (s.value#>>'{externalDecision,cancel}') IS DISTINCT FROM 'true') AS sanction
      FROM personnel p LEFT JOIN settings d ON d.key='service:'||p.id::text
      WHERE p.user_id=$1 AND p.active`,[entry.author]);
     if(!candidate||(rule.minRank!==null&&(candidate.rank??0)<rule.minRank))

@@ -7,7 +7,7 @@ type PromotionRestriction={unverified:boolean;reprimand:boolean;available_at:str
 export async function promotionRestriction(id:string,c?:PoolClient){
  const sql=`SELECT EXISTS(SELECT 1 FROM settings WHERE key='promotion-history:'||$1 AND value->>'at' IS NULL) AS unverified, EXISTS(SELECT 1 FROM settings WHERE key LIKE 'discipline:%' AND value->>'person'=$1
   AND (value#>>'{decision,until}')::timestamptz>now() AND value->'lifted' IS NULL
-  AND (value#>>'{appealResult,cancel}') IS DISTINCT FROM 'true') AS reprimand,
+  AND (value#>>'{appealResult,cancel}') IS DISTINCT FROM 'true' AND (value#>>'{externalDecision,cancel}') IS DISTINCT FROM 'true') AS reprimand,
  (SELECT to_char((occurred+interval '24 hours') AT TIME ZONE 'Europe/Kyiv','DD.MM.YYYY HH24:MI:SS')
   FROM (SELECT created_at AS occurred FROM audit_logs WHERE entity_id=$1 AND (
    (action='personnel.record' AND after->>'action'='promote') OR

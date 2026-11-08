@@ -61,7 +61,7 @@ export async function finalizeAwards(input:unknown,actor:Viewer):Promise<AwardOr
    FROM reports r JOIN personnel p ON (p.id=r.personnel_id OR (r.personnel_id IS NULL AND ltrim(p.static_id,'0')=ltrim(r.static_id,'0')))
    JOIN settings d ON d.key LIKE 'discipline:%' AND d.value->>'person'=p.id::text
    WHERE r.week_start=$1 AND (d.value#>>'{decision,until}')::timestamptz>now()
-   AND d.value->'lifted' IS NULL AND (d.value#>>'{appealResult,cancel}') IS DISTINCT FROM 'true'
+   AND d.value->'lifted' IS NULL AND (d.value#>>'{appealResult,cancel}') IS DISTINCT FROM 'true' AND (d.value#>>'{externalDecision,cancel}') IS DISTINCT FROM 'true'
    AND EXISTS(SELECT 1 FROM report_items i WHERE i.report_id=r.id AND i.status='approved' AND i.approved_amount>0)
    AND NOT EXISTS(SELECT 1 FROM settings payment WHERE payment.key='report-paid:'||r.id::text)`,[p.week]);
   if(blocked.count)throw new HttpError('Преміювання заблоковано через чинні догани. Бійців із доганою: '+blocked.count+'.',409);

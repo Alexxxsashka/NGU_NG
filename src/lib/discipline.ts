@@ -4,6 +4,7 @@ import {z} from 'zod';
 import {query,transaction} from '@/db';
 import {audit} from './admin';
 import {HttpError} from './security';
+import {annexRules,annexVersion} from './discipline-annex';
 import {fineRules} from './discipline-fines';
 import {evidence} from './validation';
 import type {Viewer} from './domain';
@@ -15,7 +16,7 @@ const sanction=z.enum(['remark','reprimand','severe']);
 const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('delegate'),person:id,unit:id,until:z.iso.date(),body:text}),
  z.object({kind:z.literal('revoke-delegation'),person:id}),
- z.object({kind:z.literal('file'),person:id,rule:text,body:text,links}),
+ z.object({kind:z.literal('file'),person:id,rule:text,ruleCode:z.string().max(8).optional(),body:text,links}),
  z.object({kind:z.literal('explain'),id,body:text,links}),
  z.object({kind:z.literal('decide'),id,outcome:z.enum(['dismiss',...sanction.options]),body:text}),
  z.object({kind:z.literal('fine'),id,rule:z.enum(['34.1','34.2','34.3','34.4','34.5','34.6']),category:z.enum(['lower','higher']),amount:z.number().int().positive(),body:text}),
@@ -23,6 +24,9 @@ const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('review-payment'),id,accept:z.boolean(),body:text}),
  z.object({kind:z.literal('suspend'),id,hours:z.number().int().min(1).max(72),responsible:z.string().trim().min(2).max(120),body:text}),
  z.object({kind:z.literal('end-suspension'),id,body:text}),
+ z.object({kind:z.literal('personnel-sanction'),id,outcome:z.enum(['demote','dismiss-service']),body:text}),
+ z.object({kind:z.literal('external-appeal'),id,body:text,links:links.min(1)}),
+ z.object({kind:z.literal('external-decision'),id,body:text,links:links.min(1),cancel:z.boolean()}),
  z.object({kind:z.literal('acknowledge'),id}),
  z.object({kind:z.literal('request-work'),id,body:text}),
  z.object({kind:z.literal('assign-work'),id,body:text}),
@@ -35,7 +39,8 @@ const operation=z.discriminatedUnion('kind',[
 type Note={body:string;links?:string[];at:string};
 type Case={
  id:string;person:string;name:string;author:string;at:string;rule:string;body:string;links:string[];
- explanation?:Note;decision?:Note&{by:string;outcome:'dismiss'|'fine'|z.infer<typeof sanction>;until?:string};
+ annex?:typeof annexRules[number]&{version:string};externalAppeal?:Note;externalDecision?:Note&{cancel:boolean};
+ explanation?:Note;decision?:Note&{by:string;outcome:'dismiss'|'fine'|'demote'|'dismiss-service'|z.infer<typeof sanction>;until?:string};
  suspension?:Note&{until:string;responsible:string;ended?:Note};
  fine?:{rule:keyof typeof fineRules;category:'lower'|'higher';rank:number;amount:number;dueAt:string;
   payment?:Note;review?:Note&{accept:boolean}};
@@ -57,7 +62,7 @@ export async function canOpenDiscipline(actorId:string){
  return role?.rank===15||!!role?.inspector;
 }
 type Role={id:string;rank:number;inspector:boolean};
-const active=(entry:Case,now:Date)=>!!entry.decision?.until&&Date.parse(entry.decision.until)>now.getTime()&&!entry.lifted&&!entry.appealResult?.cancel;
+const active=(entry:Case,now:Date)=>!!entry.decision?.until&&Date.parse(entry.decision.until)>now.getTime()&&!entry.lifted&&!entry.appealResult?.cancel&&!entry.externalDecision?.cancel;
 const calendarDay=(date:Date)=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Kyiv'}).format(date);
 export async function disciplineCases(actor:Viewer,staff:boolean){
  const [role]=await query<Role>(rolesSql,[actor.id]);
@@ -103,13 +108,15 @@ export async function changeDiscipline(actor:Viewer,input:unknown){
    const {rows:[target]}=await c.query<{name:string}>(`SELECT first_name||' '||last_name AS name FROM personnel
     WHERE id=$1 AND active AND rank IS DISTINCT FROM 15 AND user_id<>$2 AND ($3 OR NOT EXISTS(SELECT 1 FROM units WHERE units.id=personnel.unit_id AND name ~* '^ссо|nord division'))`,[action.person,actor.id,leader]);
    if(!target)throw new HttpError('Профіль недоступний.',403);
-   entry={id:randomUUID(),person:action.person,name:target.name,author:actor.id,at,rule:action.rule,body:action.body,links:action.links};
+   const rule=action.ruleCode?annexRules.find(rule=>rule.code===action.ruleCode):undefined;
+   if(action.ruleCode&&!rule)throw new HttpError('Оберіть чинний пункт Додатка 1.');
+   entry={id:randomUUID(),person:action.person,name:target.name,author:actor.id,at,rule:action.rule,annex:rule?{...rule,version:annexVersion}:undefined,body:action.body,links:action.links};
   }else{
    const {rows:[row]}=await c.query<{value:Case}>('SELECT value FROM settings WHERE key=$1 FOR UPDATE',[prefix+action.id]);
    if(!row)throw new HttpError('Справу не знайдено.',404);
    previous=row.value;entry={...previous};
    const own=role?.id===entry.person;
-   const subjectAction=['explain','acknowledge','request-work','submit-work','appeal','submit-payment'].includes(action.kind);
+   const subjectAction=['explain','acknowledge','request-work','submit-work','appeal','submit-payment','external-appeal'].includes(action.kind);
    const {rows:[grant]}=role?.inspector?await c.query<{unit:string}>(delegationSql,[role.id]):{rows:[]};
    const delegated=!!grant&&!!(await c.query('SELECT 1 FROM personnel WHERE id=$1 AND unit_id=$2 AND active',[entry.person,grant.unit])).rowCount;
    const canDecide=leader||delegated&&action.kind!=='resolve-appeal';
@@ -170,6 +177,30 @@ export async function changeDiscipline(actor:Viewer,input:unknown){
      entry.suspension={...entry.suspension,ended:{body:action.body,at}};
      await c.query("DELETE FROM settings WHERE key=$1 AND value->>'caseId'=$2",['discipline-suspension:'+entry.person,entry.id]);
      break;
+    case 'personnel-sanction': {
+     if(!leader)throw new HttpError('Кадрове стягнення оформлює Командувач.',403);
+     if(entry.decision||Date.parse(calendarDay(now))-Date.parse(calendarDay(new Date(entry.at)))>7*86400000)throw unavailable();
+     const expected=action.outcome==='demote'?'понижен':'звільнен';
+     if(!entry.annex?.sanctions.toLocaleLowerCase('uk').includes(expected))throw new HttpError('Обрана норма Додатка 1 не передбачає цього стягнення.',409);
+     const {rows:[person]}=await c.query<{rank:number;unit_id:string;static_id:string}>(`SELECT p.rank,p.unit_id,p.static_id FROM personnel p
+      JOIN app_user u ON u.id=p.user_id WHERE p.id=$1 AND p.active AND p.rank<15 AND u.role<>'admin' FOR UPDATE OF p`,[entry.person]);
+     if(!person)throw unavailable();
+     const rank=action.outcome==='demote'?person.rank-1:person.rank;
+     if(rank<1||!(await c.query('SELECT 1 FROM ranks WHERE id=$1',[rank])).rowCount)throw new HttpError('Нижчий ранг недоступний.',409);
+     const active=action.outcome==='demote';
+     await c.query('UPDATE personnel SET rank=$2,active=$3 WHERE id=$1',[entry.person,rank,active]);
+     if(!active||rank<11)await c.query(`UPDATE settings SET value=value||'{"leadershipRole":"member","commanderUnitId":null}'::jsonb WHERE key=$1`,['service:'+entry.person]);
+     entry.decision={outcome:action.outcome,body:action.body,by:actor.id,at};
+     await audit(c,actor,'personnel.record',entry.person,{rank:person.rank,active:true,unitId:person.unit_id},
+      {action:active?'demote':'dismiss',rank,active,unitId:person.unit_id,fromUnit:person.unit_id,name:entry.name,staticId:person.static_id,reason:action.body,links:entry.links,disciplineCaseId:entry.id},action.body);
+     break;
+    }
+    case 'external-appeal':
+     if(!entry.decision||entry.decision.outcome==='dismiss'||entry.externalAppeal)throw unavailable();
+     entry.externalAppeal={body:action.body,links:action.links,at};break;
+    case 'external-decision':
+     if(!leader||!entry.externalAppeal||entry.externalDecision)throw unavailable();
+     entry.externalDecision={body:action.body,links:action.links,at,cancel:action.cancel};break;
     case 'acknowledge':
      if(!entry.decision)throw unavailable();
      if(entry.acknowledged)return {saved:true};
