@@ -9,7 +9,8 @@ import type {Viewer} from './domain';
 import type {AwardOrder} from './award-order-docx';
 
 const digest=(code:string)=>createHash('sha256').update(code).digest('hex');
-type Snapshot={number:string;week:string;total:string;expiresAt:string;reports:{number:string;staticId:string;name:string;points:number;amount:string}[]};
+type SharedTask={id:string;name:string;quantity:number;rate:number;points:number;reward:string|null;multiplier:string|null;estimate:string|null;approved:string|null;links:string[]};
+type Snapshot={number:string;week:string;total:string;expiresAt:string;reports:{number:string;staticId:string;name:string;points:number;amount:string;tasks?:SharedTask[]}[]};
 
 export async function createAwardShare(input:unknown,actor:Viewer){
  const p=z.object({week,revoke:z.boolean().optional()}).parse(input);
@@ -26,9 +27,13 @@ export async function createAwardShare(input:unknown,actor:Viewer){
   const {rows:reports}=await c.query<Snapshot['reports'][number]>(`
    SELECT r.number,coalesce(nullif(ltrim(r.static_id,'0'),''),'0') AS "staticId",
     r.first_name||' '||r.last_name AS name,coalesce(sum(i.points),0)::float8 AS points,
-    (payment.value->>'amount') AS amount
+    (payment.value->>'amount') AS amount,
+    jsonb_agg(jsonb_build_object('id',i.id,'name',i.task_name,'quantity',i.quantity,'rate',i.points_rate,
+     'points',i.points,'reward',i.reward_rate::text,'multiplier',i.rank_multiplier::text,
+     'estimate',i.estimated_amount::text,'approved',i.approved_amount::text,'links',coalesce(e.links,'[]'::jsonb)) ORDER BY i.id) AS tasks
    FROM reports r JOIN settings payment ON payment.key='report-paid:'||r.id::text
    JOIN report_items i ON i.report_id=r.id AND i.status='approved'
+   LEFT JOIN LATERAL (SELECT jsonb_agg(url ORDER BY sort_order,url) AS links FROM evidence_links WHERE item_id=i.id AND url ~* '^https://') e ON true
    WHERE r.week_start=$1 GROUP BY r.id,payment.value ORDER BY r.last_name,r.first_name,r.number`,[p.week]);
   if(!reports.length)throw new HttpError('У наказі немає звітів для перевірки.',409);
   const code=randomBytes(18).toString('base64url');

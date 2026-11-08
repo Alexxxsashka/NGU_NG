@@ -4,7 +4,7 @@ import {useState} from 'react';
 import {dateLabel} from '@/lib/domain';
 import type {awardOrders,awardRecipients} from '@/lib/award-register';
 import {StaticIdField} from './static-id-field';
-import {api,Field,Loading,Notice,useResource} from './ui';
+import {api,Field,Loading,Modal,Notice,useResource} from './ui';
 
 function RecipientPayments({week}:{week:string}){
  const resource=useResource<Awaited<ReturnType<typeof awardRecipients>>>('admin/award-orders/recipients?week='+week);
@@ -55,11 +55,11 @@ export function AwardRegister(){
      <td><div className="actions"><button className="secondary" disabled={busy} onClick={()=>void shareAccess(order.week)}>Згенерувати код</button><button className="text-button" disabled={busy} onClick={()=>void shareAccess(order.week,true)}>Відкликати</button></div></td></tr>)}
    </tbody></table></div>:null}
   </section>
-  {share&&<section className="panel"><h2>Код для Мінфіну · {dateLabel(share.week)}</h2>
+  {share&&<Modal title={'Код для Мінфіну · '+dateLabel(share.week)} onClose={()=>setShare(null)}>
    <p>Код діє 7 днів. Скопіюйте посилання й код перед закриттям сторінки.</p>
    <Field label="Посилання"><input readOnly value={typeof window==='undefined'?'/award-share':window.location.origin+'/award-share'} onFocus={event=>event.currentTarget.select()}/></Field>
    <Field label="Код"><input readOnly value={share.code} onFocus={event=>event.currentTarget.select()}/></Field>
-  </section>}
+  </Modal>}
   {paymentWeek&&<RecipientPayments key={paymentWeek} week={paymentWeek}/>}
   {resource.data?.orders.length?<section className="panel">
    <h2>Коригування після виплати</h2>
