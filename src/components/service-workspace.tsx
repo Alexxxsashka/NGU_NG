@@ -16,7 +16,7 @@ const actions:Record<ServiceModule,string>={
  announcements:'Додати новину',orders:'Додати наказ',lectures:'Додати матеріал',
 };
 const artwork:Record<ServiceModule,string>={requests:'transfer',training:'briefing',calendar:'assembly',regulations:'garrison',announcements:'command',orders:'approval',lectures:'radio'};
-const statusLabels={clarification:'Потребує уточнення',pending:'На розгляді',approved:'Погоджено',rejected:'Відхилено'};
+const statusLabels={cancelled:'Скасовано',clarification:'Потребує уточнення',pending:'На розгляді',approved:'Погоджено',rejected:'Відхилено'};
 
 export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;focus?:string;unitId?:string}){
  const {data,error,refresh}=useResource<Awaited<ReturnType<typeof serviceWorkspace>>>('service/'+module+'?'+new URLSearchParams({...focus?{entry:focus}:{},...unitId?{unit:unitId}:{}}));
@@ -98,7 +98,7 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
       <Field label="Посилання HTTPS"><input type="url" name="url"/></Field>
      </>}
     </>}
-    <Field label={module==='requests'?'Підстава й дати':'Текст або опис'}><textarea name="body" rows={4} maxLength={5000} required/></Field>
+    <Field label={module==='requests'?(requestType==='OOC-відпустка'?'Причина за бажанням':'Підстава'):'Текст або опис'}><textarea name="body" rows={4} maxLength={5000} required={module!=='requests'||requestType!=='OOC-відпустка'}/></Field>
     <button disabled={busy}>{module==='requests'?'Подати заявку':'Опублікувати'}</button>
    </form>
   </details>}
@@ -133,6 +133,11 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
     {entry.from&&entry.to&&<p>Період: {entry.from} — {entry.to}</p>}
     {entry.links?.map((link,index)=><p key={link}><a href={link} target="_blank" rel="noopener noreferrer">Доказ {index+1}</a></p>)}
     {entry.replies?.map(reply=><div className="notice" key={reply.at}><p>{reply.body}</p>{reply.links.map((link,index)=><a key={link} href={link} target="_blank" rel="noopener noreferrer">Доказ {index+1} </a>)}</div>)}
+    {['IC-відгул','OOC-відпустка','Відпустка'].includes(entry.title)&&!entry.appliedAt&&
+     ['pending','clarification','approved'].includes(entry.status??'')&&(entry.author===data.actorId||canEdit(entry.unit))&&
+     <form onSubmit={event=>{if(confirm('Скасувати заявку на відсутність?'))void save(event,()=>({kind:'cancel-absence',id:entry.id}));else event.preventDefault();}}>
+      <button className="secondary" disabled={busy}>Скасувати заявку</button>
+     </form>}
     {entry.status==='clarification'&&entry.author===data.actorId&&!unitId&&<form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'resubmit',id:entry.id,body:f.get('body'),links:evidenceLines(String(f.get('links')??''))}))}>
      <Field label="Уточнення"><textarea name="body" required maxLength={5000}/></Field>
      <Field label="Додаткові докази"><textarea name="links"/></Field>

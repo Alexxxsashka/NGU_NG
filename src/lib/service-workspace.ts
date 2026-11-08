@@ -15,10 +15,12 @@ const moduleSchema=z.enum(serviceModules);
 const title=z.string().trim().min(1).max(120);
 const body=z.string().trim().min(1).max(5000);
 const uuid=z.string().uuid();
+const absenceTypes=['IC-відгул','OOC-відпустка','Відпустка'];
 const requestTypes=['Переведення','Вступ до підрозділу','IC-відгул','OOC-відпустка','Відпустка','Вступ або поновлення','Звільнення або оскарження','Звільнення','Виправлення особової справи'] as const;
 const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('recruitment'),unit:uuid,body}),
- z.object({kind:z.literal('request'),type:z.enum(requestTypes),body,targetUnit:uuid.optional(),from:z.union([z.iso.date(),z.iso.datetime({local:true})]).optional(),to:z.union([z.iso.date(),z.iso.datetime({local:true})]).optional(),links:z.array(evidence).max(20).default([])}),
+ z.object({kind:z.literal('request'),type:z.enum(requestTypes),body:z.string().trim().max(5000),targetUnit:uuid.optional(),from:z.union([z.iso.date(),z.iso.datetime({local:true})]).optional(),to:z.union([z.iso.date(),z.iso.datetime({local:true})]).optional(),links:z.array(evidence).max(20).default([])}),
+ z.object({kind:z.literal('cancel-absence'),id:uuid}),
  z.object({kind:z.literal('decide'),id:uuid,status:z.enum(['approved','rejected','clarification']),body}),
  z.object({kind:z.literal('publish'),module:moduleSchema.exclude(['requests']),unit:uuid,title,body,
   url:z.url({protocol:/^https$/}).max(2048).refine(value=>{const link=new URL(value);return !link.username&&!link.password;}).optional(),date:z.iso.date().optional(),revision:title.optional(),category:title.optional(),replaces:uuid.optional(),draft:z.boolean().optional(),requiresProof:z.boolean().optional(),responsible:title.optional()}),
@@ -35,7 +37,7 @@ const operation=z.discriminatedUnion('kind',[
 
 type Entry={
  id:string;module:ServiceModule;unit:string|null;author:string;name:string;title:string;body:string;createdAt:string;
- recruitmentRules?:string;targetUnit?:string;from?:string;to?:string;links?:string[];replies?:{body:string;links:string[];at:string}[];url?:string;date?:string;revision?:string;category?:string;replaces?:string;draft?:boolean;requiresProof?:boolean;responsible?:string;appliedAt?:string;status?:'pending'|'approved'|'rejected'|'clarification';decision?:string;decidedBy?:string;decidedAt?:string;archived?:boolean;
+ recruitmentRules?:string;targetUnit?:string;from?:string;to?:string;links?:string[];replies?:{body:string;links:string[];at:string}[];url?:string;date?:string;revision?:string;category?:string;replaces?:string;draft?:boolean;requiresProof?:boolean;responsible?:string;appliedAt?:string;status?:'pending'|'approved'|'rejected'|'clarification'|'cancelled';decision?:string;decidedBy?:string;decidedAt?:string;archived?:boolean;
 };
 const prefix='service-entry:';
 
@@ -104,6 +106,7 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    if(action.kind==='request'&&['Переведення','Вступ до підрозділу'].includes(action.type)&&(!action.targetUnit||action.targetUnit===account.unit_id||
      !(await c.query('SELECT id FROM units WHERE id=$1 AND active',[action.targetUnit])).rowCount))throw new HttpError('Оберіть інший чинний підрозділ.');
    if(action.kind==='request'){
+    if(action.type!=='OOC-відпустка'&&!action.body)throw new HttpError('Вкажіть підставу заявки.');
     if(action.type==='Вступ до підрозділу'){
      const {rows:[unit]}=await c.query<{name:string;rules:string|null}>(`SELECT u.name,s.value->>'body' AS rules FROM units u
       LEFT JOIN settings s ON s.key='recruitment:'||u.id::text WHERE u.id=$1 AND u.active`,[action.targetUnit]);
@@ -177,9 +180,27 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    }
    await write(prefix+entry.id,next);
    await audit(c,actor,'service.request.applied',person.id,{unitId:person.unit_id,rank:person.rank,active:person.active},{...next,unitId:scope,rank:admission?action.rank:person.rank,active:entry.title!=='Звільнення'});
+  }else if(action.kind==='cancel-absence'){
+   if(entry.module!=='requests'||!absenceTypes.includes(entry.title)||(!canEdit&&entry.author!==actor.id))
+    throw new HttpError('Скасування недоступне.',403);
+   if(entry.status==='cancelled')return {saved:true};
+   if(entry.appliedAt||!['pending','clarification','approved'].includes(entry.status??''))
+    throw new HttpError('Цю заявку вже не можна скасувати.',409);
+   const next={...entry,status:'cancelled'};
+   await write(prefix+entry.id,next);
+   await audit(c,actor,'service.request.cancel',entry.id,entry,next);
   }else if(action.kind==='decide'){
    if(entry.module!=='requests'||entry.status!=='pending'||entry.author===actor.id||(!canEdit&&account.role!=='admin'&&!(entry.targetUnit&&editors.has(entry.targetUnit))))throw new HttpError('Рішення недоступне.',403);
-   if(entry.status!=='pending')throw new HttpError('Рішення вже зафіксовано.',409);
+   if(action.status==='approved'&&absenceTypes.includes(entry.title)){
+    if(!entry.from||!entry.to)throw new HttpError('У заявці немає коректного періоду.',409);
+    const overlap=await c.query(`SELECT 1 FROM settings WHERE key LIKE 'service-entry:%'
+     AND value->>'module'='requests' AND value->>'author'=$1 AND value->>'status'='approved'
+     AND value->>'title'=ANY($2::text[]) AND value->>'id'<>$3
+     AND (value->>'from')::timestamp < $5::timestamp + CASE WHEN length($5)=10 THEN interval '1 day' ELSE interval '0' END
+     AND (value->>'to')::timestamp + CASE WHEN length(value->>'to')=10 THEN interval '1 day' ELSE interval '0' END > $4::timestamp
+     LIMIT 1`,[entry.author,absenceTypes,entry.id,entry.from,entry.to]);
+    if(overlap.rowCount)throw new HttpError('Цей період перетинається з уже погодженою відсутністю.',409);
+   }
    // Requests record a decision. Existing personnel controls apply changes to the roster.
    const next={...entry,status:action.status,decision:action.body,decidedBy:actor.name,decidedAt:new Date().toISOString()};
    await write(prefix+entry.id,next);
