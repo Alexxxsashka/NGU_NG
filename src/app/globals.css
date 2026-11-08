@@ -431,3 +431,36 @@ body {
  text-align: center;
  text-wrap: balance;
 }
+
+/* Emphasize actions without moving adjacent controls. */
+@media (hover: hover) {
+ :is(button:not(:disabled), .button, .home-route-card, .unit-card, .illustrated-summary, .workspace-switch a):not([aria-disabled="true"]) {
+  transition: box-shadow .18s ease, border-color .18s ease, scale .18s ease;
+ }
+ :is(button:not(:disabled), .button, .home-route-card, .unit-card, .illustrated-summary, .workspace-switch a):not([aria-disabled="true"]):hover {
+  --hover-outline: var(--accent);
+  border-color: var(--hover-outline);
+  box-shadow: 0 0 0 1px var(--hover-outline), 0 0 16px color-mix(in srgb, var(--hover-outline) 35%, transparent);
+ }
+ :is(button.danger, .button.danger):not(:disabled):hover {
+  --hover-outline: var(--danger);
+ }
+ :is(.home-route-card, .unit-card) :is(.image-button-title, .home-route-copy strong, h2),
+ :is(.illustrated-summary, .home-tablist button) > span {
+  transition: scale .18s ease;
+ }
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+ :is(button:not(:disabled), .button):not(.home-route-card):not(.home-tablist button):not([aria-disabled="true"]):hover {
+  scale: 1.035;
+ }
+ :is(.home-route-card:hover, .unit-card:hover) :is(.image-button-title, .home-route-copy strong, h2),
+ :is(.illustrated-summary:hover, .home-tablist button:not(:disabled):hover) > span {
+  scale: 1.06;
+ }
+ :is(.home-route-card, .unit-card) :is(.image-button-title, .home-route-copy strong, h2),
+ :is(.illustrated-summary, .home-tablist button) > span {
+  transition: scale .18s ease;
+ }
+ .home-route-copy strong { display: inline-block; }
+}
