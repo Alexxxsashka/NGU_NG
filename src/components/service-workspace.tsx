@@ -67,7 +67,15 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
     {kind:'publish',module,unit:f.get('unit'),title:f.get('title'),body:f.get('body'),
      date:f.get('date')||undefined,url:f.get('url')||undefined,revision:f.get('revision')||undefined,category:f.get('category')||undefined,replaces:f.get('replaces')||undefined,draft:f.has('draft'),requiresProof:f.has('requiresProof'),responsible:f.get('responsible')||undefined})}>
     {module==='requests'?<>
-     <Field label="Тип заявки"><select name="type" value={requestType} onChange={e=>setRequestType(e.target.value)}>{['Переведення','Вступ до підрозділу','IC-відгул','OOC-відпустка','Відпустка','Вступ або поновлення','Звільнення','Звільнення або оскарження','Виправлення особової справи'].map(type=><option key={type}>{type}</option>)}</select></Field>
+     <fieldset className="request-types">
+      <legend>Тип заявки</legend>
+      <div className="request-type-grid">
+       {['Переведення','Вступ до підрозділу','IC-відгул','OOC-відпустка','Відпустка','Вступ або поновлення','Звільнення','Звільнення або оскарження','Виправлення особової справи'].map(type=><label className="request-type" key={type}>
+        <input type="radio" name="type" value={type} checked={requestType===type} onChange={()=>setRequestType(type)}/>
+        <span>{type}</span>
+       </label>)}
+      </div>
+     </fieldset>
      {['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(requestType)&&<Field label="Бажаний підрозділ"><select name="targetUnit" required onChange={event=>setRecruitmentUnit(event.target.value)}><option value="">Оберіть підрозділ</option>{data.targets.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>}
      {requestType==='Вступ до підрозділу'&&<p style={{whiteSpace:'pre-line'}}>{data.targets.find(unit=>unit.id===recruitmentUnit)?.rules}</p>}
      {['Відпустка','IC-відгул','OOC-відпустка'].includes(requestType)&&<div className="form-grid"><Field label="Від"><input name="from" type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field><Field label="До"><input name="to" type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field></div>}
