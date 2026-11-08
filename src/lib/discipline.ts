@@ -12,6 +12,8 @@ const links=z.array(evidence).max(20);
 const id=z.uuid();
 const sanction=z.enum(['remark','reprimand','severe']);
 const operation=z.discriminatedUnion('kind',[
+ z.object({kind:z.literal('delegate'),person:id,unit:id,until:z.iso.date(),body:text}),
+ z.object({kind:z.literal('revoke-delegation'),person:id}),
  z.object({kind:z.literal('file'),person:id,rule:text,body:text,links}),
  z.object({kind:z.literal('explain'),id,body:text,links}),
  z.object({kind:z.literal('decide'),id,outcome:z.enum(['dismiss',...sanction.options]),body:text}),
@@ -32,6 +34,12 @@ type Case={
  work?:{request:Note;assignment?:Note;submission?:Note;review?:Note&{accept:boolean}};
 };
 const prefix='discipline:';
+const delegationSql=`SELECT d.value->>'unit' AS unit FROM settings d JOIN personnel p ON d.key='discipline-delegation:'||p.id::text
+ JOIN units u ON u.id=p.unit_id AND u.active JOIN settings service ON service.key='service:'||p.id::text
+ WHERE p.id=$1 AND p.active AND p.rank BETWEEN 11 AND 12
+ AND u.name ~* '^всп|^звп|військова служба правопорядку'
+ AND service.value->>'leadershipRole'='commander' AND service.value->>'commanderUnitId'=u.id::text
+ AND (d.value->>'until')::date >= (now() AT TIME ZONE 'Europe/Kyiv')::date`;
 const rolesSql=`SELECT p.id,p.rank,coalesce(u.name ~* '^(ВСП|ЗВП)(\\s|$)|військова служба правопорядку',false) AS inspector
  FROM personnel p LEFT JOIN units u ON u.id=p.unit_id AND u.active WHERE p.user_id=$1 AND p.active`;
 export async function canOpenDiscipline(actorId:string){
@@ -45,12 +53,14 @@ export async function disciplineCases(actor:Viewer,staff:boolean){
  const [role]=await query<Role>(rolesSql,[actor.id]);
  const leader=role?.rank===15;
  if(staff&&!leader&&!role?.inspector)throw new HttpError('Доступ до дисциплінарної черги обмежено.',403);
- const cases=await query<{value:Case}>(`SELECT value FROM settings WHERE key LIKE 'discipline:%' AND
-  (value->>'person'=$1 OR ($2 AND ($3 OR value->>'author'=$4)))
-  ORDER BY value->>'at' DESC,key LIMIT 100`,[role?.id??null,staff,leader,actor.id]);
+ const [grant]=role?.inspector?await query<{unit:string}>(delegationSql,[role.id]):[];
+ const cases=await query<{value:Case;unit:string|null}>(`SELECT value,(SELECT p.unit_id FROM personnel p WHERE p.id::text=value->>'person' AND p.active) AS unit FROM settings WHERE key LIKE 'discipline:%' AND
+  (value->>'person'=$1 OR ($2 AND ($3 OR value->>'author'=$4 OR ($5::uuid IS NOT NULL AND EXISTS(SELECT 1 FROM personnel p WHERE p.id::text=value->>'person' AND p.unit_id=$5 AND p.active)))))
+  ORDER BY value->>'at' DESC,key LIMIT 100`,[role?.id??null,staff,leader,actor.id,grant?.unit??null]);
  const people=staff?await query<{id:string;name:string;static_id:string}>(`SELECT id,first_name||' '||last_name AS name,static_id FROM personnel
   WHERE active AND rank IS DISTINCT FROM 15 AND user_id IS NOT NULL AND user_id<>$1 AND ($2 OR NOT EXISTS(SELECT 1 FROM units WHERE units.id=personnel.unit_id AND name ~* '^ссо|nord division')) ORDER BY last_name,first_name`,[actor.id,leader]):[];
- return {cases:cases.map(({value})=>({...value,active:active(value,new Date()),own:value.person===role?.id})),people,leader};
+ const units=staff&&leader?await query<{id:string;name:string}>('SELECT id,name FROM units WHERE active ORDER BY name'):[];
+ return {cases:cases.map(({value,unit})=>({...value,active:active(value,new Date()),own:value.person===role?.id,canDecide:leader||!!grant&&grant.unit===unit})),people,units,leader};
 }
 
 export async function changeDiscipline(actor:Viewer,input:unknown){
@@ -60,6 +70,23 @@ export async function changeDiscipline(actor:Viewer,input:unknown){
   const {rows:[role]}=await c.query<Role>(rolesSql,[actor.id]);
   const leader=role?.rank===15;
   const now=new Date(),at=now.toISOString();
+  if(action.kind==='delegate'||action.kind==='revoke-delegation'){
+   if(!leader||role.id===action.person)throw new HttpError('Делегування оформлює Командувач.',403);
+   const key='discipline-delegation:'+action.person;
+   const {rows:[before]}=await c.query('SELECT value FROM settings WHERE key=$1 FOR UPDATE',[key]);
+   if(action.kind==='delegate'){
+    if(action.until<calendarDay(now))throw new HttpError('Строк делегування вже минув.');
+    if(!(await c.query('SELECT 1 FROM units WHERE id=$1 AND active',[action.unit])).rowCount)throw new HttpError('Підрозділ недоступний.');
+    const grant={unit:action.unit,until:action.until,by:actor.id,at,body:action.body};
+    await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=excluded.value',[key,JSON.stringify(grant)]);
+    if(!(await c.query(delegationSql,[action.person])).rowCount)throw new HttpError('Потрібне чинне призначення командира ВСП.',409);
+    await audit(c,actor,'discipline.delegate',action.person,before?.value??null,grant,action.body);
+   }else if(before){
+    await c.query('DELETE FROM settings WHERE key=$1',[key]);
+    await audit(c,actor,'discipline.revoke-delegation',action.person,before.value,null);
+   }
+   return {saved:true};
+  }
   let entry:Case,previous:Case|null=null;
   if(action.kind==='file'){
    if(!role?.inspector&&!leader)throw new HttpError('Фіксація доступна ВСП та Командувачу.',403);
@@ -73,7 +100,10 @@ export async function changeDiscipline(actor:Viewer,input:unknown){
    previous=row.value;entry={...previous};
    const own=role?.id===entry.person;
    const subjectAction=['explain','acknowledge','request-work','submit-work','appeal'].includes(action.kind);
-   if(subjectAction?!own:!leader||own)throw new HttpError('Дія поза межами ваших повноважень.',403);
+   const {rows:[grant]}=role?.inspector?await c.query<{unit:string}>(delegationSql,[role.id]):{rows:[]};
+   const delegated=!!grant&&!!(await c.query('SELECT 1 FROM personnel WHERE id=$1 AND unit_id=$2 AND active',[entry.person,grant.unit])).rowCount;
+   const canDecide=leader||delegated&&action.kind!=='resolve-appeal';
+   if(subjectAction?!own:!canDecide||own)throw new HttpError('Дія поза межами ваших повноважень.',403);
    const unavailable=()=>new HttpError('Дія недоступна в поточному стані справи.',409);
    switch(action.kind){
     case 'explain':

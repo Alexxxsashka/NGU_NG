@@ -22,7 +22,7 @@ const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('task'),id:z.string().min(1).max(50).optional(),unitId:z.uuid().nullable(),name:z.string().trim().min(3).max(120),points:z.number().int().min(1).max(1000),requirements:z.string().trim().max(1000).optional()}),
  z.object({kind:z.literal('archive'),id:z.uuid()}),
  z.object({kind:z.literal('submit'),taskId:z.string().min(1).max(50),quantity:z.number().int().min(1).max(100),links:z.array(evidence).min(1).max(20)}),
- z.object({kind:z.literal('submit-report'),entries:z.array(z.object({taskId:z.string().min(1).max(50),quantity:z.number().int().min(1).max(100),links:z.array(evidence).min(1).max(20)})).min(1).max(50)}),
+ z.object({kind:z.literal('submit-report'),entries:z.array(z.object({expectedRate:z.number().int().positive(),taskId:z.string().min(1).max(50),quantity:z.number().int().min(1).max(100),links:z.array(evidence).min(1).max(20)})).min(1).max(50)}),
  z.object({kind:z.literal('clarify'),id:z.uuid(),links:z.array(evidence).min(1).max(20)}),
  z.object({kind:z.literal('review'),id:z.uuid(),approve:z.boolean(),clarification:z.boolean().optional(),quantity:z.number().int().min(1).max(100).optional(),reason:z.string().trim().min(5).max(2000)}),
  z.object({kind:z.literal('bonus'),userId:z.string().min(1).max(100),points:z.number().int().min(1).max(1000),reason:z.string().trim().min(5).max(2000),links:z.array(evidence).min(1).max(20)}),
@@ -133,6 +133,8 @@ export async function changePromotionPoints(input:unknown,actor:Viewer){
    const task=tasks.get(entry.taskId);
    if(action.kind!=='bonus'&&(!task||task.archived||(task.unitId&&task.unitId!==profile.unit_id)))
     throw new HttpError('Завдання '+(index+1)+' недоступне.',409);
+   if(action.kind==='submit-report'&&task!.points!==action.entries[index].expectedRate)
+    throw new HttpError('Бали за завдання змінилися. Перегляньте оновлений підсумок і підтвердьте подання ще раз.',409);
    return {id:randomUUID(),reportId,order:index,userId,name:profile.name,unitId:profile.unit_id,rank:profile.rank,cycle:profile.cycle,
     taskId:entry.taskId,title:task?.name??'Позачергове заохочення',rate:action.kind==='bonus'?action.points:task!.points,
     quantity:entry.quantity,links:[...new Set(entry.links)],status:action.kind==='bonus'?'approved':'pending',

@@ -26,6 +26,19 @@ export function Discipline({staff=false}:{staff?:boolean}){
  return <section className="panel" id="content">
   <h1>{staff?'Дисциплінарний облік ВСП':'Мої дисциплінарні справи'}</h1>
   {(error||message)&&<Notice error>{error||message}</Notice>}{!data&&!error&&<Loading/>}
+  {staff&&data?.leader&&<details className="account-action form-disclosure"><IllustratedSummary title="Письмове делегування ВСП" image="/portal-art/catalog/approval.webp"/>
+   <form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'delegate',person:f.get('person'),unit:f.get('unit'),until:f.get('until'),body:f.get('body')}))}>
+    <Field label="Командир ВСП"><select name="person" required defaultValue=""><option value="">Оберіть профіль</option>{data.people.map(p=><option value={p.id} key={p.id}>{p.name} · {p.static_id}</option>)}</select></Field>
+    <Field label="Підрозділ у межах делегування"><select name="unit" required>{data.units.map(unit=><option value={unit.id} key={unit.id}>{unit.name}</option>)}</select></Field>
+    <Field label="Діє до включно"><input name="until" type="date" required/></Field>
+    <Field label="Письмова підстава"><textarea name="body" required minLength={5} maxLength={2000}/></Field>
+    <button disabled={busy}>Зберегти делегування</button>
+   </form>
+   <form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'revoke-delegation',person:f.get('person')}))}>
+    <Field label="Відкликати в профілю"><select name="person" required defaultValue=""><option value="">Оберіть профіль</option>{data.people.map(p=><option value={p.id} key={p.id}>{p.name} · {p.static_id}</option>)}</select></Field>
+    <button className="secondary" disabled={busy}>Відкликати делегування</button>
+   </form>
+  </details>}
   {staff&&!!data?.people.length&&<details className="account-action form-disclosure"><IllustratedSummary title="Зафіксувати проступок" image="/portal-art/catalog/checkpoint.webp"/>
    <form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'file',person:f.get('person'),rule:f.get('rule'),body:f.get('body'),links:evidenceLines(String(f.get('links')??''))}))}>
     <Field label="Боєць"><select name="person" required defaultValue=""><option value="">Оберіть профіль</option>{data.people.map(p=><option value={p.id} key={p.id}>{p.name} · {p.static_id}</option>)}</select></Field>
@@ -50,8 +63,9 @@ export function Discipline({staff=false}:{staff?:boolean}){
    {entry.own&&entry.acknowledged&&!entry.appeal&&entry.decision?.outcome!=='dismiss'&&form(entry.id,'appeal','Подати скаргу',undefined,true)}
    {entry.own&&entry.active&&!entry.work&&form(entry.id,'request-work','Рапорт на дострокове зняття')}
    {entry.own&&entry.active&&entry.work?.assignment&&(!entry.work.submission||entry.work.review?.accept===false)&&form(entry.id,'submit-work','Подати виконання',undefined,true)}
-   {staff&&data.leader&&!entry.own&&!entry.decision&&form(entry.id,'decide','Зберегти рішення',<Field label="Рішення"><select name="outcome">{Object.entries(outcomes).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></Field>)}
-   {staff&&data.leader&&!entry.own&&entry.active&&entry.work&&<>
+   {staff&&data.leader&&entry.appeal&&!entry.appealResult&&form(entry.id,'resolve-appeal','Розглянути скаргу',<Field label="Рішення"><select name="cancel"><option value="no">Залишити чинним</option><option value="yes">Скасувати</option></select></Field>)}
+   {staff&&entry.canDecide&&!entry.own&&!entry.decision&&form(entry.id,'decide','Зберегти рішення',<Field label="Рішення"><select name="outcome">{Object.entries(outcomes).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></Field>)}
+   {staff&&entry.canDecide&&!entry.own&&entry.active&&entry.work&&<>
     {!entry.work.assignment&&form(entry.id,'assign-work','Призначити норматив')}
     {entry.work.submission&&!entry.work.review&&form(entry.id,'review-work','Перевірити виконання',<Field label="Рішення"><select name="accept"><option value="yes">Прийняти</option><option value="no">Відхилити</option></select></Field>)}
     {entry.work.review?.accept&&form(entry.id,'lift','Оформити дострокове зняття')}

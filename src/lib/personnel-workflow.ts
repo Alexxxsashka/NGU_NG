@@ -6,6 +6,7 @@ import {query,transaction} from '@/db';
 import {audit} from './admin';
 import {HttpError} from './security';
 import {evidence} from './validation';
+import {promotionChecklist,type Requirement} from './promotion-checklist';
 import {promotionProgress} from './promotion-points';
 import {promotionRankName} from './promotion-rules';
 import {workspaceUnits} from './workspace-scope';
@@ -16,11 +17,13 @@ const actions=['promote','demote','dismiss','admit','transfer'] as const;
 const proof={reason:z.string().trim().min(5).max(3000),links:z.array(evidence).min(1).max(20)};
 const rank=z.number().int().positive().max(2147483647);
 const operation=z.discriminatedUnion('kind',[
+ z.object({kind:z.literal('requirement'),rank:rank.max(14),title:z.string().trim().min(3).max(160),category:z.enum(['standard','assessment'])}),
+ z.object({kind:z.literal('confirm-requirement'),userId:z.string().min(1).max(100),id:z.uuid(),source:evidence}),
  z.object({kind:z.literal('submit'),rank,...proof}),
  z.object({kind:z.literal('record'),action:z.enum(actions),userId:z.string().min(1).max(100),rank:rank.optional(),unitId:z.uuid().optional(),qualified:z.boolean().optional(),...proof}),
  z.object({kind:z.literal('decide'),id:z.uuid(),approve:z.boolean(),qualified:z.boolean().optional(),reason:proof.reason}),
 ]);
-type Promotion={id:string;userId:string;name:string;staticId:string;unitId:string;fromRank:number;rank:number;reason:string;links:string[];status:string;decision?:string;createdAt:string;creditIds?:string[]};
+type Promotion={id:string;userId:string;name:string;staticId:string;unitId:string;fromRank:number;rank:number;reason:string;links:string[];status:string;decision?:string;createdAt:string;creditIds?:string[];confirmationIds?:string[]};
 
 export async function personnelWorkflow(actor:Viewer,unitId:string|null=null,focus:string|null=null){
  const units=await workspaceUnits(actor.id,unitId);
@@ -42,7 +45,9 @@ export async function personnelWorkflow(actor:Viewer,unitId:string|null=null,foc
  const progress=await promotionProgress(actor.id);
  const destinations=unitId?(await accessibleUnits(actor.id)).filter(unit=>unit.editor):[];
  const restriction=!unitId&&progress.profile?await promotionRestriction(progress.profile.id):null;
- return {units,destinations,progress:{restriction,points:progress.points,step:progress.step},canTransfer:actor.role==='admin'||leadership.length>0,me:me[0],ranks,promotions:promotions.map(row=>row.value),people,history,actorId:actor.id};
+ const checklist=!unitId&&progress.profile?await promotionChecklist(progress.profile):[];
+ const requirements=units.length?(await query<{value:Requirement}>("SELECT value FROM settings WHERE key LIKE 'promotion-requirement:%' ORDER BY value->>'title'")).map(row=>row.value):[];
+ return {units,destinations,requirements,progress:{restriction,checklist,points:progress.points,step:progress.step},canTransfer:actor.role==='admin'||leadership.length>0,me:me[0],ranks,promotions:promotions.map(row=>row.value),people,history,actorId:actor.id};
 }
 
 export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
@@ -57,6 +62,24 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
    FROM app_user u LEFT JOIN personnel p ON p.user_id=u.id LEFT JOIN settings d ON d.key='service:'||p.id::text
    WHERE u.id=$1 AND NOT u.must_change_password`,[actor.id]);
   if(!author)throw new HttpError('Сеанс недоступний.',403);
+  if(action.kind==='requirement'){
+   if(!units.some(unit=>unit.appoint))throw new HttpError('Нормативи встановлює керуючий склад.',403);
+   const entry={id:randomUUID(),rank:action.rank,title:action.title,kind:action.category};
+   await c.query('INSERT INTO settings(key,value) VALUES($1,$2)',['promotion-requirement:'+entry.id,JSON.stringify(entry)]);
+   await audit(c,actor,'promotion.requirement',entry.id,null,entry);
+   return {saved:true};
+  }
+  if(action.kind==='confirm-requirement'){
+   const {profile}=await promotionProgress(action.userId,c);
+   if(action.userId===actor.id||!profile||!canEdit(profile.unit_id))throw new HttpError('Підтвердження поза межами ваших повноважень.',403);
+   const requirement=(await promotionChecklist(profile,c)).find(item=>item.rule.id===action.id);
+   if(!requirement)throw new HttpError('Норматив недоступний для цього звання.',409);
+   if(requirement.confirmation)return {saved:true};
+   const confirmation={id:randomUUID(),source:action.source,by:actor.id,at:new Date().toISOString()};
+   await c.query('INSERT INTO settings(key,value) VALUES($1,$2)',['promotion-confirmation:'+profile.id+':'+profile.cycle+':'+action.id,JSON.stringify(confirmation)]);
+   await audit(c,actor,'promotion.requirement.confirm',profile.id,null,{...confirmation,rule:action.id});
+   return {saved:true};
+  }
   if(action.kind==='submit'){
    if(!author.active||!author.rank||!author.unit_id||!author.static_id||action.rank<=author.rank||
     !(await c.query('SELECT 1 FROM ranks WHERE id=$1',[action.rank])).rowCount)
@@ -68,8 +91,11 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
    if(progress.profile)await checkPromotion(c,progress.profile.id,author.rank,action.rank);
    if(!progress.step||promotionRankName(action.rank,destinationRank.name).toLocaleLowerCase('uk')!==progress.step[1].toLocaleLowerCase('uk')||progress.points<progress.step[2])
     throw new HttpError('Потрібні підтверджені бали й наступне звання за шкалою підвищень.',409);
+   const checklist=progress.profile?await promotionChecklist(progress.profile,c):[];
+   if(checklist.some(item=>!item.confirmation))throw new HttpError('Залишилися непідтверджені нормативи або атестації.',409);
+   const confirmationIds=checklist.flatMap(item=>item.confirmation?[item.confirmation.id]:[]);
    const entry:Promotion={id:randomUUID(),userId:actor.id,name:author.name,staticId:author.static_id,unitId:author.unit_id,
-    fromRank:author.rank,rank:action.rank,reason:action.reason,links:action.links,status:'pending',creditIds:progress.creditIds,createdAt:new Date().toISOString()};
+    fromRank:author.rank,rank:action.rank,reason:action.reason,links:action.links,status:'pending',creditIds:progress.creditIds,confirmationIds,createdAt:new Date().toISOString()};
    await c.query('INSERT INTO settings(key,value) VALUES($1,$2)',['promotion-report:'+entry.id,JSON.stringify(entry)]);
    await audit(c,actor,'personnel.promotion.submit',entry.id,null,entry);
    return {saved:true};
@@ -110,6 +136,7 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
   if(type==='promote'){
    await checkPromotion(c,target.id,target.rank,nextRank!);
    const progress=await promotionProgress(targetId,c);
+   if(!promotion&&progress.profile&&(await promotionChecklist(progress.profile,c)).some(item=>!item.confirmation))throw new HttpError('Залишилися непідтверджені нормативи або атестації.',409);
    if(!action.qualified)throw new HttpError('Підтвердьте виконання нормативів і проходження атестацій.',409);
    if(progress.step&&(progress.points<progress.step[2]||promotionRankName(nextRank!,rankName(nextRank!)!).toLocaleLowerCase('uk')!==progress.step[1].toLocaleLowerCase('uk')))
     throw new HttpError('Потрібні '+progress.step[2]+' підтверджених балів та наступне звання '+progress.step[1]+'.',409);
@@ -134,7 +161,7 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
   if(type==='admit')await c.query("UPDATE profile_claims SET status='approved',reason=$3,reviewed_by=$4 WHERE user_id=$1 AND static_id::numeric=$2::text::numeric AND status='pending'",[targetId,staticId,action.reason,actor.id]);
   const record={action:type,author:author.name,actorStaticId:author.static_id,name:target.name,staticId,member:targetId,
    fromUnit:target.unit_id,unitId,fromUnitName:units.find(unit=>unit.id===target.unit_id)?.name,unitName:units.find(unit=>unit.id===unitId)?.name,
-   fromRankName:rankName(target.rank),rankName:rankName(rankId),reason:action.reason,
+   rank:rankId,fromRankName:rankName(target.rank),rankName:rankName(rankId),reason:action.reason,
    qualified:type==='promote'?action.qualified:undefined,links:action.kind==='record'?action.links:promotion!.links,promotionId:promotion?.id,creditIds:promotion?.creditIds};
   await audit(c,actor,'personnel.record',personId,{unitId:target.unit_id,rank:target.rank,active:target.active},record,action.reason);
   if(promotion){

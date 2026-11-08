@@ -39,6 +39,19 @@ export function PersonnelWorkflow({unitId,focus,mode='personal'}:{unitId?:string
  const proof=(fd:FormData)=>({reason:fd.get('reason'),links:evidenceLines(String(fd.get('links')||''))});
  return <div id={mode==='record'?undefined:'content'}>
   <header className="portal-preview-header feature-cover personnel-cover"><h1>{mode==='audit'?'Кадровий аудит':mode==='review'?'Рішення щодо нового звання':mode==='record'?'Кадрові дії':'Запит на нове звання'}</h1><p>Звіти бійців, кадрові рішення та докази.</p></header>
+  {data&&mode==='record'&&<section className="panel stack">
+   <h2>Нормативи підвищення</h2>
+   {data.units.some(unit=>unit.appoint)&&<form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'requirement',rank:Number(f.get('rank')),title:f.get('title'),category:f.get('category')}))}>
+    <Field label="Поточний ранг переходу"><select name="rank">{data.ranks.filter(rank=>rank.id<15).map(rank=><option key={rank.id} value={rank.id}>{rank.id} · {rank.name}</option>)}</select></Field>
+    <Field label="Тип"><select name="category"><option value="standard">Норматив</option><option value="assessment">Атестація</option></select></Field>
+    <Field label="Назва"><input name="title" required minLength={3} maxLength={160}/></Field><button disabled={busy}>Додати вимогу</button>
+   </form>}
+   {!!data.requirements.length&&<form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'confirm-requirement',userId:f.get('userId'),id:f.get('id'),source:f.get('source')}))}>
+    <Field label="Боєць"><select name="userId" required defaultValue=""><option value="">Оберіть бійця</option>{data.people.filter(person=>person.active&&person.unit_id===unitId).map(person=><option key={person.id} value={person.id}>{person.name} · {person.static_id}</option>)}</select></Field>
+    <Field label="Вимога"><select name="id">{data.requirements.map(rule=><option key={rule.id} value={rule.id}>{rule.rank} → {rule.rank+1} · {rule.title}</option>)}</select></Field>
+    <Field label="Джерело підтвердження"><input type="url" name="source" required/></Field><button disabled={busy}>Підтвердити виконання</button>
+   </form>}
+  </section>}
   {(resource.error||error)&&<Notice error>{resource.error||error}</Notice>}{saved&&<Notice>Запис збережено.</Notice>}
   {!data&&!resource.error&&<Loading/>}
   {data&&<>
@@ -50,8 +63,9 @@ export function PersonnelWorkflow({unitId,focus,mode='personal'}:{unitId?:string
        <p>Поточне звання: {rankName(data.me.rank)}. Підтверджені бали: {data.progress.points}{data.progress.step?' / '+data.progress.step[2]:''}.</p>
        <Link href="/portal/promotion-points">Завдання й бали підвищення</Link>
        {data.progress.restriction&&<Notice>{data.progress.restriction}</Notice>}
+       {!!data.progress.checklist.length&&<ul>{data.progress.checklist.map(item=><li key={item.rule.id}>{item.rule.kind==='assessment'?'Атестація':'Норматив'} · {item.rule.title} · {item.confirmation?<a href={item.confirmation.source} target="_blank" rel="noreferrer">Зараховано</a>:'Очікує підтвердження'}</li>)}</ul>}
        <Field label="Запитуване звання"><select name="rank" required defaultValue=""><option value="">Оберіть вище звання</option>{data.ranks.filter(rank=>rank.id===Number(data.me?.rank)+1&&rankName(rank.id).toLocaleLowerCase('uk')===data.progress.step?.[1].toLocaleLowerCase('uk')).map(rank=><option key={rank.id} value={rank.id}>{rankName(rank.id)}</option>)}</select></Field>
-       <Proof/><button disabled={busy||!!data.progress.restriction||!data.progress.step||data.progress.points<data.progress.step[2]}>Надіслати звіт</button>
+       <Proof/><button disabled={busy||data.progress.checklist.some(item=>!item.confirmation)||!!data.progress.restriction||!data.progress.step||data.progress.points<data.progress.step[2]}>Надіслати звіт</button>
       </form>:<p>Для подання потрібні активний кадровий профіль, підрозділ і звання.</p>}
      </div>
     </details>}

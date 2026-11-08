@@ -28,7 +28,7 @@ export function MilitaryTicket({unitId}:{unitId?:string}){
    <p>{ticket?.issued?'Квиток видано':person.ready?'Готовий до видачі':ticket?'У процесі':'Програму ще не призначено'}</p>
    <p>Підтверджена дата вступу: {person.joined??'очікує підтвердження'}</p>
    {ticket&&<><p>{ticket.program==='ukmb'?'УКМБ':'КМБ'} · {Math.max(0,person.days??0)} / {person.required} календарних днів</p>
-    {ticket.program==='ukmb'?<ul><li>Належність до держструктури: {ticket.external?'підтверджено':'очікує'}</li><li>Лекції {ticket.lectures.length}/5 · Атестації {ticket.assessments.length}/5 · Тренування {ticket.exercises.length}/2</li><li>Ознайомлення: {ticket.orientation?'виконано':'очікує'} · Присяга: {ticket.oath?'складено':'очікує'}</li></ul>:<ul><li>Курс і нормативи: {ticket.course?'зараховано':'очікує'}</li><li>Отримання 5-го звання: {ticket.rankFive?'підтверджено':'очікує'}</li></ul>}
+    {ticket.program==='ukmb'?<ul><li>Належність до держструктури: {ticket.external?'підтверджено':'очікує'}</li><li>Лекції {ticket.lectures.length}/5 · Атестації {ticket.assessments.length}/5 · Тренування {ticket.exercises.length}/2</li><li>Ознайомлення: {ticket.orientation?'виконано':'очікує'} · Присяга: {ticket.oath?'складено':'очікує'}</li></ul>:<ul><li>Курс і нормативи: {ticket.course?'зараховано':'очікує'}</li><li>Отримання 5-го звання: {person.rank_five_recorded?'підтверджено кадровим записом':ticket.rankFive?'підтверджено вручну':'очікує'}</li></ul>}
     {ticket.issued&&<p>Видано {new Date(ticket.issued.at).toLocaleDateString('uk-UA',{timeZone:'Europe/Kyiv'})}{ticket.issued.reference&&' · '+ticket.issued.reference}</p>}
    </>}
    {unitId&&<div key={person.id} className="stack">
@@ -53,7 +53,15 @@ export function MilitaryTicket({unitId}:{unitId?:string}){
       <button disabled={busy}>Зберегти підтвердження</button>
      </form>
     </details>}
-    {person.ready&&!ticket?.issued&&<form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'issue',id:person.id,reference:f.get('reference')}))}>
+    {data?.canIssue&&ticket?.issued&&<details className="account-action form-disclosure">
+     <IllustratedSummary title="Виправити реквізити квитка" image="/portal-art/cabinet/training.webp"/>
+     <form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'correct',id:person.id,reference:f.get('reference'),reason:f.get('reason')}))}>
+      <Field label="Реквізити"><input name="reference" defaultValue={ticket.issued.reference} maxLength={120}/></Field>
+      <Field label="Підстава"><textarea name="reason" required minLength={5} maxLength={2000}/></Field>
+      <button disabled={busy}>Зберегти виправлення</button>
+     </form>
+    </details>}
+    {data?.canIssue&&person.ready&&!ticket?.issued&&<form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'issue',id:person.id,reference:f.get('reference')}))}>
      <Field label="Реквізити квитка"><input name="reference" maxLength={120}/></Field><button disabled={busy}>Зафіксувати видачу</button>
     </form>}
    </div>}

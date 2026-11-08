@@ -18,8 +18,34 @@ export async function CommandWorkspace({actor,unitId,section,filters}:{actor:Vie
  const units=(await accessibleUnits(actor.id)).filter(unit=>unit.editor);
  if(!units.length)notFound();
  if(!unitId){
-  if(units.length===1)redirect('/command/'+units[0].id+'/overview');
+  const canSeeFaction=units.some(unit=>unit.appoint);
+  const summary=canSeeFaction?await query<{id:string;name:string;commander:boolean;overdue:number;conflicts:number}>(`
+   SELECT u.id,u.name,
+    EXISTS(SELECT 1 FROM personnel p JOIN settings s ON s.key='service:'||p.id::text
+     WHERE p.unit_id=u.id AND p.active AND p.rank BETWEEN 11 AND 12
+     AND s.value->>'leadershipRole'='commander' AND s.value->>'commanderUnitId'=u.id::text) AS commander,
+    (SELECT count(*)::int FROM settings s WHERE s.key LIKE 'service-entry:%'
+     AND s.value->>'module'='requests' AND s.value->>'status'='pending'
+     AND coalesce(s.value->>'targetUnit',s.value->>'unit')=u.id::text
+     AND (s.value->>'createdAt')::timestamptz < now()-interval '72 hours') AS overdue,
+    (SELECT count(*)::int FROM personnel p JOIN settings s ON s.key='service:'||p.id::text
+     WHERE s.value->>'commanderUnitId'=u.id::text AND s.value->>'leadershipRole' IN ('commander','deputy')
+     AND (NOT p.active OR p.unit_id IS DISTINCT FROM u.id OR p.rank IS NULL OR p.rank NOT BETWEEN 11 AND 12)) AS conflicts
+   FROM units u WHERE u.id=ANY($1::uuid[]) ORDER BY u.sort_order,u.name`,[units.map(unit=>unit.id)]):[];
+  if(units.length===1&&!canSeeFaction)redirect('/command/'+units[0].id+'/overview');
   return <section id="content" className="panel"><h1>Керування підрозділами</h1><p>Оберіть підрозділ для роботи.</p>
+   {canSeeFaction&&<section className="portal-shortcuts">
+    <h2>Зведення фракції</h2>
+    <p>Простроченими вважаються заявки, які очікують рішення понад 72 години.</p>
+    <div className="table-wrap"><table><thead><tr><th>Підрозділ</th><th>Командир</th><th>Прострочені заявки</th><th>Конфлікти призначень</th></tr></thead>
+     <tbody>{summary.map(row=><tr key={row.id}>
+      <td><Link href={'/command/'+row.id+'/overview'}>{row.name}</Link></td>
+      <td><Link href={'/command/'+row.id+'/roster'}>{row.commander?'Призначений':'Вакансія'}</Link></td>
+      <td><Link href={'/command/'+row.id+'/queue?kind=requests&overdue=1'}>{row.overdue}</Link></td>
+      <td><Link href={'/command/'+row.id+'/roster'}>{row.conflicts}</Link></td>
+     </tr>)}</tbody>
+    </table></div>
+   </section>}
    <div className="home-card-grid">{units.map(unit=><CardLink key={unit.id} href={'/command/'+unit.id+'/overview'} title={unit.name} showImageTitle={false} image={unitCover(unit.name)??'/portal-art/home/service.webp'}/>)}</div>
   </section>;
  }

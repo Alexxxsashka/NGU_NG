@@ -7,3 +7,15 @@ export function defaultRecruitment(name:string){
  if(/^(всп|звп)/.test(title))return 'Внутрішній контроль, перевірки та розгляд скарг.\nВід рангу 5, щонайменше 14 днів служби та відсутність активних стягнень.';
  return '';
 }
+
+export function recruitmentRequirements(name:string){
+ const title=name.trim().toLocaleLowerCase('uk');
+ const ncp=title.startsWith('нцп');
+ const police=/^(всп|звп)/.test(title);
+ return {
+  minRank:title.startsWith('ссо')?6:police?5:/^(оаз|злп)/.test(title)?4:null,
+  minDays:police?14:0,
+  clearDiscipline:ncp||police,
+  commanderApproval:ncp,
+ };
+}

@@ -41,14 +41,14 @@ export function PromotionReportForm({tasks,onSaved,actorId,selectedTaskId}:{acto
  async function submit(event:FormEvent<HTMLFormElement>){
   event.preventDefault();if(busy)return;
   setError('');setSaved(false);
-  const entries=rows.map(row=>({taskId:row.taskId,quantity:Number(row.quantity),links:evidenceLines(row.links)}));
+  const entries=rows.map(row=>({taskId:row.taskId,quantity:Number(row.quantity),expectedRate:tasks.find(task=>task.id===row.taskId)?.points,links:evidenceLines(row.links)}));
   const invalid=entries.findIndex(entry=>!tasks.some(task=>task.id===entry.taskId)||entry.links.length<1||entry.links.length>20);
   if(invalid>=0){setError('Завдання '+(invalid+1)+': оберіть доступне завдання та додайте від 1 до 20 посилань.');return;}
   setBusy(true);
   try{
    await api('promotion-points',{kind:'submit-report',entries});
    setRows([{id:0,taskId:'',quantity:'1',links:''}]);setNextId(1);setSaved(true);await onSaved();
-  }catch(error){setError((error as Error).message);}
+  }catch(error){setError((error as Error).message);await onSaved().catch(()=>undefined);}
   finally{setBusy(false);}
  }
  return <form className="report-layout account-action-content" onSubmit={submit}>
