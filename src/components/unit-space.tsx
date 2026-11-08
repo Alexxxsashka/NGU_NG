@@ -27,6 +27,8 @@ export async function UnitSpace({userId,unitId,mode='personal',ownOnly=false}:{u
   FROM personnel p LEFT JOIN ranks k ON k.id=p.rank LEFT JOIN settings d ON d.key='service:'||p.id::text
   WHERE p.unit_id=$1 AND ($2::boolean OR p.active) ORDER BY p.rank DESC NULLS LAST,p.last_name,p.first_name
  `,[unit.id,mode==='roster']),unit.editor?query<{id:number;name:string}>('SELECT id,name FROM ranks ORDER BY id'):[]]);
+ const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Europe/Kyiv'}).format(new Date());
+ const pinned=(item:{pinnedUntil?:string})=>!!item.pinnedUntil&&item.pinnedUntil>=today;
  const editor=mode!=='personal'?<UnitEditor canAppoint={unit.appoint} mode={mode} ranks={ranks} unitId={unit.id} info={content} news={content.news.map(({id,title,draft,archived})=>({id,title,draft,archived}))}/>:null;
  if(mode==='content')return <div id="content">{editor}<div className="home-card-grid portal-shortcuts">
   <CardLink href={'/command/'+unit.id+'/calendar'} title="Додати подію" image="/portal-art/cabinet/calendar.webp"/>
@@ -51,9 +53,9 @@ export async function UnitSpace({userId,unitId,mode='personal',ownOnly=false}:{u
   </nav>
   <div className="portal-feature-grid">{sections.map(([title,body,Icon])=><section key={title}><h2><Icon size={18}/>{title}</h2><p className="unit-copy">{body||'Інформацію ще не додано.'}</p></section>)}</div>
   <section className="panel" id="unit-news"><h2>Новини й оголошення</h2>
-   {content.news.some(news=>!news.draft&&!news.archived)?content.news.filter(news=>!news.draft&&!news.archived).map(news=><article key={news.id} className="unit-news-item">
+   {content.news.some(news=>!news.draft&&!news.archived)?content.news.filter(news=>!news.draft&&!news.archived).sort((a,b)=>Number(pinned(b))-Number(pinned(a))||b.publishedAt.localeCompare(a.publishedAt)).map(news=><article key={news.id} className="unit-news-item">
     <span className={'pill '+(news.kind==='announcement'?'prime':'any')}>{news.kind==='announcement'?'Оголошення':'Новина'}</span>
-    <h3>{news.title}</h3><time dateTime={news.publishedAt}>{new Date(news.publishedAt).toLocaleString('uk-UA',{timeZone:'Europe/Kyiv'})}</time>
+    {pinned(news)&&<span className="pill prime">Закріплено до {news.pinnedUntil}</span>}<h3>{news.title}</h3><time dateTime={news.publishedAt}>{new Date(news.publishedAt).toLocaleString('uk-UA',{timeZone:'Europe/Kyiv'})}</time>
     <p className="unit-copy">{news.body}</p>
    </article>):<p>Публікацій ще немає.</p>}
   </section>

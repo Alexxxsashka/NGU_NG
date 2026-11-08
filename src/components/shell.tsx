@@ -10,7 +10,7 @@ import {PortalIcon} from './portal-icon';
 import {adminPortalRoutes,serviceModules,visiblePortalGroups} from '@/lib/portal-navigation';
 import type {Viewer} from '@/lib/domain';
 const bonusLinks=[['/admin/weekly-bonus','Огляд',ChartNoAxesCombined],['/admin/weekly-bonus/reports','Звіти',ClipboardList],['/admin/weekly-bonus/units','Зведення за підрозділами',Users],['/admin/weekly-bonus/tasks','Завдання і бали',SlidersHorizontal],['/admin/weekly-bonus/periods','Звітні тижні',CalendarDays],['/admin/weekly-bonus/settings','Налаштування',SlidersHorizontal],['/admin/weekly-bonus/import','Перенесення історії',Upload]] as const;
-export function Shell({user,children,commandUnits,trainingUnitId,disciplineAccess}:{user:Viewer|null;children:ReactNode;trainingUnitId?:string;disciplineAccess:boolean;commandUnits:{id:string;name:string}[]}){
+export function Shell({user,children,commandUnits,trainingUnitId,disciplineAccess}:{user:Viewer|null;children:ReactNode;trainingUnitId?:string;disciplineAccess:boolean;commandUnits:{id:string;name:string;appoint:boolean}[]}){
  const pathname=usePathname(),router=useRouter();const [menu,setMenu]=useState(false),[error,setError]=useState('');
  const isAdmin=user?.role==='admin'&&!user.mustChangePassword;
  const workspace=workspaceForPath(pathname);
@@ -24,7 +24,7 @@ export function Shell({user,children,commandUnits,trainingUnitId,disciplineAcces
  {group.links.map(([href,label])=><Link key={href} onClick={()=>setMenu(false)} href={href} aria-current={activePath===href?'page':undefined} className={activePath===href||href==='/weekly-bonus'&&pathname==='/weekly-bonus/report'?'selected':''}><PortalIcon href={href}/><span className="portal-nav-label">{label}</span>{href.startsWith('/portal/')&&!['/portal/notifications','/portal/structure','/portal/personnel-actions','/portal/promotion-points'].includes(href)&&!serviceModules.some(module=>href==='/portal/'+module)&&!(isAdmin&&Object.hasOwn(adminPortalRoutes,href.slice(8)))&&<span className="portal-nav-mark" title="У розробці"/>}</Link>)}
  </details>)}{disciplineAccess&&<Link href="/command/discipline" onClick={()=>setMenu(false)} aria-current={pathname==='/command/discipline'?'page':undefined}>Дисциплінарний облік ВСП</Link>}{inCommand&&commandUnit&&<details className="portal-nav-group" open>
   <summary className="nav-label">Керування підрозділом<ChevronDown size={14} aria-hidden="true"/></summary>
-  {commandSections.filter(([key])=>key!=='training'||commandUnit.id===trainingUnitId).map(([key,label])=>{const href='/command/'+commandUnit.id+'/'+key;
+  {commandSections.filter(([key])=>(key!=='training'||commandUnit.id===trainingUnitId)&&(key!=='assignment-conflicts'||commandUnit.appoint)).map(([key,label])=>{const href='/command/'+commandUnit.id+'/'+key;
    return <Link href={href} key={key} onClick={()=>setMenu(false)} aria-current={pathname===href?'page':undefined} className={pathname===href?'selected':''}>{label}</Link>;
   })}
  </details>}{isAdmin&&workspace==='admin'&&<details className="portal-nav-group" open={pathname.startsWith('/admin')}><summary className="nav-label">Робоча адмінпанель<ChevronDown size={14} aria-hidden="true"/></summary><Link onClick={()=>setMenu(false)} className={bonusAdminOpen?'selected':''} href="/admin/weekly-bonus"><SlidersHorizontal size={18}/>Налаштування щотижневого преміювання</Link>

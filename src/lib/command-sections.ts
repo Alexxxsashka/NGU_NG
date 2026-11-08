@@ -2,6 +2,7 @@ export const commandSections=[
  ['queue','Єдина черга','cabinet/requests'],
  ['overview','Огляд підрозділу','home/command'],
  ['content','Редактор сторінки','unit-actions/info'],
+ ['assignment-conflicts','Конфлікти призначень','unit-actions/archive'],
  ['roster','Керування складом','unit-actions/access'],
  ['orders','Службові накази','catalog/approval'],
  ['requests','Черга заявок','cabinet/requests'],

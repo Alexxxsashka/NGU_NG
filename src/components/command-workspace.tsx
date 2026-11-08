@@ -42,7 +42,7 @@ export async function CommandWorkspace({actor,unitId,section,filters}:{actor:Vie
       <td><Link href={'/command/'+row.id+'/overview'}>{row.name}</Link></td>
       <td><Link href={'/command/'+row.id+'/roster'}>{row.commander?'Призначений':'Вакансія'}</Link></td>
       <td><Link href={'/command/'+row.id+'/queue?kind=requests&overdue=1'}>{row.overdue}</Link></td>
-      <td><Link href={'/command/'+row.id+'/roster'}>{row.conflicts}</Link></td>
+      <td><Link href={'/command/'+row.id+'/assignment-conflicts'}>{row.conflicts}</Link></td>
      </tr>)}</tbody>
     </table></div>
    </section>}
@@ -55,6 +55,20 @@ export async function CommandWorkspace({actor,unitId,section,filters}:{actor:Vie
  const managesKmb=unit.id===await kmbUnitId();
  if(section==='training'&&!managesKmb)notFound();
  const root='/command/'+unit.id;
+ if(section==='assignment-conflicts'){
+  if(!unit.appoint)notFound();
+  const conflicts=await query<{id:string;name:string;static_id:string;rank:number|null;active:boolean;current_unit:string|null;role:string}>(`
+   SELECT p.id,p.first_name||' '||p.last_name AS name,p.static_id,p.rank,p.active,u.name AS current_unit,s.value->>'leadershipRole' AS role
+   FROM personnel p JOIN settings s ON s.key='service:'||p.id::text LEFT JOIN units u ON u.id=p.unit_id
+   WHERE s.value->>'commanderUnitId'=$1::uuid::text AND s.value->>'leadershipRole' IN ('commander','deputy')
+   AND (NOT p.active OR p.unit_id IS DISTINCT FROM $1::uuid OR p.rank IS NULL OR p.rank NOT BETWEEN 11 AND 12)
+   ORDER BY p.last_name,p.first_name,p.id`,[unit.id]);
+  return <section id="content" className="panel"><h1>Конфлікти призначень · {unit.name}</h1><p><Link href="/command">До зведення фракції</Link></p>
+   {conflicts.length?<div className="table-wrap"><table><thead><tr><th>Боєць</th><th>Призначення</th><th>Фактичний підрозділ</th><th>Ранг</th><th>Стан</th></tr></thead>
+    <tbody>{conflicts.map(row=><tr key={row.id}><td>{row.name}<small>ID {row.static_id}</small></td><td>{row.role==='commander'?'Командир':'Заступник'}</td><td>{row.current_unit??'Не призначено'}</td><td>{row.rank??'—'}</td><td>{row.active?'Активний':'Неактивний'}</td></tr>)}</tbody>
+   </table></div>:<p>Конфліктних призначень немає.</p>}
+  </section>;
+ }
  const nextHref=commandQueueNextHref(unit.id,filters);
  if(section==='overview'){
   const [counts]=await query<{people:number;requests:number;reports:number;promotions:number;event:string|null}>(`SELECT
@@ -70,7 +84,7 @@ export async function CommandWorkspace({actor,unitId,section,filters}:{actor:Vie
    'promotion-decisions':counts.promotions+' на розгляді',calendar:counts.event??'Запланованих подій поки немає.',
   };
   return <div id="content"><header className="portal-preview-header"><h1>{unit.name}</h1><p>Робочий простір командування</p></header>
-   <div className="home-card-grid portal-shortcuts">{commandSections.filter(([key])=>key!=='overview'&&(key!=='training'||managesKmb)).map(([key,label,art])=><CardLink key={key} href={root+'/'+key} title={label} image={'/portal-art/'+art+'.webp'} description={descriptions[key]}/>)}</div>
+   <div className="home-card-grid portal-shortcuts">{commandSections.filter(([key])=>key!=='overview'&&(key!=='training'||managesKmb)&&(key!=='assignment-conflicts'||unit.appoint)).map(([key,label,art])=><CardLink key={key} href={root+'/'+key} title={label} image={'/portal-art/'+art+'.webp'} description={descriptions[key]}/>)}</div>
   </div>;
  }
  return <><nav className="portal-crumb" aria-label="Шлях до розділу"><Link href={root+'/overview'}>{unit.name}</Link><span>/</span><span>{view[1]}</span>{filters.fromQueue==='1'&&<Link href={commandQueueHref(unit.id,filters)}>Повернутися до черги</Link>}</nav>

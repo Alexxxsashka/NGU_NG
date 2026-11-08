@@ -17,6 +17,7 @@ const actions=[
  {id:'archive',title:'Керувати публікаціями',description:'Вибрати й видалити публікацію.',icon:Archive},
 ] as const;
 export function UnitEditor({unitId,info,news,ranks,mode,canAppoint}:{canAppoint:boolean;mode:'content'|'roster';ranks:{id:number;name:string}[];unitId:string;info:Info;news:{id:string;title:string;draft?:boolean;archived?:boolean}[]}){
+ const [preview,setPreview]=useState<{title:string;body:string;type:string;until:string}|null>(null);
  const [selected,setSelected]=useState<(typeof actions)[number]|null>(null);
  const router=useRouter();
  const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
@@ -31,7 +32,7 @@ export function UnitEditor({unitId,info,news,ranks,mode,canAppoint}:{canAppoint:
   <p className="muted">{mode==='content'?'Службова інформація та публікації.':'Доступ до підрозділу, звання та посади.'}</p>
   {message&&<Notice>{message}</Notice>}{error&&!selected&&<Notice error>{error}</Notice>}
   <div className="home-card-grid">{actions.filter(action=>action.id==='command'?mode==='roster'&&canAppoint:(action.id==='access'||action.id==='rank')===(mode==='roster')).map(action=><button key={action.id} type="button" aria-haspopup="dialog"
-   className="home-route-card home-action-card" disabled={busy} onClick={()=>{setError('');setMessage('');setSelected(action);}}>
+   className="home-route-card home-action-card" disabled={busy} onClick={()=>{setError('');setMessage('');setPreview(null);setSelected(action);}}>
    <CardFace title={action.title} description={action.description} image={'/portal-art/unit-actions/'+(action.id==='command'?'rank':action.id)+'.webp'} icon={<action.icon size={19} aria-hidden="true"/>}/>
   </button>)}</div>
   {selected&&<Modal title={selected.title} onClose={()=>setSelected(null)}>
@@ -40,11 +41,17 @@ export function UnitEditor({unitId,info,news,ranks,mode,canAppoint}:{canAppoint:
     {infoFields.map(([name,label])=><Field key={name} label={label}><textarea name={name} rows={3} maxLength={name==='contacts'?2000:name==='schedule'?3000:4000} defaultValue={info[name]}/></Field>)}
     <button disabled={busy}>Зберегти інформацію</button>
    </form>}
-   {selected.id==='news'&&<form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);void save({kind:'publish',type:data.get('type'),title:data.get('title'),body:data.get('body'),draft:data.has('draft')},form);}}>
+   {selected.id==='news'&&<form className="stack" onChange={()=>setPreview(null)} onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);
+    if((e.nativeEvent as SubmitEvent).submitter?.getAttribute('value')==='preview'){
+     setPreview({title:String(data.get('title')),body:String(data.get('body')),type:String(data.get('type')),until:String(data.get('pinnedUntil')??'')});return;
+    }
+    void save({kind:'publish',type:data.get('type'),title:data.get('title'),body:data.get('body'),pinnedUntil:data.get('type')==='announcement'?data.get('pinnedUntil')||undefined:undefined,draft:data.has('draft')},form);}}>
     <Field label="Тип"><select name="type"><option value="news">Новина</option><option value="announcement">Оголошення</option></select></Field>
     <Field label="Заголовок"><input name="title" required maxLength={100}/></Field>
     <Field label="Текст"><textarea name="body" required rows={4} maxLength={3000}/></Field>
-    <label className="checkbox"><input type="checkbox" name="draft"/>Зберегти як чернетку</label><p>Після публікації повідомлення бачить склад підрозділу.</p><button disabled={busy}>Зберегти</button>
+    <label className="checkbox"><input type="checkbox" name="draft"/>Зберегти як чернетку</label><Field label="Закріпити оголошення до дати включно"><input name="pinnedUntil" type="date"/></Field>
+    {preview&&<article className="unit-news-item"><span className="pill prime">{preview.type==='announcement'?'Оголошення':'Новина'}</span>{preview.type==='announcement'&&preview.until&&<span className="pill prime">Закріплено до {preview.until}</span>}<h3>{preview.title}</h3><p className="unit-copy">{preview.body}</p></article>}
+    <div className="actions"><button value="preview" className="secondary" disabled={busy}>Попередній перегляд</button><button disabled={busy}>Зберегти</button></div>
    </form>}
    {selected.id==='access'&&<form className="stack" onSubmit={e=>{e.preventDefault();const form=e.currentTarget;const data=new FormData(form);void save({kind:'member',staticId:data.get('staticId'),grant:data.get('grant')==='yes'},form);}}>
     <p>Вкажіть Static ID бійця з активним кадровим профілем. Переведення з іншого підрозділу виконує адміністратор.</p>
