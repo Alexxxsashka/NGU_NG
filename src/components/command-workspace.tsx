@@ -7,7 +7,7 @@ import {kmbUnitId} from '@/lib/service-workspace';
 import {unitCover} from '@/lib/unit-artwork';
 import {commandSections} from '@/lib/command-sections';
 import type {Viewer} from '@/lib/domain';
-import {CommandQueue,type QueueFilters} from './command-queue';
+import {CommandQueue,commandQueueHref,type QueueFilters} from './command-queue';
 import {CardLink} from './card-link';
 import {UnitSpace} from './unit-space';
 import {PersonnelWorkflow} from './personnel-workflow';
@@ -46,7 +46,7 @@ export async function CommandWorkspace({actor,unitId,section,filters}:{actor:Vie
    <div className="home-card-grid portal-shortcuts">{commandSections.filter(([key])=>key!=='overview'&&(key!=='training'||managesKmb)).map(([key,label,art])=><CardLink key={key} href={root+'/'+key} title={label} image={'/portal-art/'+art+'.webp'} description={descriptions[key]}/>)}</div>
   </div>;
  }
- return <><nav className="portal-crumb" aria-label="Шлях до розділу"><Link href={root+'/overview'}>{unit.name}</Link><span>/</span><span>{view[1]}</span></nav>
+ return <><nav className="portal-crumb" aria-label="Шлях до розділу"><Link href={root+'/overview'}>{unit.name}</Link><span>/</span><span>{view[1]}</span>{filters.fromQueue==='1'&&<Link href={commandQueueHref(unit.id,filters)}>Повернутися до черги</Link>}</nav>
   {section==='military-ticket'&&<MilitaryTicket key={unit.id} unitId={unit.id}/>}
   {section==='queue'&&<CommandQueue unitId={unit.id} actorId={actor.id} filters={filters}/>}
   {section==='content'&&<UnitSpace userId={actor.id} unitId={unit.id} mode="content"/>}
