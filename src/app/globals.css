@@ -523,3 +523,18 @@ select option, select optgroup { color: var(--ink); background: var(--surface); 
 .filters .choice-field { flex: 1 1 200px; }
 .choice-grid .request-type input:focus-visible + label { outline-offset: -3px; }
 .choice-grid-validation:focus-visible { position: static; width: 100%; height: auto; opacity: 1; }
+
+.portal-workspace-bar [aria-current=true] { border-color: var(--accent); background: var(--raised); box-shadow: var(--accent-glow); }
+.unit-switcher, .portal-account-menu { position: relative; }
+.unit-switcher > summary, .portal-account-menu > summary { display:flex; align-items:center; gap:8px; list-style:none; cursor:pointer; min-height:42px; padding:8px 12px; border:1px solid var(--line); border-radius:8px; }
+.unit-switcher > summary::-webkit-details-marker, .portal-account-menu > summary::-webkit-details-marker { display:none; }
+.unit-switcher > nav, .portal-account-menu > div { display:grid; gap:4px; position:absolute; top:calc(100% + 6px); inset-inline-end:0; z-index:15; min-width:min(240px,85vw); max-height:50vh; overflow:auto; padding:8px; border:1px solid var(--line); border-radius:10px; background:var(--surface); }
+.unit-switcher a, .portal-account-menu a { display:block; padding:9px 12px; border-radius:6px; }
+.unit-switcher a[aria-current], .unit-switcher a:hover, .portal-account-menu a:hover { background:var(--raised); }
+.portal-account-menu .text-button { justify-content:flex-start; padding-inline:12px; }
+@media(max-width:700px) {
+ .portal-workspace-bar { align-items:flex-start; }
+ .portal-workspace-bar .actions { gap:6px; }
+ .portal-workspace-bar .button { min-height:40px; padding:8px 11px; font-size:12px; }
+ .unit-switcher > nav { inset-inline-start:0; inset-inline-end:auto; }
+}
