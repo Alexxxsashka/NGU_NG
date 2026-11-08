@@ -81,7 +81,7 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
    <form key={draftId} className="stack account-action-content" onSubmit={e=>void save(e,f=>module==='requests'?
     {kind:'request',draft:!!draftId||f.has('saveDraft'),draftId:draftId||undefined,type:f.get('type'),body:f.get('body'),correction:f.has('correctionValue')?{field:f.get('correctionField'),value:f.get('correctionValue')}:undefined,post:f.get('post')||undefined,replacement:f.get('replacement')||undefined,targetUnit:f.get('targetUnit')||undefined,from:f.get('from')||undefined,to:f.get('to')||undefined,links:evidenceLines(String(f.get('links')??''))}:
     {kind:'publish',module,unit:f.get('unit'),title:f.get('title'),body:f.get('body'),
-     date:f.get('date')||undefined,url:f.get('url')||undefined,revision:f.get('revision')||undefined,category:f.get('category')||undefined,replaces:f.get('replaces')||undefined,draft:f.has('draft'),requiresProof:f.has('requiresProof'),responsible:f.get('responsible')||undefined},()=>{setDraftId('');setSaveDraft(false);})}>
+     date:f.get('date')||undefined,url:f.get('url')||undefined,revision:f.get('revision')||undefined,category:f.get('category')||undefined,replaces:f.get('replaces')||undefined,draft:f.has('draft'),requiresProof:f.has('requiresProof'),responsible:f.get('responsible')||undefined,requirementId:f.get('requirementId')||undefined},()=>{setDraftId('');setSaveDraft(false);})}>
     {module==='requests'?<>
      <fieldset className="request-types">
       <legend>Тип заявки</legend>
@@ -96,8 +96,8 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
      {requestType==='Вступ до підрозділу'&&<p style={{whiteSpace:'pre-line'}}>{data.targets.find(unit=>unit.id===recruitmentUnit)?.rules}</p>}
      {['Відпустка','IC-відгул','OOC-відпустка'].includes(requestType)&&<div className="form-grid"><Field label="Від"><input name="from" defaultValue={draftRequest?.from} type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field><Field label="До"><input name="to" defaultValue={draftRequest?.to} type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field></div>}
      {requestType==='Виправлення особової справи'&&<div className="form-grid">
-      <Field label="Поле"><select name="correctionField" value={correctionField} onChange={event=>setCorrectionField(event.target.value)}><option value="joinedOn">Дата вступу</option><option value="callsign">Позивний</option></select></Field>
-      <Field label="Нове значення"><input key={correctionField} name="correctionValue" defaultValue={draftRequest?.correction?.field===correctionField?draftRequest.correction.value:undefined} type={correctionField==='joinedOn'?'date':'text'} required maxLength={40}/></Field>
+      <Field label="Поле"><select name="correctionField" value={correctionField} onChange={event=>setCorrectionField(event.target.value)}><option value="joinedOn">Дата вступу</option><option value="callsign">Позивний</option><option value="bio">Коротко про себе</option></select></Field>
+      <Field label="Нове значення"><input key={correctionField} name="correctionValue" defaultValue={draftRequest?.correction?.field===correctionField?draftRequest.correction.value:undefined} type={correctionField==='joinedOn'?'date':'text'} required maxLength={correctionField==='bio'?500:40}/></Field>
      </div>}
      {requestType==='IC-відгул'&&<div className="form-grid"><Field label="Пост або службове завдання"><input name="post" defaultValue={draftRequest?.post} required maxLength={160}/></Field><Field label="Хто замінить на посту, якщо потрібно"><input name="replacement" defaultValue={draftRequest?.replacement} maxLength={160}/></Field></div>}
      <Field label="Докази"><textarea name="links" defaultValue={draftRequest?.links.join('\n')} placeholder="Одне HTTPS-посилання на рядок"/></Field>
@@ -113,6 +113,7 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
      {module==='training'&&<label className="checkbox"><input name="requiresProof" type="checkbox"/>Вимагати докази для зарахування</label>}
      <label className="checkbox"><input name="draft" type="checkbox"/>Зберегти як чернетку</label>
      <p className="muted">Після публікації запис буде доступний учасникам вибраного підрозділу.</p>
+     {module==='calendar'&&<Field label="Норматив підвищення"><select name="requirementId"><option value="">Без прив’язки</option>{data.requirements.map(rule=><option key={rule.id} value={rule.id}>{rule.rank} → {rule.rank+1} · {rule.title}</option>)}</select></Field>}
      {module==='calendar'&&<Field label="Дата"><input type="date" name="date" required/></Field>}
      {['regulations','orders','lectures'].includes(module)&&<>
       <Field label="Редакція або номер"><input name="revision" maxLength={120}/></Field>
@@ -165,7 +166,7 @@ export function ServiceWorkspace({module,focus,unitId}:{module:ServiceModule;foc
     <p className="unit-copy">{entry.body}</p>
     {entry.url&&<a href={entry.url} target="_blank" rel="noopener noreferrer">Відкрити документ</a>}
     {entry.recruitmentRules&&<details><summary>Умови на момент подання</summary><p style={{whiteSpace:'pre-line'}}>{entry.recruitmentRules}</p></details>}
-    {entry.correction&&<dl><dt>{entry.correction.field==='joinedOn'?'Дата вступу':'Позивний'}</dt><dd>Було: {entry.correction.previous??'Не вказано'}</dd><dd>Запропоновано: {entry.correction.value}</dd></dl>}
+    {entry.correction&&<dl><dt>{entry.correction.field==='joinedOn'?'Дата вступу':entry.correction.field==='bio'?'Коротко про себе':'Позивний'}</dt><dd>Було: {entry.correction.previous??'Не вказано'}</dd><dd>Запропоновано: {entry.correction.value}</dd></dl>}
     {entry.post&&<p>Пост або завдання: {entry.post}{entry.replacement&&' · Заміна: '+entry.replacement}</p>}
     {entry.from&&entry.to&&<p>Період: {entry.from} — {entry.to}</p>}
     {entry.links?.map((link,index)=><p key={link}><a href={link} target="_blank" rel="noopener noreferrer">Доказ {index+1}</a></p>)}

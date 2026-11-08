@@ -29,7 +29,7 @@ type ServiceCard={
  pending_items:string;
 };
 
-export async function ServiceTablet({user,editable=true}:{user:Viewer;editable?:boolean}){
+export async function ServiceTablet({user,editable=true,historyPage=1}:{user:Viewer;editable?:boolean;historyPage?:number}){
  const Heading=editable?'h1':'h2';
  const [card]=await query<ServiceCard>(`
   SELECT p.static_id,CASE WHEN u.active THEN u.id END AS unit_id,p.first_name,p.last_name,p.active,p.rank,CASE WHEN u.active THEN u.name END AS unit_name,k.name AS rank_name,
@@ -95,7 +95,7 @@ export async function ServiceTablet({user,editable=true}:{user:Viewer;editable?:
   </div>}
  </section>
  {editable&&<>
-  <CabinetActivity user={user} today={today} joinedOn={joinedOn}/>
+  <CabinetActivity user={user} today={today} joinedOn={joinedOn} joinedVerified={card?.joined_verified} historyPage={historyPage}/>
   <section className="portal-shortcuts" aria-labelledby="cabinet-security">
    <h2 id="cabinet-security">Особисті дані та безпека</h2>
    <div className="cabinet-security-grid">

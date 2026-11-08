@@ -41,6 +41,13 @@ export function PersonnelWorkflow({unitId,focus,mode='personal'}:{unitId?:string
   <header className="portal-preview-header feature-cover personnel-cover"><h1>{mode==='audit'?'Кадровий аудит':mode==='review'?'Рішення щодо нового звання':mode==='record'?'Кадрові дії':'Запит на нове звання'}</h1><p>Звіти бійців, кадрові рішення та докази.</p></header>
   {data&&mode==='record'&&<section className="panel stack">
    <h2>Нормативи підвищення</h2>
+   {data.units.some(unit=>unit.appoint)&&<details className="account-action form-disclosure"><IllustratedSummary title="Звірити дату старого підвищення" image="/portal-art/unit-actions/archive.webp"/>
+    <form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'reconcile-promotion',userId:f.get('userId'),at:f.get('at')?new Date(String(f.get('at'))).toISOString():null,...proof(f)}))}>
+     <Field label="Боєць"><select name="userId" required defaultValue=""><option value="">Оберіть бійця</option>{data.people.filter(person=>person.active&&person.unit_id===unitId).map(person=><option key={person.id} value={person.id}>{person.name} · {person.static_id}</option>)}</select></Field>
+     <Field label="Дата й час у часовому поясі пристрою"><input type="datetime-local" name="at"/><small>Порожнє поле позначає невідому дату й блокує підвищення до звірки.</small></Field>
+     <Proof/><button disabled={busy}>Зберегти звірку</button>
+    </form>
+   </details>}
    {data.units.some(unit=>unit.appoint)&&<form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'requirement',rank:Number(f.get('rank')),title:f.get('title'),category:f.get('category')}))}>
     <Field label="Поточний ранг переходу"><select name="rank">{data.ranks.filter(rank=>rank.id<15).map(rank=><option key={rank.id} value={rank.id}>{rank.id} · {rank.name}</option>)}</select></Field>
     <Field label="Тип"><select name="category"><option value="standard">Норматив</option><option value="assessment">Атестація</option></select></Field>

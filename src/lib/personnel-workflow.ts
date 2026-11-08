@@ -17,6 +17,7 @@ const actions=['promote','demote','dismiss','admit','transfer'] as const;
 const proof={reason:z.string().trim().min(5).max(3000),links:z.array(evidence).min(1).max(20)};
 const rank=z.number().int().positive().max(2147483647);
 const operation=z.discriminatedUnion('kind',[
+ z.object({kind:z.literal('reconcile-promotion'),userId:z.string().min(1).max(100),at:z.iso.datetime().nullable(),...proof}),
  z.object({kind:z.literal('requirement'),rank:rank.max(14),title:z.string().trim().min(3).max(160),category:z.enum(['standard','assessment'])}),
  z.object({kind:z.literal('confirm-requirement'),userId:z.string().min(1).max(100),id:z.uuid(),source:evidence}),
  z.object({kind:z.literal('submit'),rank,...proof}),
@@ -62,6 +63,17 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
    FROM app_user u LEFT JOIN personnel p ON p.user_id=u.id LEFT JOIN settings d ON d.key='service:'||p.id::text
    WHERE u.id=$1 AND NOT u.must_change_password`,[actor.id]);
   if(!author)throw new HttpError('Сеанс недоступний.',403);
+  if(action.kind==='reconcile-promotion'){
+   const {rows:[person]}=await c.query<{id:string;unit_id:string}>('SELECT id,unit_id FROM personnel WHERE user_id=$1 AND active FOR UPDATE',[action.userId]);
+   if(!person||action.userId===actor.id||!units.some(unit=>unit.id===person.unit_id&&unit.appoint))throw new HttpError('Кадрова звірка доступна керуючому складу.',403);
+   if(action.at&&Date.parse(action.at)>Date.now())throw new HttpError('Дата підвищення не може бути в майбутньому.');
+   const key='promotion-history:'+person.id;
+   const {rows:[old]}=await c.query('SELECT value FROM settings WHERE key=$1',[key]);
+   const next={at:action.at,links:action.links,reason:action.reason};
+   await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=excluded.value',[key,JSON.stringify(next)]);
+   await audit(c,actor,'promotion.history.reconcile',person.id,old?.value??null,next,action.reason);
+   return {saved:true};
+  }
   if(action.kind==='requirement'){
    if(!units.some(unit=>unit.appoint))throw new HttpError('Нормативи встановлює керуючий склад.',403);
    const entry={id:randomUUID(),rank:action.rank,title:action.title,kind:action.category};
@@ -137,6 +149,10 @@ export async function changePersonnelWorkflow(input:unknown,actor:Viewer){
    await checkPromotion(c,target.id,target.rank,nextRank!);
    const progress=await promotionProgress(targetId,c);
    if(!promotion&&progress.profile&&(await promotionChecklist(progress.profile,c)).some(item=>!item.confirmation))throw new HttpError('Залишилися непідтверджені нормативи або атестації.',409);
+   if(promotion?.confirmationIds?.length&&progress.profile){
+    const confirmed=new Set((await promotionChecklist(progress.profile,c)).map(item=>item.confirmation?.id));
+    if(promotion.confirmationIds.some(id=>!confirmed.has(id)))throw new HttpError('Підтвердження нормативу відкликано. Перевірте вимоги перед підвищенням.',409);
+   }
    if(!action.qualified)throw new HttpError('Підтвердьте виконання нормативів і проходження атестацій.',409);
    if(progress.step&&(progress.points<progress.step[2]||promotionRankName(nextRank!,rankName(nextRank!)!).toLocaleLowerCase('uk')!==progress.step[1].toLocaleLowerCase('uk')))
     throw new HttpError('Потрібні '+progress.step[2]+' підтверджених балів та наступне звання '+progress.step[1]+'.',409);

@@ -22,7 +22,7 @@ import {Personal} from '@/components/personal';
 import {UnitSpace} from '@/components/unit-space';
 import {ServiceWorkspace} from '@/components/service-workspace';
 import {ServiceTablet} from '@/components/service-tablet';
-export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string;next?:string;entry?:string;task?:string;report?:string;from?:string}>}){
+export default async function Page({params,searchParams}:{params:Promise<{slug:string[]}>;searchParams:Promise<{password?:string;next?:string;entry?:string;task?:string;historyPage?:string;report?:string;from?:string}>}){
  const {slug}=await params;const path=slug.join('/');
  if(path==='weekly-bonus')return <div id="content"><section className="panel portal-preview-header weekly-bonus-banner">
   <h1>Щотижневе преміювання</h1>
@@ -54,7 +54,7 @@ export default async function Page({params,searchParams}:{params:Promise<{slug:s
  if(slug[0]==='portal'&&slug[1]==='promotion-points'&&(slug.length===2||slug.length===3&&['tasks','submit','history'].includes(slug[2]))){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <PromotionPoints screen={slug[2]} taskId={(await searchParams).task} focus={(await searchParams).entry}/>;}
  if(path==='portal/military-ticket'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <MilitaryTicket/>;}
  if(path==='portal/discipline'||path==='command/discipline'){const u=await viewer(await headers());if(!u)redirect('/login');if(u.mustChangePassword)redirect('/cabinet');return <Discipline staff={path==='command/discipline'}/>;}
- if(path==='cabinet'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword} overview={u.mustChangePassword?null:<ServiceTablet user={u}/>}/>;}
+ if(path==='cabinet'){const u=await viewer(await headers());if(!u)redirect('/login');return <Personal mustChangePassword={u.mustChangePassword} overview={u.mustChangePassword?null:<ServiceTablet user={u} historyPage={Math.min(10000,Math.max(1,Number.parseInt((await searchParams).historyPage??'1',10)||1))}/>}/>;}
  if(slug[0]==='portal'&&slug.length===2&&Object.hasOwn(portalPreviews,slug[1])){
   const section=slug[1];
   const user=await viewer(await headers());

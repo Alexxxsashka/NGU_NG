@@ -6,7 +6,7 @@ type Learning={id:string;title:string;status:string|null};
 type Change={id:string;date:string;label:string;detail:string|null;author:string|null;reason:string|null};
 type Report={id:string;number:string;week:string;reason:string|null};
 
-export async function loadCabinetActivity(userId:string,today:string){
+export async function loadCabinetActivity(userId:string,today:string,historyPage=1){
  const [requests,learning,event,reports,history,promotionClarifications]=await Promise.all([
   query<{value:Entry}>(`SELECT value FROM settings WHERE key LIKE 'service-entry:%' AND value->>'module'='requests'
    AND value->>'author'=$1 AND value->>'status' IN ('approved','rejected','clarification')
@@ -28,6 +28,8 @@ export async function loadCabinetActivity(userId:string,today:string){
    ORDER BY r.submitted_at DESC,r.id LIMIT 5`,[userId]),
   query<Change>(`SELECT a.id,a.created_at AS date, author.name AS author, nullif(a.reason,'') AS reason,
     CASE WHEN a.action='service.training.result' THEN 'Результат КМБ'
+         WHEN a.action='personnel.correction' THEN 'Виправлення особової справи'
+         WHEN a.action='personnel.joined-on.verify' THEN 'Підтвердження дати вступу'
          WHEN a.action='service.request.applied' THEN a.after->>'title'
          WHEN a.action='personnel.record' THEN CASE a.after->>'action' WHEN 'promote' THEN 'Підвищення' WHEN 'demote' THEN 'Пониження' WHEN 'admit' THEN 'Прийняття до НГУ' WHEN 'dismiss' THEN 'Звільнення з НГУ' ELSE 'Переведення' END
          WHEN a.action='unit.transfer' THEN 'Переведення до підрозділу'
@@ -45,13 +47,13 @@ export async function loadCabinetActivity(userId:string,today:string){
    LEFT JOIN units unit ON unit.id::text=a.after->>'unitId'
    LEFT JOIN ranks rank ON rank.id::text=a.after->>'rank'
    WHERE (a.action='service.training.result' AND a.after->>'member'=$1)
-   OR (a.action IN ('personnel.assign','personnel.save','unit.assignment','unit.member.grant','unit.member.revoke','unit.transfer','unit.command','personnel.record','service.request.applied')
+   OR (a.action IN ('personnel.assign','personnel.save','unit.assignment','unit.member.grant','unit.member.revoke','unit.transfer','unit.command','personnel.record','personnel.correction','personnel.joined-on.verify','service.request.applied')
     AND EXISTS(SELECT 1 FROM personnel p WHERE p.user_id=$1 AND p.id::text=a.entity_id))
-   ORDER BY a.created_at DESC,a.id DESC LIMIT 25`,[userId]),
+   ORDER BY a.created_at DESC,a.id DESC LIMIT 26 OFFSET $2`,[userId,(historyPage-1)*25]),
   query<{id:string;title:string;reason:string|null}>(`SELECT coalesce(value->>'reportId',value->>'id') AS id,
    value->>'title' AS title,value->>'reason' AS reason FROM settings
    WHERE key LIKE 'promotion-credit:%' AND value->>'userId'=$1 AND value->>'status'='clarification'
    ORDER BY value->>'createdAt',key LIMIT 5`,[userId]),
  ]);
- return {requests:requests.map(row=>row.value),learning,event:event[0]?.value,reports,history,promotionClarifications};
+ return {requests:requests.map(row=>row.value),learning,event:event[0]?.value,reports,history:history.slice(0,25),hasMoreHistory:history.length>25,promotionClarifications};
 }

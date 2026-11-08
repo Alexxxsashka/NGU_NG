@@ -1,3 +1,5 @@
+import {promotionProgress} from './promotion-points';
+import {promotionChecklist,type Requirement} from './promotion-checklist';
 import 'server-only';
 import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
@@ -19,6 +21,7 @@ const absenceTypes=['IC-відгул','OOC-відпустка','Відпустк
 const requestTypes=['Переведення','Вступ до підрозділу','IC-відгул','OOC-відпустка','Відпустка','Вступ або поновлення','Звільнення або оскарження','Звільнення','Виправлення особової справи'] as const;
 const correction=z.discriminatedUnion('field',[
  z.object({field:z.literal('joinedOn'),value:z.iso.date()}),
+ z.object({field:z.literal('bio'),value:z.string().trim().max(500)}),
  z.object({field:z.literal('callsign'),value:z.string().trim().min(1).max(40)}),
 ]);
 const operation=z.discriminatedUnion('kind',[
@@ -28,7 +31,7 @@ const operation=z.discriminatedUnion('kind',[
  z.object({kind:z.literal('cancel-absence'),id:uuid}),
  z.object({kind:z.literal('decide'),id:uuid,status:z.enum(['approved','rejected','clarification']),side:z.enum(['source','destination']).optional(),body}),
  z.object({kind:z.literal('publish'),module:moduleSchema.exclude(['requests']),unit:uuid,title,body,
-  url:z.url({protocol:/^https$/}).max(2048).refine(value=>{const link=new URL(value);return !link.username&&!link.password;}).optional(),date:z.iso.date().optional(),revision:title.optional(),category:title.optional(),replaces:uuid.optional(),draft:z.boolean().optional(),requiresProof:z.boolean().optional(),responsible:title.optional()}),
+  url:z.url({protocol:/^https$/}).max(2048).refine(value=>{const link=new URL(value);return !link.username&&!link.password;}).optional(),date:z.iso.date().optional(),revision:title.optional(),category:title.optional(),replaces:uuid.optional(),draft:z.boolean().optional(),requiresProof:z.boolean().optional(),responsible:title.optional(),requirementId:uuid.optional()}),
  z.object({kind:z.literal('resubmit'),id:uuid,body,links:z.array(evidence).max(20).default([])}),
  z.object({kind:z.literal('apply'),id:uuid,rank:z.number().int().positive().optional()}),
  z.object({kind:z.literal('transfer'),id:uuid}),
@@ -45,7 +48,7 @@ type Entry={
  id:string;module:ServiceModule;unit:string|null;author:string;name:string;title:string;body:string;createdAt:string;
  correction?:z.infer<typeof correction>&{previous:string|null;profileId:string};orderId?:string;reportId?:string;
  transferApprovals?:Partial<Record<'source'|'destination',{actorId:string;name:string;at:string;body:string}>>;
- post?:string;replacement?:string;recruitmentRequirements?:ReturnType<typeof recruitmentRequirements>;recruitmentRules?:string;targetUnit?:string;from?:string;to?:string;links?:string[];replies?:{body:string;links:string[];at:string}[];url?:string;date?:string;revision?:string;category?:string;replaces?:string;draft?:boolean;requiresProof?:boolean;responsible?:string;appliedAt?:string;status?:'pending'|'approved'|'rejected'|'clarification'|'cancelled';decision?:string;decidedBy?:string;decidedAt?:string;archived?:boolean;
+ requirementId?:string;post?:string;replacement?:string;recruitmentRequirements?:ReturnType<typeof recruitmentRequirements>;recruitmentRules?:string;targetUnit?:string;from?:string;to?:string;links?:string[];replies?:{body:string;links:string[];at:string}[];url?:string;date?:string;revision?:string;category?:string;replaces?:string;draft?:boolean;requiresProof?:boolean;responsible?:string;appliedAt?:string;status?:'pending'|'approved'|'rejected'|'clarification'|'cancelled';decision?:string;decidedBy?:string;decidedAt?:string;archived?:boolean;
 };
 const prefix='service-entry:';
 
@@ -66,7 +69,7 @@ export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:s
  const personalUnit=membership[0]?.unit_id;
  const readUnits=unitId?units.map(unit=>unit.id):personalUnit?[personalUnit]:[];
  const editors=units.filter(unit=>unit.editor).map(unit=>unit.id);
- const [rows,people,results,targets,attendance,authority,absences,ranks,drafts]=await Promise.all([
+ const [rows,people,results,targets,attendance,authority,absences,ranks,drafts,requirements]=await Promise.all([
   query<{value:Entry}>(`SELECT value FROM settings WHERE key LIKE 'service-entry:%' AND value->>'module'=$1
    AND (($5::boolean AND $1='requests' AND value->>'author'=$2) OR value->>'unit'=ANY($3::text[]) OR value->>'targetUnit'=ANY($4::text[]) OR ($5::boolean AND $1='orders' AND EXISTS(
     SELECT 1 FROM settings report WHERE report.key='service-entry:'||(settings.value->>'reportId')
@@ -92,8 +95,9 @@ export async function serviceWorkspace(actor:Viewer,module:ServiceModule,focus:s
   module==='requests'&&unitId?query<{id:number;name:string}>('SELECT id,name FROM ranks ORDER BY id'):[],
   module==='requests'&&!unitId?query<{value:ServiceDraft}>(`SELECT value FROM settings WHERE key LIKE 'service-draft:%'
    AND value->>'author'=$1 ORDER BY value->>'at' DESC LIMIT 50`,[actor.id]):[],
+  module==='calendar'&&editors.length?query<{value:Requirement}>("SELECT value FROM settings WHERE key LIKE 'promotion-requirement:%' ORDER BY value->>'title'"):[],
  ]);
- return {units,entries:rows.map(({value})=>value),people,results:results.map(({value})=>value),trainingUnit,absences,drafts:drafts.map(row=>row.value),targets:targets.map(unit=>({...unit,rules:unit.rules??defaultRecruitment(unit.name)})),ranks,attendance:attendance.map(row=>row.value),memberUnit:personalUnit,canTransfer:actor.role==='admin'||authority.length>0,actorId:actor.id,admin:actor.role==='admin'};
+ return {units,entries:rows.map(({value})=>value),people,results:results.map(({value})=>value),trainingUnit,absences,requirements:requirements.map(row=>row.value),drafts:drafts.map(row=>row.value),targets:targets.map(unit=>({...unit,rules:unit.rules??defaultRecruitment(unit.name)})),ranks,attendance:attendance.map(row=>row.value),memberUnit:personalUnit,canTransfer:actor.role==='admin'||authority.length>0,actorId:actor.id,admin:actor.role==='admin'};
 }
 
 export async function changeServiceWorkspace(actor:Viewer,input:unknown){
@@ -187,6 +191,8 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
     if(action.type==='Вступ або поновлення'&&(!action.targetUnit||!(await c.query('SELECT 1 FROM units WHERE id=$1 AND active',[action.targetUnit])).rowCount))
      throw new HttpError('Оберіть підрозділ для вступу.');
    }
+   if(action.kind==='publish'&&action.requirementId&&(action.module!=='calendar'||!(await c.query('SELECT 1 FROM settings WHERE key=$1',['promotion-requirement:'+action.requirementId])).rowCount))
+    throw new HttpError('Оберіть чинний норматив для події.');
    if(action.kind==='publish'&&action.module==='calendar'&&!action.date)throw new HttpError('Вкажіть дату події.');
    if(action.kind==='publish'&&action.replaces){
     const {rows:[previous]}=await c.query<{value:Entry}>('SELECT value FROM settings WHERE key=$1 FOR UPDATE',[prefix+action.replaces]);
@@ -202,7 +208,7 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    const id=randomUUID();
    const entry:Entry={id,module:action.kind==='request'?'requests':action.module,unit:action.kind==='request'?(action.type==='Вступ до підрозділу'?null:account.unit_id??previousUnit??null):action.unit,
     author:actor.id,name:actor.name,title:action.kind==='request'?action.type:action.title,body:action.body,createdAt:new Date().toISOString(),
-    ...(action.kind==='request'?{status:'pending' as const,correction:proposed,recruitmentRequirements:requirements,recruitmentRules,targetUnit:['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(action.type)?action.targetUnit:undefined,from:action.from,to:action.to,post:action.type==='IC-відгул'?action.post:undefined,replacement:action.type==='IC-відгул'?action.replacement:undefined,links:action.links}:{url:action.url,date:action.date,revision:action.revision,category:action.category,replaces:action.replaces,draft:action.draft,requiresProof:action.requiresProof,responsible:action.responsible})};
+    ...(action.kind==='request'?{status:'pending' as const,correction:proposed,recruitmentRequirements:requirements,recruitmentRules,targetUnit:['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(action.type)?action.targetUnit:undefined,from:action.from,to:action.to,post:action.type==='IC-відгул'?action.post:undefined,replacement:action.type==='IC-відгул'?action.replacement:undefined,links:action.links}:{url:action.url,date:action.date,revision:action.revision,category:action.category,replaces:action.replaces,draft:action.draft,requiresProof:action.requiresProof,responsible:action.responsible,requirementId:action.requirementId})};
    await write(prefix+id,entry);
    await audit(c,actor,'service.'+action.kind,id,null,entry);
    if(action.kind==='request'&&action.draftId)await c.query('DELETE FROM settings WHERE key=$1',['service-draft:'+action.draftId]);
@@ -342,6 +348,21 @@ export async function changeServiceWorkspace(actor:Viewer,input:unknown){
    if(!tracking&&['present','absent'].includes(previous?.value?.status))throw new HttpError('Відвідування вже зафіксовано.',409);
    const next={entry:entry.id,unit:entry.unit,member,status:action.status};
    await write(key,next);
+   if(tracking&&entry.requirementId){
+    const {profile}=await promotionProgress(member!,c);
+    if(profile){
+     const confirmationKey='promotion-confirmation:'+profile.id+':'+profile.cycle+':'+entry.requirementId;
+     const {rows:[before]}=await c.query('SELECT value FROM settings WHERE key=$1',[confirmationKey]);
+     if(action.status==='present'&&!before&&(await promotionChecklist(profile,c)).some(item=>item.rule.id===entry.requirementId)){
+      const confirmation={id:randomUUID(),source:'/portal/calendar?entry='+entry.id,at:new Date().toISOString(),by:actor.id,eventId:entry.id};
+      await write(confirmationKey,confirmation);
+      await audit(c,actor,'promotion.requirement.attendance',profile.id,null,confirmation);
+     }else if(action.status==='absent'&&before?.value.eventId===entry.id){
+      await c.query('DELETE FROM settings WHERE key=$1',[confirmationKey]);
+      await audit(c,actor,'promotion.requirement.attendance',profile.id,before.value,null);
+     }
+    }
+   }
    await audit(c,actor,'service.attendance',entry.id,previous?.value??null,next);
   }else if(action.kind==='publish-draft'){
    if(!canEdit||!entry.draft)throw new HttpError('Публікація чернетки недоступна.',403);
