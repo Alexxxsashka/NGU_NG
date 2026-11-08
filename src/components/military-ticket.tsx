@@ -1,4 +1,5 @@
 'use client';
+import {ChoiceGrid} from './choice-grid';
 import {IllustratedSummary} from './illustrated-summary';
 import {useState,type FormEvent} from 'react';
 import type {militaryTickets} from '@/lib/military-ticket';
@@ -22,7 +23,7 @@ export function MilitaryTicket({unitId}:{unitId?:string}){
   <h1>Військовий квиток НГУ</h1>
   {(error||message)&&<Notice error>{error||message}</Notice>}
   {!data&&!error&&<Loading/>}
-  {unitId&&data&&<Field label="Боєць"><select value={selected} onChange={event=>setSelected(event.target.value)}><option value="">Оберіть профіль</option>{data.profiles.map(item=><option key={item.id} value={item.id}>{item.name} · {item.static_id}</option>)}</select></Field>}
+  {unitId&&data&&<Field label="Боєць"><ChoiceGrid value={selected} onChange={event=>setSelected(event.target.value)}><option value="">Оберіть профіль</option>{data.profiles.map(item=><option key={item.id} value={item.id}>{item.name} · {item.static_id}</option>)}</ChoiceGrid></Field>}
   {data&&!unitId&&!person&&<p>Кадровий профіль ще недоступний.</p>}
   {person&&<>
    <p>{ticket?.issued?'Квиток видано':person.ready?'Готовий до видачі':ticket?'У процесі':'Програму ще не призначено'}</p>
@@ -40,7 +41,7 @@ export function MilitaryTicket({unitId}:{unitId?:string}){
       program:f.get('program'),course:f.has('course'),rankFive:f.has('rankFive'),external:f.has('external'),orientation:f.has('orientation'),oath:f.has('oath'),
       ...Object.fromEntries(['lectures','assessments','exercises'].map(key=>[key,String(f.get(key)??'').split(/\r?\n/).map(line=>line.trim()).filter(Boolean)])),
      }}))}>
-      <Field label="Програма"><select name="program" defaultValue={ticket?.program??'kmb'}><option value="kmb">КМБ</option><option value="ukmb">УКМБ</option></select></Field>
+      <Field label="Програма"><ChoiceGrid name="program" defaultValue={ticket?.program??'kmb'}><option value="kmb">КМБ</option><option value="ukmb">УКМБ</option></ChoiceGrid></Field>
       <fieldset><legend>КМБ</legend><label className="checkbox"><input type="checkbox" name="course" defaultChecked={ticket?.course}/>Курс і нормативи завершені</label><label className="checkbox"><input type="checkbox" name="rankFive" defaultChecked={ticket?.rankFive}/>Отримання 5-го звання звірено з кадровим записом</label></fieldset>
       <fieldset><legend>УКМБ</legend>
        <label className="checkbox"><input type="checkbox" name="external" defaultChecked={ticket?.external}/>Належність до іншої держструктури підтверджено</label>

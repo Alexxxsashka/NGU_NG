@@ -1,5 +1,6 @@
 'use client';
-import {useCallback,useEffect,useId,useRef,useState,type ReactNode} from 'react';
+import {Children,isValidElement,useCallback,useEffect,useId,useRef,useState,type ReactNode} from 'react';
+import {ChoiceGrid} from './choice-grid';
 import {RefreshCw,AlertCircle,LoaderCircle} from 'lucide-react';
 export async function api<T>(path:string,body?:unknown):Promise<T>{const response=await fetch('/api/'+path,{method:body===undefined?'GET':'POST',headers:body===undefined?undefined:{'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),cache:'no-store'});const data=await response.json().catch(()=>null);if(!response.ok||data===null)throw new Error(data?.error||data?.message||'Сервер не підтвердив операцію. Спробуйте ще раз.');return data as T;}
 export function useResource<T>(path:string|null){
@@ -13,7 +14,11 @@ export function Notice({children,error=false}:{children:ReactNode;error?:boolean
 export function Refresh({loading,onClick,at}:{loading:boolean;onClick:()=>void;at?:string}){return <div className="refresh"><span>{loading?'Завантаження…':at?'Оновлено о '+at:''}</span><button type="button" className="secondary" onClick={onClick} disabled={loading}><RefreshCw size={16} className={loading?'spin':''}/>Оновити</button></div>;}
 export function Loading(){return <div className="loading" role="status"><LoaderCircle className="spin" size={22}/> Завантажуємо дані…</div>;}
 export function Empty({children}:{children:ReactNode}){return <div className="empty">{children}</div>;}
-export function Field({label,children,wide=false}:{label:string;children:ReactNode;wide?:boolean}){return <label className={wide?'wide':''}><span>{label}</span>{children}</label>;}
+export function Field({label,children,wide=false}:{label:string;children:ReactNode;wide?:boolean}){
+ if(Children.toArray(children).some(child=>isValidElement(child)&&child.type===ChoiceGrid))
+  return <fieldset className={'choice-field '+(wide?'wide':'')}><legend>{label}</legend>{children}</fieldset>;
+ return <label className={wide?'wide':''}><span>{label}</span>{children}</label>;
+}
 export function Modal({title,onClose,children,className}:{title:string;onClose:()=>void;children:ReactNode;className?:string}){
   const titleId=useId();
   const ref=useRef<HTMLDialogElement>(null);useEffect(()=>{ref.current?.showModal();},[]);

@@ -1,4 +1,5 @@
 'use client';
+import {ChoiceGrid} from './choice-grid';
 import {DecisionTemplate,wantsNext} from './decision-template';
 import Link from 'next/link';
 import {useState,type FormEvent} from 'react';
@@ -68,7 +69,7 @@ export function PromotionPoints({unitId,focus,nextHref,taskId,screen='',mode='pe
    </details>}
    {mode==='catalog'&&data.units.length>0&&<section className="panel"><h2>Завдання підрозділів і заохочення</h2>
     <details className="account-action form-disclosure"><IllustratedSummary title="Додати завдання" image="/portal-art/unit-actions/info.webp"/><form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'task',unitId:f.get('unitId')||null,name:f.get('name'),points:Number(f.get('points')),requirements:f.get('requirements')}))}>
-     <Field label="Підрозділ"><select name="unitId">{data.canEditCommon&&<option value="">Спільне для всіх підрозділів</option>}{data.units.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>
+     <Field label="Підрозділ"><ChoiceGrid name="unitId">{data.canEditCommon&&<option value="">Спільне для всіх підрозділів</option>}{data.units.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</ChoiceGrid></Field>
      <Field label="Завдання"><input name="name" required minLength={3} maxLength={120}/></Field>
      <Field label="Балів за виконання"><input name="points" type="number" min={1} max={1000} required/></Field>
      <Field label="Вимоги до доказів і нормативи"><textarea name="requirements" maxLength={1000}/></Field><button disabled={busy}>Створити завдання</button>
@@ -83,7 +84,7 @@ export function PromotionPoints({unitId,focus,nextHref,taskId,screen='',mode='pe
      {(task.unitId||/^[a-f0-9-]{36}$/i.test(task.id))&&<form onSubmit={e=>{if(confirm('Архівувати завдання?'))void save(e,()=>({kind:'archive',id:task.id}));else e.preventDefault();}}><button className="text-button" disabled={busy}>Архівувати</button></form>}
     </details>)}
     <details className="account-action form-disclosure"><IllustratedSummary title="Нарахувати додаткові бали" image="/portal-art/catalog/approval.webp"/><form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'bonus',userId:f.get('userId'),points:Number(f.get('points')),reason:f.get('reason'),links:links(f)}))}>
-     <Field label="Боєць"><select name="userId" required defaultValue=""><option value="">Оберіть бійця</option>{data.people.map(person=><option key={person.id} value={person.id}>{person.name} · {data.units.find(unit=>unit.id===person.unit_id)?.name}</option>)}</select></Field>
+     <Field label="Боєць"><ChoiceGrid name="userId" required defaultValue=""><option value="">Оберіть бійця</option>{data.people.map(person=><option key={person.id} value={person.id}>{person.name} · {data.units.find(unit=>unit.id===person.unit_id)?.name}</option>)}</ChoiceGrid></Field>
      <Field label="Бали"><input name="points" type="number" min={1} max={1000} required/></Field>
      <Field label="Підстава"><textarea name="reason" required minLength={5} maxLength={2000}/></Field>
      <Field label="Докази"><textarea name="links" required placeholder="Одне HTTPS-посилання на рядок"/></Field>
@@ -108,7 +109,7 @@ export function PromotionPoints({unitId,focus,nextHref,taskId,screen='',mode='pe
       <Field label="Додаткові докази"><textarea name="links" required/></Field><button disabled={busy}>Повторно надіслати</button>
      </form>}
      {entry.status==='pending'&&entry.userId!==data.actorId&&editable(entry.unitId)&&<form className="stack narrow" onSubmit={e=>void save(e,f=>({kind:'review',id:entry.id,approve:f.get('decision')==='approve',clarification:f.get('decision')==='clarification',quantity:Number(f.get('quantity')),reason:f.get('reason')}))}>
-      <Field label="Рішення"><select name="decision"><option value="approve">Зарахувати</option><option value="reject">Відхилити</option><option value="clarification">Запросити уточнення</option></select></Field>
+      <Field label="Рішення"><ChoiceGrid name="decision"><option value="approve">Зарахувати</option><option value="reject">Відхилити</option><option value="clarification">Запросити уточнення</option></ChoiceGrid></Field>
       <Field label="Кількість до зарахування"><input name="quantity" type="number" min={1} max={100} step={1} defaultValue={entry.quantity} required/></Field>
       <DecisionTemplate field="reason"/><Field label="Підстава рішення"><textarea name="reason" required minLength={5} maxLength={2000}/></Field>
       <div className="actions"><button disabled={busy}>Зберегти рішення</button>{nextHref&&<button type="submit" data-next="true" className="secondary" disabled={busy}>Зберегти й перейти до наступного</button>}</div>

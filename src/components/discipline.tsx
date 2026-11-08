@@ -1,4 +1,5 @@
 'use client';
+import {ChoiceGrid} from './choice-grid';
 import {IllustratedSummary} from './illustrated-summary';
 import {useState,type FormEvent} from 'react';
 import {annexRules} from '@/lib/discipline-annex';
@@ -30,21 +31,21 @@ export function Discipline({staff=false}:{staff?:boolean}){
   {(error||message)&&<Notice error>{error||message}</Notice>}{!data&&!error&&<Loading/>}
   {staff&&data?.leader&&<details className="account-action form-disclosure"><IllustratedSummary title="Письмове делегування ВСП" image="/portal-art/catalog/approval.webp"/>
    <form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'delegate',person:f.get('person'),unit:f.get('unit'),until:f.get('until'),body:f.get('body')}))}>
-    <Field label="Командир ВСП"><select name="person" required defaultValue=""><option value="">Оберіть профіль</option>{data.people.map(p=><option value={p.id} key={p.id}>{p.name} · {p.static_id}</option>)}</select></Field>
-    <Field label="Підрозділ у межах делегування"><select name="unit" required>{data.units.map(unit=><option value={unit.id} key={unit.id}>{unit.name}</option>)}</select></Field>
+    <Field label="Командир ВСП"><ChoiceGrid name="person" required defaultValue=""><option value="">Оберіть профіль</option>{data.people.map(p=><option value={p.id} key={p.id}>{p.name} · {p.static_id}</option>)}</ChoiceGrid></Field>
+    <Field label="Підрозділ у межах делегування"><ChoiceGrid name="unit" required>{data.units.map(unit=><option value={unit.id} key={unit.id}>{unit.name}</option>)}</ChoiceGrid></Field>
     <Field label="Діє до включно"><input name="until" type="date" required/></Field>
     <Field label="Письмова підстава"><textarea name="body" required minLength={5} maxLength={2000}/></Field>
     <button disabled={busy}>Зберегти делегування</button>
    </form>
    <form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'revoke-delegation',person:f.get('person')}))}>
-    <Field label="Відкликати в профілю"><select name="person" required defaultValue=""><option value="">Оберіть профіль</option>{data.people.map(p=><option value={p.id} key={p.id}>{p.name} · {p.static_id}</option>)}</select></Field>
+    <Field label="Відкликати в профілю"><ChoiceGrid name="person" required defaultValue=""><option value="">Оберіть профіль</option>{data.people.map(p=><option value={p.id} key={p.id}>{p.name} · {p.static_id}</option>)}</ChoiceGrid></Field>
     <button className="secondary" disabled={busy}>Відкликати делегування</button>
    </form>
   </details>}
   {staff&&!!data?.people.length&&<details className="account-action form-disclosure"><IllustratedSummary title="Зафіксувати проступок" image="/portal-art/catalog/checkpoint.webp"/>
    <form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'file',person:f.get('person'),ruleCode:f.get('ruleCode')||undefined,rule:f.get('rule'),body:f.get('body'),links:evidenceLines(String(f.get('links')??''))}))}>
-    <Field label="Боєць"><select name="person" required defaultValue=""><option value="">Оберіть профіль</option>{data.people.map(p=><option value={p.id} key={p.id}>{p.name} · {p.static_id}</option>)}</select></Field>
-    <Field label="Додаток 1"><select name="ruleCode"><option value="">Інша норма</option>{annexRules.map(rule=><option key={rule.code} value={rule.code}>{rule.code} · {rule.title}</option>)}</select></Field>
+    <Field label="Боєць"><ChoiceGrid name="person" required defaultValue=""><option value="">Оберіть профіль</option>{data.people.map(p=><option value={p.id} key={p.id}>{p.name} · {p.static_id}</option>)}</ChoiceGrid></Field>
+    <Field label="Додаток 1"><ChoiceGrid name="ruleCode"><option value="">Інша норма</option>{annexRules.map(rule=><option key={rule.code} value={rule.code}>{rule.code} · {rule.title}</option>)}</ChoiceGrid></Field>
     <Field label="Порушена норма"><input name="rule" required minLength={5} maxLength={2000}/></Field>
     <Field label="Обставини"><textarea name="body" required minLength={5} maxLength={2000}/></Field>
     <Field label="Докази"><textarea name="links" placeholder="Одне HTTPS-посилання на рядок"/></Field><button disabled={busy}>Зареєструвати справу</button>
@@ -56,8 +57,8 @@ export function Discipline({staff=false}:{staff?:boolean}){
    {entry.externalAppeal&&<p>Зовнішня скарга: {entry.externalAppeal.body}</p>}
    {entry.externalDecision&&<p>Зовнішнє рішення: {entry.externalDecision.body}{entry.externalDecision.cancel&&' · Стягнення скасовано'}</p>}
    {entry.own&&entry.decision&&entry.decision.outcome!=='dismiss'&&!entry.externalAppeal&&form(entry.id,'external-appeal','Зареєструвати зовнішню скаргу',undefined,true)}
-   {staff&&data.leader&&entry.externalAppeal&&!entry.externalDecision&&form(entry.id,'external-decision','Зафіксувати зовнішнє рішення',<Field label="Наслідок"><select name="cancel"><option value="no">Залишити чинним</option><option value="yes">Стягнення скасовано зовнішнім рішенням</option></select></Field>,true)}
-   {staff&&data.leader&&!entry.own&&!entry.decision&&entry.annex&&/понижен|звільнен/i.test(entry.annex.sanctions)&&form(entry.id,'personnel-sanction','Застосувати кадрове стягнення',<Field label="Рішення"><select name="outcome">{/понижен/i.test(entry.annex.sanctions)&&<option value="demote">Понизити на один ранг</option>}{/звільнен/i.test(entry.annex.sanctions)&&<option value="dismiss-service">Звільнити зі служби</option>}</select></Field>)}
+   {staff&&data.leader&&entry.externalAppeal&&!entry.externalDecision&&form(entry.id,'external-decision','Зафіксувати зовнішнє рішення',<Field label="Наслідок"><ChoiceGrid name="cancel"><option value="no">Залишити чинним</option><option value="yes">Стягнення скасовано зовнішнім рішенням</option></ChoiceGrid></Field>,true)}
+   {staff&&data.leader&&!entry.own&&!entry.decision&&entry.annex&&/понижен|звільнен/i.test(entry.annex.sanctions)&&form(entry.id,'personnel-sanction','Застосувати кадрове стягнення',<Field label="Рішення"><ChoiceGrid name="outcome">{/понижен/i.test(entry.annex.sanctions)&&<option value="demote">Понизити на один ранг</option>}{/звільнен/i.test(entry.annex.sanctions)&&<option value="dismiss-service">Звільнити зі служби</option>}</ChoiceGrid></Field>)}
    {entry.explanation&&<p>Пояснення: {entry.explanation.body}</p>}
    {entry.decision&&<p>{entry.decision.body}{entry.active&&' · Чинна догана'}</p>}
    {entry.suspension&&<p>Відсторонення до {new Date(entry.suspension.until).toLocaleString('uk-UA',{timeZone:'Europe/Kyiv'})} · {entry.suspension.responsible} · {entry.suspension.body}{entry.suspension.ended&&' · Поновлено: '+entry.suspension.ended.body}</p>}
@@ -73,11 +74,11 @@ export function Discipline({staff=false}:{staff?:boolean}){
     {entry.own&&!entry.appealResult?.cancel&&(!entry.fine.payment||entry.fine.review?.accept===false)&&<form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'submit-payment',id:entry.id,source:f.get('source')}))}>
      <Field label="Доказ сплати до бюджету НГУ"><input name="source" type="url" required/></Field><button disabled={busy}>Подати доказ</button>
     </form>}
-    {staff&&entry.canDecide&&!entry.own&&!entry.appealResult?.cancel&&entry.fine.payment&&!entry.fine.review&&form(entry.id,'review-payment','Перевірити сплату',<Field label="Рішення"><select name="accept"><option value="yes">Підтвердити</option><option value="no">Відхилити</option></select></Field>)}
+    {staff&&entry.canDecide&&!entry.own&&!entry.appealResult?.cancel&&entry.fine.payment&&!entry.fine.review&&form(entry.id,'review-payment','Перевірити сплату',<Field label="Рішення"><ChoiceGrid name="accept"><option value="yes">Підтвердити</option><option value="no">Відхилити</option></ChoiceGrid></Field>)}
    </>}
    {staff&&entry.canDecide&&!entry.own&&!entry.decision&&form(entry.id,'fine','Оформити штраф',<>
-    <Field label="Правова підстава"><select name="rule">{Object.entries(fineRules).map(([rule,info])=><option key={rule} value={rule}>{rule} · {info.title}</option>)}</select></Field>
-    <Field label="Категорія"><select name="category"><option value="lower">Нижча</option><option value="higher">Вища</option></select></Field>
+    <Field label="Правова підстава"><ChoiceGrid name="rule">{Object.entries(fineRules).map(([rule,info])=><option key={rule} value={rule}>{rule} · {info.title}</option>)}</ChoiceGrid></Field>
+    <Field label="Категорія"><ChoiceGrid name="category"><option value="lower">Нижча</option><option value="higher">Вища</option></ChoiceGrid></Field>
     <Field label="Сума в ігрових доларах"><input name="amount" type="number" min={1} step={1} required/></Field>
    </>)}
    {entry.work?.assignment&&<p>Норматив: {entry.work.assignment.body}</p>}
@@ -92,11 +93,11 @@ export function Discipline({staff=false}:{staff?:boolean}){
    {entry.own&&entry.acknowledged&&!entry.appeal&&entry.decision?.outcome!=='dismiss'&&form(entry.id,'appeal','Подати скаргу',undefined,true)}
    {entry.own&&entry.active&&!entry.work&&form(entry.id,'request-work','Рапорт на дострокове зняття')}
    {entry.own&&entry.active&&entry.work?.assignment&&(!entry.work.submission||entry.work.review?.accept===false)&&form(entry.id,'submit-work','Подати виконання',undefined,true)}
-   {staff&&data.leader&&entry.appeal&&!entry.appealResult&&form(entry.id,'resolve-appeal','Розглянути скаргу',<Field label="Рішення"><select name="cancel"><option value="no">Залишити чинним</option><option value="yes">Скасувати</option></select></Field>)}
-   {staff&&entry.canDecide&&!entry.own&&!entry.decision&&form(entry.id,'decide','Зберегти рішення',<Field label="Рішення"><select name="outcome">{Object.entries(outcomes).filter(([key])=>key!=='demote'&&key!=='dismiss-service').map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></Field>)}
+   {staff&&data.leader&&entry.appeal&&!entry.appealResult&&form(entry.id,'resolve-appeal','Розглянути скаргу',<Field label="Рішення"><ChoiceGrid name="cancel"><option value="no">Залишити чинним</option><option value="yes">Скасувати</option></ChoiceGrid></Field>)}
+   {staff&&entry.canDecide&&!entry.own&&!entry.decision&&form(entry.id,'decide','Зберегти рішення',<Field label="Рішення"><ChoiceGrid name="outcome">{Object.entries(outcomes).filter(([key])=>key!=='demote'&&key!=='dismiss-service').map(([key,label])=><option key={key} value={key}>{label}</option>)}</ChoiceGrid></Field>)}
    {staff&&entry.canDecide&&!entry.own&&entry.active&&entry.work&&<>
     {!entry.work.assignment&&form(entry.id,'assign-work','Призначити норматив')}
-    {entry.work.submission&&!entry.work.review&&form(entry.id,'review-work','Перевірити виконання',<Field label="Рішення"><select name="accept"><option value="yes">Прийняти</option><option value="no">Відхилити</option></select></Field>)}
+    {entry.work.submission&&!entry.work.review&&form(entry.id,'review-work','Перевірити виконання',<Field label="Рішення"><ChoiceGrid name="accept"><option value="yes">Прийняти</option><option value="no">Відхилити</option></ChoiceGrid></Field>)}
     {entry.work.review?.accept&&form(entry.id,'lift','Оформити дострокове зняття')}
    </>}
   </details>)}

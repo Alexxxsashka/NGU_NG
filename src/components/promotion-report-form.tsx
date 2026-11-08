@@ -1,4 +1,5 @@
 'use client';
+import {ChoiceGrid} from './choice-grid';
 import {useEffect,useState,type FormEvent} from 'react';
 import {Plus,Trash2} from 'lucide-react';
 import {evidenceLines} from '@/lib/report-limits';
@@ -59,11 +60,11 @@ export function PromotionReportForm({tasks,onSaved,actorId,selectedTaskId}:{acto
     return <div className="task-entry" key={row.id}>
     <div className="section-heading"><strong>Завдання {index+1}</strong>{rows.length>1&&<button type="button" className="text-button danger" disabled={busy} onClick={()=>setRows(current=>current.filter(item=>item.id!==row.id))}><Trash2 size={16}/>Видалити</button>}</div>
     <div className="task-fields">
-     <Field label="Завдання"><select required value={row.taskId} disabled={busy} onChange={e=>update(row.id,{taskId:e.target.value})}>
+     <Field label="Завдання"><ChoiceGrid required value={row.taskId} disabled={busy} onChange={e=>update(row.id,{taskId:e.target.value})}>
       <option value="">Оберіть завдання</option>
       {row.taskId&&!tasks.some(task=>task.id===row.taskId)&&<option value={row.taskId} disabled>Завдання більше недоступне</option>}
       {[['Спільні',false],['Мій підрозділ',true]].map(([label,unit])=><optgroup key={String(label)} label={String(label)}>{tasks.filter(task=>Boolean(task.unitId)===unit).map(task=><option key={task.id} value={task.id}>{task.name} · {task.points} б.</option>)}</optgroup>)}
-     </select></Field>
+     </ChoiceGrid></Field>
      <Field label="Кількість"><input type="number" min={1} max={100} step={1} required disabled={busy} value={row.quantity} onChange={e=>update(row.id,{quantity:e.target.value})}/></Field>
     </div>
     {task&&<p className="pill prime">{task.points} б. за виконання · {task.points*Number(row.quantity)} б. за рядок</p>}

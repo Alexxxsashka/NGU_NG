@@ -1,4 +1,5 @@
 'use client';
+import {ChoiceGrid} from './choice-grid';
 import {useEffect,useState} from 'react';
 import Link from 'next/link';
 import {usePathname,useRouter} from 'next/navigation';
@@ -23,8 +24,8 @@ export function WorkspaceSwitch({units,isAdmin,trainingUnitId}:{isAdmin:boolean;
    <Link className="button secondary" aria-current={workspace==='command'?'page':undefined} href={current?'/command/'+current.id+'/overview':'/command'}>Керування підрозділом</Link>
    {isAdmin&&<Link className="button secondary" aria-current={workspace==='admin'?'page':undefined} href="/admin">Адміністрування</Link>}
   </div>
-  {selected&&<label>Підрозділ<select value={selected.id} onChange={event=>router.push('/command/'+event.target.value+'/'+(section==='training'&&event.target.value!==trainingUnitId?'overview':section))}>
+  {selected&&<fieldset className="choice-field"><legend>Підрозділ</legend><ChoiceGrid value={selected.id} onChange={event=>router.push('/command/'+event.target.value+'/'+(section==='training'&&event.target.value!==trainingUnitId?'overview':section))}>
    {units.map(unit=><option value={unit.id} key={unit.id}>{unit.name}</option>)}
-  </select></label>}
+  </ChoiceGrid></fieldset>}
  </div>;
 }

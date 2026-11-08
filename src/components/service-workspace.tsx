@@ -1,4 +1,5 @@
 'use client';
+import {ChoiceGrid} from './choice-grid';
 import {DecisionTemplate,wantsNext} from './decision-template';
 import Link from 'next/link';
 
@@ -78,15 +79,15 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
   {data&&module==='requests'&&unitId&&data.canTransfer&&<details className="account-action profile-action">
    <IllustratedSummary title="Типи й маршрути рапортів" image="/portal-art/catalog/approval.webp"/>
    <div className="account-action-content stack">
-    <Field label="Тип рапорту"><select value={manageTemplate} onChange={event=>setManageTemplate(event.target.value)}><option value="">Новий тип</option>{data.reportTemplates.map(item=><option value={item.id} key={item.id}>{item.title}</option>)}</select></Field>
+    <Field label="Тип рапорту"><ChoiceGrid value={manageTemplate} onChange={event=>setManageTemplate(event.target.value)}><option value="">Новий тип</option>{data.reportTemplates.map(item=><option value={item.id} key={item.id}>{item.title}</option>)}</ChoiceGrid></Field>
     <form key={manageTemplate} className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'report-template',id:manageTemplate||undefined,template:{
      title:f.get('title'),fields:String(f.get('fields')??'').split(/\r?\n/).map(field=>field.trim()).filter(Boolean),
      route:f.get('route'),issueOrder:f.has('issueOrder'),personnelAction:f.get('personnelAction')||undefined,
     }}))}>
      <Field label="Назва"><input name="title" required maxLength={120} defaultValue={selectedTemplate?.title}/></Field>
      <Field label="Обов’язкові поля · одне на рядок"><textarea name="fields" defaultValue={selectedTemplate?.fields.join('\n')}/></Field>
-     <Field label="Хто погоджує"><select name="route" defaultValue={selectedTemplate?.route??'unit'}><option value="unit">Командування підрозділу</option><option value="command">Керуючий склад</option></select></Field>
-     <Field label="Кадрова дія після погодження"><select name="personnelAction" defaultValue={selectedTemplate?.personnelAction??''}><option value="">Без кадрової дії</option>{['Переведення','Вступ або поновлення','Звільнення','Виправлення особової справи','Відпустка'].map(action=><option key={action}>{action}</option>)}</select><small>Кадровий сценарій формує наказ під час застосування рішення.</small></Field>
+     <Field label="Хто погоджує"><ChoiceGrid name="route" defaultValue={selectedTemplate?.route??'unit'}><option value="unit">Командування підрозділу</option><option value="command">Керуючий склад</option></ChoiceGrid></Field>
+     <Field label="Кадрова дія після погодження"><ChoiceGrid name="personnelAction" defaultValue={selectedTemplate?.personnelAction??''}><option value="">Без кадрової дії</option>{['Переведення','Вступ або поновлення','Звільнення','Виправлення особової справи','Відпустка'].map(action=><option key={action}>{action}</option>)}</ChoiceGrid><small>Кадровий сценарій формує наказ під час застосування рішення.</small></Field>
      <label className="checkbox"><input name="issueOrder" type="checkbox" defaultChecked={selectedTemplate?.issueOrder}/>Сформувати наказ після погодження</label>
      <button disabled={busy}>Зберегти тип</button>
     </form>
@@ -96,7 +97,7 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
    <IllustratedSummary title="Умови набору підрозділу" image="/portal-art/unit-actions/info.webp"/>
    <form className="stack account-action-content" onSubmit={event=>void save(event,fields=>({kind:'recruitment',unit:unitId,body:fields.get('rules'),minRank:fields.get('minRank')?Number(fields.get('minRank')):null}))}>
     <Field label="Опис і вимоги до вступу"><textarea name="rules" rows={6} required maxLength={5000} defaultValue={data.targets.find(unit=>unit.id===unitId)?.rules}/></Field>
-    <Field label="Мінімальний ранг (порожньо — базове правило)"><select name="minRank" defaultValue={data.targets.find(unit=>unit.id===unitId)?.requirements.minRank??''}><option value="">Базове правило / не підтверджено</option>{data.ranks.filter(rank=>rank.id<=15).map(rank=><option value={rank.id} key={rank.id}>{rank.id} · {rank.name}</option>)}</select></Field>
+    <Field label="Мінімальний ранг (порожньо — базове правило)"><ChoiceGrid name="minRank" defaultValue={data.targets.find(unit=>unit.id===unitId)?.requirements.minRank??''}><option value="">Базове правило / не підтверджено</option>{data.ranks.filter(rank=>rank.id<=15).map(rank=><option value={rank.id} key={rank.id}>{rank.id} · {rank.name}</option>)}</ChoiceGrid></Field>
     <button disabled={busy}>Зберегти умови</button>
    </form>
   </details>}
@@ -111,7 +112,7 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
       <legend>Тип заявки</legend>
       <div className="request-type-grid">
        {requestType==='Інший рапорт'&&<>
-      <Field label="Тип рапорту"><select name="templateId" required value={templateId} onChange={event=>setTemplateId(event.target.value)}><option value="">Оберіть тип</option>{data.reportTemplates.map(item=><option value={item.id} key={item.id}>{item.title}</option>)}</select></Field>
+      <Field label="Тип рапорту"><ChoiceGrid name="templateId" required value={templateId} onChange={event=>setTemplateId(event.target.value)}><option value="">Оберіть тип</option>{data.reportTemplates.map(item=><option value={item.id} key={item.id}>{item.title}</option>)}</ChoiceGrid></Field>
       {template?.fields.map((label,index)=><Field key={template.id+':'+index} label={label}><textarea name="answer" required={!saveDraft} maxLength={1000} defaultValue={draftRequest?.templateId===template.id?draftRequest.answers?.[index]:undefined}/></Field>)}
      </>}
      {['Переведення','Вступ до підрозділу','IC-відгул','OOC-відпустка','Відпустка','Вступ або поновлення','Звільнення','Звільнення або оскарження','Виправлення особової справи',...(data.reportTemplates.length?['Інший рапорт']:[])].map(type=><label className="request-type" key={type}>
@@ -120,7 +121,7 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
        </label>)}
       </div>
      </fieldset>
-     {['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(requestWorkflow)&&<Field label="Бажаний підрозділ"><select name="targetUnit" defaultValue={draftRequest?.targetUnit} required onChange={event=>setRecruitmentUnit(event.target.value)}><option value="">Оберіть підрозділ</option>{data.targets.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>}
+     {['Переведення','Вступ до підрозділу','Вступ або поновлення'].includes(requestWorkflow)&&<Field label="Бажаний підрозділ"><ChoiceGrid name="targetUnit" defaultValue={draftRequest?.targetUnit} required onChange={event=>setRecruitmentUnit(event.target.value)}><option value="">Оберіть підрозділ</option>{data.targets.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</ChoiceGrid></Field>}
      {requestType==='Вступ до підрозділу'&&recruitmentTarget&&<>
       <p style={{whiteSpace:'pre-line'}}>{recruitmentTarget.rules}</p>
       <p>Мінімальний ранг: {recruitmentTarget.requirements.minRank??'ще не підтверджено'}</p>
@@ -133,24 +134,24 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
      </>}
      {['Відпустка','IC-відгул','OOC-відпустка'].includes(requestWorkflow)&&<div className="form-grid"><Field label="Від"><input name="from" defaultValue={draftRequest?.from} type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field><Field label="До"><input name="to" defaultValue={draftRequest?.to} type={requestType==='IC-відгул'?'datetime-local':'date'} required/></Field></div>}
      {requestWorkflow==='Виправлення особової справи'&&<div className="form-grid">
-      <Field label="Поле"><select name="correctionField" value={correctionField} onChange={event=>setCorrectionField(event.target.value)}><option value="joinedOn">Дата вступу</option><option value="callsign">Позивний</option><option value="bio">Коротко про себе</option></select></Field>
+      <Field label="Поле"><ChoiceGrid name="correctionField" value={correctionField} onChange={event=>setCorrectionField(event.target.value)}><option value="joinedOn">Дата вступу</option><option value="callsign">Позивний</option><option value="bio">Коротко про себе</option></ChoiceGrid></Field>
       <Field label="Нове значення"><input key={correctionField} name="correctionValue" defaultValue={draftRequest?.correction?.field===correctionField?draftRequest.correction.value:undefined} type={correctionField==='joinedOn'?'date':'text'} required maxLength={correctionField==='bio'?500:40}/></Field>
      </div>}
      {requestType==='IC-відгул'&&<div className="form-grid"><Field label="Пост або службове завдання"><input name="post" defaultValue={draftRequest?.post} required maxLength={160}/></Field><Field label="Хто замінить на посту, якщо потрібно"><input name="replacement" defaultValue={draftRequest?.replacement} maxLength={160}/></Field></div>}
      <Field label="Докази"><textarea name="links" defaultValue={draftRequest?.links.join('\n')} placeholder="Одне HTTPS-посилання на рядок"/></Field>
     </>:<>
-     <Field label="Підрозділ"><select name="unit">{editors.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>
+     <Field label="Підрозділ"><ChoiceGrid name="unit">{editors.map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</ChoiceGrid></Field>
      <Field label="Заголовок"><input name="title" maxLength={120} required/></Field>
      {module==='regulations'&&<>
       <Field label="Категорія"><input name="category" maxLength={120} list="document-categories"/><datalist id="document-categories">{categories.map(name=><option key={name} value={name}/>)}</datalist></Field>
-      <Field label="Попередня редакція"><select name="replaces"><option value="">Новий документ</option>{data.entries.filter(entry=>!entry.archived&&!entry.draft&&canEdit(entry.unit)).map(entry=><option key={entry.id} value={entry.id}>{entry.title} · {data.units.find(unit=>unit.id===entry.unit)?.name}</option>)}</select></Field>
+      <Field label="Попередня редакція"><ChoiceGrid name="replaces"><option value="">Новий документ</option>{data.entries.filter(entry=>!entry.archived&&!entry.draft&&canEdit(entry.unit)).map(entry=><option key={entry.id} value={entry.id}>{entry.title} · {data.units.find(unit=>unit.id===entry.unit)?.name}</option>)}</ChoiceGrid></Field>
      </>}
      {['calendar','training'].includes(module)&&<Field label="Відповідальний"><input name="responsible" maxLength={120}/></Field>}
      {module==='training'&&<Field label="Навчальна група"><input name="category" maxLength={120}/></Field>}
      {module==='training'&&<label className="checkbox"><input name="requiresProof" type="checkbox"/>Вимагати докази для зарахування</label>}
      <label className="checkbox"><input name="draft" type="checkbox"/>Зберегти як чернетку</label>
      <p className="muted">Після публікації запис буде доступний учасникам вибраного підрозділу.</p>
-     {module==='calendar'&&<Field label="Норматив підвищення"><select name="requirementId"><option value="">Без прив’язки</option>{data.requirements.map(rule=><option key={rule.id} value={rule.id}>{rule.rank} → {rule.rank+1} · {rule.title}</option>)}</select></Field>}
+     {module==='calendar'&&<Field label="Норматив підвищення"><ChoiceGrid name="requirementId"><option value="">Без прив’язки</option>{data.requirements.map(rule=><option key={rule.id} value={rule.id}>{rule.rank} → {rule.rank+1} · {rule.title}</option>)}</ChoiceGrid></Field>}
      {module==='calendar'&&<Field label="Дата"><input type="date" name="date" required/></Field>}
      {['regulations','orders','lectures'].includes(module)&&<>
       <Field label="Редакція або номер"><input name="revision" maxLength={120}/></Field>
@@ -164,8 +165,8 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
   </details>}
   {module==='regulations'&&data&&<div className="filters">
    <Field label="Пошук документів"><input type="search" value={documentSearch} onChange={e=>setDocumentSearch(e.target.value)}/></Field>
-   <Field label="Категорія"><select value={category} onChange={e=>setCategory(e.target.value)}><option value="">Усі категорії</option>{categories.map(name=><option key={name}>{name}</option>)}</select></Field>
-   <Field label="Стан"><select value={archive?'archive':'current'} onChange={e=>setArchive(e.target.value==='archive')}><option value="current">Чинні редакції</option><option value="archive">Архів</option></select></Field>
+   <Field label="Категорія"><ChoiceGrid value={category} onChange={e=>setCategory(e.target.value)}><option value="">Усі категорії</option>{categories.map(name=><option key={name}>{name}</option>)}</ChoiceGrid></Field>
+   <Field label="Стан"><ChoiceGrid value={archive?'archive':'current'} onChange={e=>setArchive(e.target.value==='archive')}><option value="current">Чинні редакції</option><option value="archive">Архів</option></ChoiceGrid></Field>
   </div>}
   {module==='requests'&&!unitId&&!!data?.drafts.length&&<section className="panel">
    <h2>Мої чернетки рапортів</h2>
@@ -180,9 +181,9 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
     </form>
    </article>)}
   </section>}
-  {module==='requests'&&unitId&&<div className="filters"><Field label="Стан заявки"><select value={requestFilter} onChange={e=>setRequestFilter(e.target.value)}>
+  {module==='requests'&&unitId&&<div className="filters"><Field label="Стан заявки"><ChoiceGrid value={requestFilter} onChange={e=>setRequestFilter(e.target.value)}>
    <option value="">Усі</option>{Object.entries(statusLabels).map(([value,label])=><option value={value} key={value}>{label}</option>)}<option value="applied">Застосовано</option>
-  </select></Field></div>}
+  </ChoiceGrid></Field></div>}
   {visibleEntries?.length===0&&<p>Записів за цим фільтром немає.</p>}
   {data&&visibleEntries?.map(entry=>{
    const ownResult=data.results.find(result=>result.entry===entry.id&&result.member===data.actorId);
@@ -232,11 +233,11 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
     {entry.status&&<p>{statusLabels[entry.status]}{entry.decision?' · '+entry.decision:''}{entry.decidedBy?' · '+entry.decidedBy:''}</p>}
     {entry.status==='pending'&&entry.author!==data.actorId&&(entry.template?.route!=='command'||data.canTransfer)&&(data.admin||canEdit(entry.unit)||canEdit(entry.targetUnit))&&
      <form className="stack" onSubmit={e=>void save(e,f=>({kind:'decide',id:entry.id,status:f.get('status'),side:f.get('side')||undefined,manualVerified:f.has('manualVerified'),body:f.get('body')}))}>
-      {workflow==='Переведення'&&<Field label="Сторона погодження"><select name="side" required defaultValue=""><option value="">Оберіть сторону</option>
+      {workflow==='Переведення'&&<Field label="Сторона погодження"><ChoiceGrid name="side" required defaultValue=""><option value="">Оберіть сторону</option>
        {canEdit(entry.unit)&&<option value="source">Поточний підрозділ</option>}
        {canEdit(entry.targetUnit)&&<option value="destination">Підрозділ призначення</option>}
-      </select></Field>}
-      <Field label="Рішення"><select name="status"><option value="approved">Погодити</option><option value="rejected">Відхилити</option><option value="clarification">Запросити уточнення</option></select></Field>
+      </ChoiceGrid></Field>}
+      <Field label="Рішення"><ChoiceGrid name="status"><option value="approved">Погодити</option><option value="rejected">Відхилити</option><option value="clarification">Запросити уточнення</option></ChoiceGrid></Field>
       {entry.title==='Вступ до підрозділу'&&<label className="checkbox"><input type="checkbox" name="manualVerified"/>Ручні вимоги та докази перевірено</label>}
       <DecisionTemplate field="body"/><Field label="Пояснення"><textarea name="body" required maxLength={5000}/></Field>
       <div className="actions"><button disabled={busy}>Зберегти рішення</button>{nextHref&&<button type="submit" data-next="true" className="secondary" disabled={busy}>Зберегти й перейти до наступного</button>}</div>
@@ -248,7 +249,7 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
     {unitId&&entry.author!==data.actorId&&entry.status==='approved'&&!entry.appliedAt&&
      ((workflow==='Вступ або поновлення'&&canEdit(entry.targetUnit))||(['Відпустка','Звільнення'].includes(workflow)&&canEdit(entry.unit)))&&
      <form className="stack narrow" onSubmit={e=>{if(confirm('Застосувати погоджене рішення?'))void save(e,f=>({kind:'apply',id:entry.id,rank:f.get('rank')?Number(f.get('rank')):undefined}));else e.preventDefault();}}>
-      {workflow==='Вступ або поновлення'&&<Field label="Початкове звання"><select name="rank" required defaultValue=""><option value="">Оберіть звання</option>{data.ranks.map(rank=><option key={rank.id} value={rank.id}>{rank.name}</option>)}</select></Field>}
+      {workflow==='Вступ або поновлення'&&<Field label="Початкове звання"><ChoiceGrid name="rank" required defaultValue=""><option value="">Оберіть звання</option>{data.ranks.map(rank=><option key={rank.id} value={rank.id}>{rank.name}</option>)}</ChoiceGrid></Field>}
       <button disabled={busy}>Застосувати рішення</button>
      </form>}
     {unitId&&data.canTransfer&&entry.author!==data.actorId&&workflow==='Переведення'&&entry.status==='approved'&&!entry.appliedAt&&<form onSubmit={e=>{
@@ -264,8 +265,8 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
      {canEdit(entry.unit)&&<details className="account-action form-disclosure"><IllustratedSummary title={'Участь і відвідування ('+attendance.filter(row=>row.status==='confirmed'||row.status==='present').length+')'} image="/portal-art/cabinet/calendar.webp"/>
       <ul>{roster.map(person=><li key={person.id}>{person.name} · {({confirmed:'підтверджено',declined:'відмова',present:'присутній',absent:'відсутній'} as Record<string,string>)[attendance.find(row=>row.member===person.id)?.status??'']||'без відповіді'}</li>)}</ul>
       {entry.date<=today&&<form className="stack" onSubmit={e=>void save(e,f=>({kind:'attendance',id:entry.id,member:f.get('member'),status:f.get('status')}))}>
-       <Field label="Боєць"><select name="member" required><option value="">Оберіть бійця</option>{roster.map(person=><option key={person.id} value={person.id}>{person.name}</option>)}</select></Field>
-       <Field label="Відвідування"><select name="status"><option value="present">Присутній</option><option value="absent">Відсутній</option></select></Field>
+       <Field label="Боєць"><ChoiceGrid name="member" required><option value="">Оберіть бійця</option>{roster.map(person=><option key={person.id} value={person.id}>{person.name}</option>)}</ChoiceGrid></Field>
+       <Field label="Відвідування"><ChoiceGrid name="status"><option value="present">Присутній</option><option value="absent">Відсутній</option></ChoiceGrid></Field>
        <button disabled={busy}>Записати відвідування</button>
       </form>}
      </details>}
@@ -281,15 +282,15 @@ export function ServiceWorkspace({module,focus,nextHref,unitId}:{module:ServiceM
     </p>)}
     {module==='training'&&<p>{ownResult?.status==='passed'?'Зараховано':ownResult?.status==='retry'?'Потрібно повторити':'Результат ще не внесено'}</p>}
     {module==='training'&&!entry.draft&&canEdit(entry.unit)&&entry.unit===data.trainingUnit&&<form className="stack" onSubmit={e=>void save(e,f=>({kind:'enroll',id:entry.id,member:f.get('member')}))}>
-     <Field label="Призначити етап бійцю"><select name="member" required defaultValue=""><option value="">Оберіть бійця</option>{data.people.filter(person=>!data.results.some(row=>row.entry===entry.id&&row.member===person.id)).map(person=><option key={person.id} value={person.id}>{person.name}</option>)}</select></Field>
+     <Field label="Призначити етап бійцю"><ChoiceGrid name="member" required defaultValue=""><option value="">Оберіть бійця</option>{data.people.filter(person=>!data.results.some(row=>row.entry===entry.id&&row.member===person.id)).map(person=><option key={person.id} value={person.id}>{person.name}</option>)}</ChoiceGrid></Field>
      <button disabled={busy}>Призначити етап</button>
     </form>}
     {module==='training'&&!entry.draft&&canEdit(entry.unit)&&<form className="stack" onSubmit={e=>void save(e,f=>({kind:'result',id:entry.id,member:f.get('member'),status:f.get('status'),note:f.get('note')}))}>
-     <Field label="Боєць"><select name="member" required><option value="">Оберіть бійця</option>{data.people.filter(person=>(person.unit===entry.unit||data.results.some(row=>row.entry===entry.id&&row.member===person.id))).map(person=>{
+     <Field label="Боєць"><ChoiceGrid name="member" required><option value="">Оберіть бійця</option>{data.people.filter(person=>(person.unit===entry.unit||data.results.some(row=>row.entry===entry.id&&row.member===person.id))).map(person=>{
       const result=data.results.find(row=>row.entry===entry.id&&row.member===person.id);
       return <option key={person.id} value={person.id}>{person.name}{result?(result.status==='passed'?' · зараховано':result.status==='retry'?' · повторити':' · призначено'):''}</option>;
-     })}</select></Field>
-     <Field label="Результат"><select name="status"><option value="passed">Зараховано</option><option value="retry">Повторити</option></select></Field>
+     })}</ChoiceGrid></Field>
+     <Field label="Результат"><ChoiceGrid name="status"><option value="passed">Зараховано</option><option value="retry">Повторити</option></ChoiceGrid></Field>
      <Field label="Рекомендація"><textarea name="note" maxLength={2000}/></Field><button disabled={busy}>Зберегти результат</button>
     </form>}
     {module!=='requests'&&!entry.archived&&!entry.reportId&&canEdit(entry.unit)&&<form onSubmit={e=>{if(confirm('Архівувати запис?'))void save(e,()=>({kind:'archive',id:entry.id}));else e.preventDefault();}}>

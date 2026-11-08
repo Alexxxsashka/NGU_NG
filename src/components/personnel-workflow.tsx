@@ -1,5 +1,6 @@
 'use client';
 
+import {ChoiceGrid} from './choice-grid';
 import {DecisionTemplate,wantsNext} from './decision-template';
 import Link from 'next/link';
 import {promotionRankName} from '@/lib/promotion-rules';
@@ -45,19 +46,19 @@ export function PersonnelWorkflow({unitId,focus,nextHref,mode='personal'}:{unitI
    <h2>Нормативи підвищення</h2>
    {data.units.some(unit=>unit.appoint)&&<details className="account-action form-disclosure"><IllustratedSummary title="Звірити дату старого підвищення" image="/portal-art/unit-actions/archive.webp"/>
     <form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'reconcile-promotion',userId:f.get('userId'),at:f.get('at')?new Date(String(f.get('at'))).toISOString():null,...proof(f)}))}>
-     <Field label="Боєць"><select name="userId" required defaultValue=""><option value="">Оберіть бійця</option>{data.people.filter(person=>person.active&&person.unit_id===unitId).map(person=><option key={person.id} value={person.id}>{person.name} · {person.static_id}</option>)}</select></Field>
+     <Field label="Боєць"><ChoiceGrid name="userId" required defaultValue=""><option value="">Оберіть бійця</option>{data.people.filter(person=>person.active&&person.unit_id===unitId).map(person=><option key={person.id} value={person.id}>{person.name} · {person.static_id}</option>)}</ChoiceGrid></Field>
      <Field label="Дата й час у часовому поясі пристрою"><input type="datetime-local" name="at"/><small>Порожнє поле позначає невідому дату й блокує підвищення до звірки.</small></Field>
      <Proof/><button disabled={busy}>Зберегти звірку</button>
     </form>
    </details>}
    {data.units.some(unit=>unit.appoint)&&<form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'requirement',rank:Number(f.get('rank')),title:f.get('title'),category:f.get('category')}))}>
-    <Field label="Поточний ранг переходу"><select name="rank">{data.ranks.filter(rank=>rank.id<15).map(rank=><option key={rank.id} value={rank.id}>{rank.id} · {rank.name}</option>)}</select></Field>
-    <Field label="Тип"><select name="category"><option value="standard">Норматив</option><option value="assessment">Атестація</option></select></Field>
+    <Field label="Поточний ранг переходу"><ChoiceGrid name="rank">{data.ranks.filter(rank=>rank.id<15).map(rank=><option key={rank.id} value={rank.id}>{rank.id} · {rank.name}</option>)}</ChoiceGrid></Field>
+    <Field label="Тип"><ChoiceGrid name="category"><option value="standard">Норматив</option><option value="assessment">Атестація</option></ChoiceGrid></Field>
     <Field label="Назва"><input name="title" required minLength={3} maxLength={160}/></Field><button disabled={busy}>Додати вимогу</button>
    </form>}
    {!!data.requirements.length&&<form className="stack narrow" onSubmit={event=>void save(event,f=>({kind:'confirm-requirement',userId:f.get('userId'),id:f.get('id'),source:f.get('source')}))}>
-    <Field label="Боєць"><select name="userId" required defaultValue=""><option value="">Оберіть бійця</option>{data.people.filter(person=>person.active&&person.unit_id===unitId).map(person=><option key={person.id} value={person.id}>{person.name} · {person.static_id}</option>)}</select></Field>
-    <Field label="Вимога"><select name="id">{data.requirements.map(rule=><option key={rule.id} value={rule.id}>{rule.rank} → {rule.rank+1} · {rule.title}</option>)}</select></Field>
+    <Field label="Боєць"><ChoiceGrid name="userId" required defaultValue=""><option value="">Оберіть бійця</option>{data.people.filter(person=>person.active&&person.unit_id===unitId).map(person=><option key={person.id} value={person.id}>{person.name} · {person.static_id}</option>)}</ChoiceGrid></Field>
+    <Field label="Вимога"><ChoiceGrid name="id">{data.requirements.map(rule=><option key={rule.id} value={rule.id}>{rule.rank} → {rule.rank+1} · {rule.title}</option>)}</ChoiceGrid></Field>
     <Field label="Джерело підтвердження"><input type="url" name="source" required/></Field><button disabled={busy}>Підтвердити виконання</button>
    </form>}
   </section>}
@@ -73,7 +74,7 @@ export function PersonnelWorkflow({unitId,focus,nextHref,mode='personal'}:{unitI
        <Link href="/portal/promotion-points">Завдання й бали підвищення</Link>
        {data.progress.restriction&&<Notice>{data.progress.restriction}</Notice>}
        {!!data.progress.checklist.length&&<ul>{data.progress.checklist.map(item=><li key={item.rule.id}>{item.rule.kind==='assessment'?'Атестація':'Норматив'} · {item.rule.title} · {item.confirmation?<a href={item.confirmation.source} target="_blank" rel="noreferrer">Зараховано</a>:'Очікує підтвердження'}</li>)}</ul>}
-       <Field label="Запитуване звання"><select name="rank" required defaultValue=""><option value="">Оберіть вище звання</option>{data.ranks.filter(rank=>rank.id===Number(data.me?.rank)+1&&rankName(rank.id).toLocaleLowerCase('uk')===data.progress.step?.[1].toLocaleLowerCase('uk')).map(rank=><option key={rank.id} value={rank.id}>{rankName(rank.id)}</option>)}</select></Field>
+       <Field label="Запитуване звання"><ChoiceGrid name="rank" required defaultValue=""><option value="">Оберіть вище звання</option>{data.ranks.filter(rank=>rank.id===Number(data.me?.rank)+1&&rankName(rank.id).toLocaleLowerCase('uk')===data.progress.step?.[1].toLocaleLowerCase('uk')).map(rank=><option key={rank.id} value={rank.id}>{rankName(rank.id)}</option>)}</ChoiceGrid></Field>
        <Proof/><button disabled={busy||data.progress.checklist.some(item=>!item.confirmation)||!!data.progress.restriction||!data.progress.step||data.progress.points<data.progress.step[2]}>Надіслати звіт</button>
       </form>:<p>Для подання потрібні активний кадровий профіль, підрозділ і звання.</p>}
      </div>
@@ -94,12 +95,12 @@ export function PersonnelWorkflow({unitId,focus,nextHref,mode='personal'}:{unitI
        rank:needsRank?Number(fd.get('rank')):undefined,unitId:needsUnit?fd.get('unitId'):undefined,qualified:fd.has('qualified'),...proof(fd)}));
       else e.preventDefault();
      }}>
-      <Field label="Кадрова дія"><select value={kind} onChange={e=>{setKind(e.target.value as typeof kind);setTarget('');}}>{Object.entries(actionLabels).filter(([id])=>id!=='transfer'||data.canTransfer).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></Field>
+      <Field label="Кадрова дія"><ChoiceGrid value={kind} onChange={e=>{setKind(e.target.value as typeof kind);setTarget('');}}>{Object.entries(actionLabels).filter(([id])=>id!=='transfer'||data.canTransfer).map(([id,label])=><option key={id} value={id}>{label}</option>)}</ChoiceGrid></Field>
       <Field label="Пошук за ім’ям або Static ID"><input type="search" value={search} onChange={e=>{setSearch(e.target.value);setTarget('');}}/></Field>
-      <Field label="Боєць"><select value={target} required onChange={e=>setTarget(e.target.value)}><option value="">Оберіть зареєстрованого бійця</option>{filtered.map(person=><option key={person.id} value={person.id}>{person.name} · {person.static_id}</option>)}</select></Field>
+      <Field label="Боєць"><ChoiceGrid value={target} required onChange={e=>setTarget(e.target.value)}><option value="">Оберіть зареєстрованого бійця</option>{filtered.map(person=><option key={person.id} value={person.id}>{person.name} · {person.static_id}</option>)}</ChoiceGrid></Field>
       {person&&<p>Поточні дані: {rankName(person.rank)} · {data.units.find(unit=>unit.id===person.unit_id)?.name??'Без підрозділу'}</p>}
-      {needsRank&&<Field label="Нове звання"><select key={kind+target} name="rank" required defaultValue=""><option value="">Оберіть звання</option>{data.ranks.filter(rank=>kind==='admit'||(kind==='promote'?rank.id>(person?.rank??0):rank.id<(person?.rank??0))).map(rank=><option key={rank.id} value={rank.id}>{rankName(rank.id)}</option>)}</select></Field>}
-      {needsUnit&&<Field label="Новий підрозділ"><select name="unitId" required defaultValue=""><option value="">Оберіть підрозділ</option>{(kind==='transfer'?data.destinations:data.units).filter(unit=>kind==='admit'||unit.id!==person?.unit_id).map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</select></Field>}
+      {needsRank&&<Field label="Нове звання"><ChoiceGrid key={kind+target} name="rank" required defaultValue=""><option value="">Оберіть звання</option>{data.ranks.filter(rank=>kind==='admit'||(kind==='promote'?rank.id>(person?.rank??0):rank.id<(person?.rank??0))).map(rank=><option key={rank.id} value={rank.id}>{rankName(rank.id)}</option>)}</ChoiceGrid></Field>}
+      {needsUnit&&<Field label="Новий підрозділ"><ChoiceGrid name="unitId" required defaultValue=""><option value="">Оберіть підрозділ</option>{(kind==='transfer'?data.destinations:data.units).filter(unit=>kind==='admit'||unit.id!==person?.unit_id).map(unit=><option key={unit.id} value={unit.id}>{unit.name}</option>)}</ChoiceGrid></Field>}
       {kind==='promote'&&<label className="checkbox"><input type="checkbox" name="qualified" required/>Нормативи, атестації та перевірки пройдено</label>}
       <Proof/><button disabled={busy||!target}>Застосувати й записати</button>
      </form>
@@ -118,14 +119,14 @@ export function PersonnelWorkflow({unitId,focus,nextHref,mode='personal'}:{unitI
        if(fields.get('decision')==='approve'&&!confirm(report.name+' · ID '+report.staticId+'\nЗвання: '+rankName(report.fromRank)+' → '+rankName(report.rank)+'\nПідстава: '+String(fields.get('reason')??''))){e.preventDefault();return;}
        void save(e,fd=>({kind:'decide',id:report.id,approve:fd.get('decision')==='approve',qualified:fd.has('qualified'),reason:fd.get('reason')}));
       }}>
-       <Field label="Рішення"><select name="decision"><option value="approve">Погодити й застосувати звання</option><option value="reject">Відхилити</option></select></Field>
+       <Field label="Рішення"><ChoiceGrid name="decision"><option value="approve">Погодити й застосувати звання</option><option value="reject">Відхилити</option></ChoiceGrid></Field>
        <DecisionTemplate field="reason"/><Field label="Підстава рішення"><textarea name="reason" required minLength={5} maxLength={3000}/></Field>
        <label className="checkbox"><input type="checkbox" name="qualified"/>Для схвалення підтверджую нормативи, атестації та перевірки</label>
        <div className="actions"><button disabled={busy}>Зберегти рішення</button>{nextHref&&<button type="submit" data-next="true" className="secondary" disabled={busy}>Зберегти й перейти до наступного</button>}</div>
       </form>}
     </details>)}
    </section>}
-   {mode==='audit'&&data.units.length>0&&<section className="panel"><h2>Кадровий аудит</h2><div className="filters"><Field label="ПІБ або Static ID"><input value={auditSearch} onChange={e=>setAuditSearch(e.target.value)}/></Field><Field label="Дія"><select value={auditType} onChange={e=>setAuditType(e.target.value)}><option value="">Усі</option>{Object.entries(actionLabels).map(([id,label])=><option key={id} value={id}>{label}</option>)}</select></Field><Field label="Починаючи з"><input type="date" value={auditDate} onChange={e=>setAuditDate(e.target.value)}/></Field></div>
+   {mode==='audit'&&data.units.length>0&&<section className="panel"><h2>Кадровий аудит</h2><div className="filters"><Field label="ПІБ або Static ID"><input value={auditSearch} onChange={e=>setAuditSearch(e.target.value)}/></Field><Field label="Дія"><ChoiceGrid value={auditType} onChange={e=>setAuditType(e.target.value)}><option value="">Усі</option>{Object.entries(actionLabels).map(([id,label])=><option key={id} value={id}>{label}</option>)}</ChoiceGrid></Field><Field label="Починаючи з"><input type="date" value={auditDate} onChange={e=>setAuditDate(e.target.value)}/></Field></div>
     {!data.history.length&&<p>Кадрових записів поки немає.</p>}
     {data.history.filter(record=>(!auditType||record.after.action===auditType)&&(!auditDate||String(record.created_at).slice(0,10)>=auditDate)&&(record.after.name+' '+record.after.staticId).toLocaleLowerCase('uk').includes(auditSearch.trim().toLocaleLowerCase('uk'))).map(record=><details key={record.id} className="audit-row">
      <summary><strong>{actionLabels[record.after.action as keyof typeof actionLabels]} · {record.after.name} · ID {record.after.staticId}</strong> · {new Date(record.created_at).toLocaleString('uk-UA',{timeZone:'Europe/Kyiv'})}</summary>

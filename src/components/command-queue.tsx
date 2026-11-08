@@ -1,3 +1,4 @@
+import {ChoiceGrid} from './choice-grid';
 import Link from 'next/link';
 import {z} from 'zod';
 import {query} from '@/db';
@@ -60,8 +61,8 @@ export async function CommandQueue({unitId,filters,actorId}:{unitId:string;filte
  return <section id="content" className="panel">
   <h1>Єдина черга підрозділу</h1>
   <form className="filters" action={root+'/queue'}>
-   <label>Тип<select name="kind" defaultValue={kind}><option value="">Усі</option>{Object.entries(kinds).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
-   <label>Стан<select name="state" defaultValue={state}>{Object.entries(states).map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+   <fieldset className="choice-field"><legend>Тип</legend><ChoiceGrid name="kind" defaultValue={kind}><option value="">Усі</option>{Object.entries(kinds).map(([key,label])=><option key={key} value={key}>{label}</option>)}</ChoiceGrid></fieldset>
+   <fieldset className="choice-field"><legend>Стан</legend><ChoiceGrid name="state" defaultValue={state}>{Object.entries(states).map(([key,label])=><option key={key} value={key}>{label}</option>)}</ChoiceGrid></fieldset>
    <label>ПІБ<input type="search" name="person" defaultValue={person} maxLength={100}/></label>
    <label>Подано від<input type="date" name="from" defaultValue={from}/></label>
    <label>Подано до<input type="date" name="to" defaultValue={to}/></label>

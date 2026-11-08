@@ -1,4 +1,5 @@
 'use client';
+import {ChoiceGrid} from './choice-grid';
 import {useState} from 'react';
 import {dateLabel} from '@/lib/domain';
 import type {awardOrders,awardRecipients} from '@/lib/award-register';
@@ -56,7 +57,7 @@ export function AwardRegister(){
     catch(e){setError((e as Error).message);}
     finally{setBusy(false);}
    }}>
-    <Field label="Наказ"><select name="week" required>{resource.data.orders.map(order=><option value={order.week} key={order.week}>{order.number}</option>)}</select></Field>
+    <Field label="Наказ"><ChoiceGrid name="week" required>{resource.data.orders.map(order=><option value={order.week} key={order.week}>{order.number}</option>)}</ChoiceGrid></Field>
     <StaticIdField/>
     <Field label="Різниця, $"><input name="delta" type="number" step="0.01" required/></Field>
     <Field label="Підстава"><textarea name="reason" required minLength={5} maxLength={2000}/></Field>

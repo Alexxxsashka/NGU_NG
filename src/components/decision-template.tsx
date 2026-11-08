@@ -1,4 +1,5 @@
 'use client';
+import {ChoiceGrid} from './choice-grid';
 import {Field} from './ui';
 
 const templates=[
@@ -7,14 +8,13 @@ const templates=[
  'Наданих доказів недостатньо для підтвердження.',
 ];
 export function DecisionTemplate({field}:{field:string}){
- return <Field label="Шаблон відповіді"><select defaultValue="" onChange={event=>{
-  const target=event.currentTarget.form?.elements.namedItem(field);
+ return <Field label="Шаблон відповіді"><ChoiceGrid value="" onChange={event=>{
+  const target=event.currentTarget.closest('form')?.elements.namedItem(field);
   if(event.currentTarget.value&&target instanceof HTMLTextAreaElement)target.value=event.currentTarget.value;
-  event.currentTarget.value='';
  }}>
   <option value="">Оберіть шаблон або напишіть відповідь</option>
   {templates.map(template=><option key={template}>{template}</option>)}
- </select></Field>;
+ </ChoiceGrid></Field>;
 }
 
 export function wantsNext(event:Event){
