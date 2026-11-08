@@ -62,3 +62,28 @@ export async function correctAwardOrder(input:unknown,actor:Viewer){
   return {saved:true};
  });
 }
+
+export function awardRecipients(day:string){
+ return query<{staticId:string;name:string;amount:string;paidAt:string|null;paidBy:string|null}>(`
+  SELECT person->>'staticId' AS "staticId",person->>'name' AS name,person->>'amount' AS amount,
+   payment.value->>'paidAt' AS "paidAt",payment.value->>'paidBy' AS "paidBy"
+  FROM settings orders CROSS JOIN LATERAL jsonb_array_elements(orders.value->'recipients') AS person
+  LEFT JOIN settings payment ON payment.key='award-recipient-paid:'||$2||':'||(person->>'staticId')
+  WHERE orders.key=$1 ORDER BY person->>'name',person->>'staticId'`,['award-order:'+week.parse(day),day]);
+}
+
+export async function markAwardRecipientPaid(input:unknown,actor:Viewer){
+ const p=z.object({week,staticId:z.string().regex(/^[0-9]{1,30}$/)}).parse(input);
+ return transaction(async c=>{
+  await lockAdmin(c,actor);
+  const {rows:[recipient]}=await c.query<{person:{amount:string}}>(`
+   SELECT person FROM settings CROSS JOIN LATERAL jsonb_array_elements(value->'recipients') AS person
+   WHERE key=$1 AND person->>'staticId'=$2`,['award-order:'+p.week,p.staticId]);
+  if(!recipient)throw new HttpError('Цього отримувача немає в наказі.',404);
+  const key='award-recipient-paid:'+p.week+':'+p.staticId;
+  const payment={...p,amount:recipient.person.amount,paidAt:new Date().toISOString(),paidBy:actor.name};
+  const saved=await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT DO NOTHING',[key,JSON.stringify(payment)]);
+  if(saved.rowCount)await audit(c,actor,'award.recipient.paid',key,null,payment);
+  return {saved:true};
+ });
+}

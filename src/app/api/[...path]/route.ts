@@ -19,7 +19,7 @@ import { saveTask,changePeriod,reviewItems,deleteReportItem,adjustAward,saveSett
 import {changeServiceWorkspace,serviceWorkspace} from '@/lib/service-workspace';
 import {serviceModules} from '@/lib/portal-navigation';
 import {finalizeAwards,recalculateAwardWeek} from '@/lib/finalize-awards';
-import {awardOrders,awardPreview,awardBlockers,correctAwardOrder} from '@/lib/award-register';
+import {awardOrders,awardPreview,awardBlockers,awardRecipients,markAwardRecipientPaid,correctAwardOrder} from '@/lib/award-register';
 import {awardOrderDocx,type AwardOrder} from '@/lib/award-order-docx';
 import { updateUnitPage } from '@/lib/unit-page';
 import { assignService,savePersonalServiceDetails } from '@/lib/service-assignment';
@@ -47,6 +47,7 @@ export async function GET(request:Request,ctx:Context){try{
   const u=await admin(request);
   if(path==='admin/award-blockers')return json(await awardBlockers(week.parse(url.searchParams.get('week'))));
   if(path==='admin/award-preview')return json(await awardPreview(week.parse(url.searchParams.get('week'))));
+  if(path==='admin/award-orders/recipients')return json(await awardRecipients(week.parse(url.searchParams.get('week'))));
   if(path==='admin/award-orders')return json(await awardOrders());
   if(path==='admin/award-orders/docx'){
    const [order]=await query<{value:AwardOrder}>('SELECT value FROM settings WHERE key=$1',['award-order:'+week.parse(url.searchParams.get('week'))]);
@@ -80,6 +81,7 @@ export async function POST(request:Request,ctx:Context){try{
   if(path==='me/claims'){const u=await member(request);const p=z.object({staticId}).parse(input);return json(await transaction(async c=>{await lockStaticClaims(c);if((await c.query("SELECT id FROM profile_claims WHERE user_id=$1 AND status='pending'",[u.id])).rows.length)throw new HttpError('У вас уже є заявка на перевірці.');if((await c.query('SELECT id FROM personnel WHERE user_id=$1',[u.id])).rows.length)throw new HttpError('Ваш профіль уже прив’язаний.');await reserveStatic(c,p.staticId,u.id);return {saved:true};}));}
   if(path.startsWith('units/')&&path.split('/').length===2)return json(await updateUnitPage(path.split('/')[1],input,await member(request)));
   const u=await admin(request);
+  if(path==='admin/award-orders/recipients')return json(await markAwardRecipientPaid(input,u));
   if(path==='admin/award-orders/correction')return json(await correctAwardOrder(input,u));
   if(path==='admin/periods/recalculate')return json(await recalculateAwardWeek(input,u));
   if(path==='admin/periods/pay'){
