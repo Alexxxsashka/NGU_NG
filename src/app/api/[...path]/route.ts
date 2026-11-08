@@ -1,3 +1,4 @@
+import {militaryTickets,changeMilitaryTicket} from '@/lib/military-ticket';
 import { z } from 'zod';
 import { MAX_REPORT_BYTES } from '@/lib/report-limits';
 import { query,transaction } from '@/db';
@@ -32,6 +33,7 @@ const json=(data:unknown)=>Response.json(data,{headers:{'Cache-Control':'private
 export async function GET(request:Request,ctx:Context){try{
   const path=(await ctx.params).path.join('/'),url=new URL(request.url);
   if(path.startsWith('service/'))return json(await serviceWorkspace(await member(request),z.enum(serviceModules).parse(path.slice(8)),z.uuid().nullable().parse(url.searchParams.get('entry')),url.searchParams.get('unit')));
+  if(path==='military-ticket')return json(await militaryTickets(await member(request),url.searchParams.get('unit')));
   if(path==='catalog')return json(await getCatalog(week.parse(url.searchParams.get('week')||currentWeek())));
   if(path==='viewer')return json({user:await viewer(request.headers),configured:!!process.env.DATABASE_URL&&!!process.env.AUTH_SECRET&&!!process.env.APP_URL});
   if(path==='personnel-lookup')return json(await lookupPersonnel(await member(request),url.searchParams.get('q'),url.searchParams.get('unit')));
@@ -61,6 +63,7 @@ export async function POST(request:Request,ctx:Context){try{
   const input=await readBody(request,path==='admin/import'?2_500_000:(path==='reports'||path==='me/reports/clarify'||path==='promotion-points')?MAX_REPORT_BYTES:100_000);
   if(path==='promotion-points')return json(await changePromotionPoints(input,await member(request)));
   if(path==='personnel-workflow')return json(await changePersonnelWorkflow(input,await member(request)));
+  if(path==='military-ticket')return json(await changeMilitaryTicket(await member(request),input));
   if(path==='service')return json(await changeServiceWorkspace(await member(request),input));
   if(path==='me/notifications')return json(await markNotifications((await member(request)).id,input));
   if(path==='me/reports/clarify')return json(await clarifyReport(input,await member(request)));

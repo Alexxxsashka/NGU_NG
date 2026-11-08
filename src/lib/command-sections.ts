@@ -9,6 +9,7 @@ export const commandSections=[
  ['catalog','Каталог завдань підвищення','cabinet/training'],
  ['audit','Кадровий аудит','unit-actions/archive'],
  ['calendar','Події й відвідування','cabinet/calendar'],
+ ['military-ticket','Військові квитки','cabinet/training'],
  ['training','Керування КМБ','home/training'],
  ['documents','Редактор документів','cabinet/documents'],
 ] as const;

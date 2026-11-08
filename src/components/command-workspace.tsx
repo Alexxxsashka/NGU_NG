@@ -1,3 +1,4 @@
+import {MilitaryTicket} from './military-ticket';
 import Link from 'next/link';
 import {notFound,redirect} from 'next/navigation';
 import {query} from '@/db';
@@ -46,6 +47,7 @@ export async function CommandWorkspace({actor,unitId,section,filters}:{actor:Vie
   </div>;
  }
  return <><nav className="portal-crumb" aria-label="Шлях до розділу"><Link href={root+'/overview'}>{unit.name}</Link><span>/</span><span>{view[1]}</span></nav>
+  {section==='military-ticket'&&<MilitaryTicket key={unit.id} unitId={unit.id}/>}
   {section==='queue'&&<CommandQueue unitId={unit.id} actorId={actor.id} filters={filters}/>}
   {section==='content'&&<UnitSpace userId={actor.id} unitId={unit.id} mode="content"/>}
   {section==='roster'&&<><UnitSpace userId={actor.id} unitId={unit.id} mode="roster"/><PersonnelWorkflow key={root+'/roster'} unitId={unit.id} mode="record"/></>}

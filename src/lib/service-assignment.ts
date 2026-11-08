@@ -48,7 +48,7 @@ export async function assignService(input:unknown,actor:Viewer){
   `,values);
   const key='service:'+profile.id;
   const {rows:[old]}=await c.query('SELECT value FROM settings WHERE key=$1',[key]);
-  const details={...old?.value,joinedOn:p.joinedOn,position:p.position,leadershipRole:p.leadershipRole,commanderUnitId:unitCommand?p.unitId:null};
+  const details={...old?.value,joinedOn:p.joinedOn,joinedOnVerified:old?.value?.joinedOn===p.joinedOn&&old?.value?.joinedOnVerified===true,position:p.position,leadershipRole:p.leadershipRole,commanderUnitId:unitCommand?p.unitId:null};
   await c.query('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=excluded.value',[key,JSON.stringify(details)]);
   await c.query("UPDATE profile_claims SET status='approved',reason='Кадровий профіль призначено адміністратором',reviewed_by=$1 WHERE user_id=$2 AND static_id::numeric=$3::text::numeric AND status='pending'",[actor.id,p.userId,staticId]);
   await audit(c,actor,'personnel.assign',profile.id,{profile:previous??null,details:old?.value??null},{...p,staticId,details});

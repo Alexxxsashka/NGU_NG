@@ -10,7 +10,7 @@ const shortcuts=[
  ['/portal/promotion-points/submit','Звіт на підвищення','Подати завдання, додати докази й переглянути бали.','unit-actions/rank',ClipboardList],
  ['/my-unit','Мій підрозділ','Склад, новини й службова інформація.','cabinet/unit',Users],
  ['/portal/requests','Службові заявки','Подання заявок і рішення командування.','cabinet/requests',ClipboardList],
- ['/portal/training','КМБ','Етапи підготовки та результати.','cabinet/training',GraduationCap],
+ ['/portal/military-ticket','Військовий квиток','Умови КМБ і УКМБ та стан видачі.','cabinet/training',GraduationCap],
  ['/portal/calendar','Календар','Найближчі заходи підрозділу.','cabinet/calendar',CalendarDays],
  ['/portal/regulations','Документи','Чинні документи й регламенти підрозділу.','cabinet/documents',FileText],
 ] as const;
